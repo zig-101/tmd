@@ -1,0 +1,19 @@
+runtime: python39
+
+default_expiration: "3650d"
+
+handlers:
+- url: /
+  static_files: pages/index.html
+  upload: pages/index.html
+  expiration: "1d"
+
+- url: /static/(.*)
+  static_files: pages/static/\1
+  upload: pages/static/(.*)
+
+- url: /(.*)
+  static_files: pages/\1
+  upload: pages/(.*)
+  expiration: "1d"
+

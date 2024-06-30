@@ -1,0 +1,363 @@
+
+##### Tapir's Markdown Format
+
+Tapir's Markdown (TMD) is an improvement and enhancement of traditional markdown formats.
+
+TMD is also much more specified than traditional markdown.
+
+##======= Demos
+
+##::::::::::::::::::::::::::::::::::::::::::::::::::::
+	Demo 1 (span styles)
+
+TMD source:
+
+'''''
+**bold text** and ^**pale text**.
+
+%%italic text%% and ^%%revert italic text%%.
+
+++larger font size++ and ^++smaller font size++.
+
+spoiler text: ??spoiler text?? (selectable, 
+invisible when unslected, visible when selected),
+
+secure spoiler text: ^??secure spoiler text??
+(selectable, always invisible).
+
+~~deleted text~~ and invisible text:
+^~~invisible text~~ (non-selectable, still occupy space).
+
+||marked text|| and ^||marked text with warning smell||.
+
+$$subscript$$ and ^$$superscript$$.
+
+This is __a self-defined link``https://go101.org__,
+this is __a broken link__,
+and this is ^__underlined text__.
+
+This is a code span: ` var ok = x && y `.
+
+^`text with mono font`.
+'''''
+
+Render result:
+
+!
+{
+**bold text** and ^**pale text**.
+
+%%italic text%% and ^%%revert italic text%%.
+
+++larger font size++ and ^++smaller font size++.
+
+spoiler text: ??spoiler text?? (selectable, 
+invisible when unslected, visible when selected),
+
+secure spoiler text: ^??secure spoiler text??
+(selectable, always invisible).
+
+~~deleted text~~ and invisible text:
+^~~invisible text~~ (non-selectable, still occupy space).
+
+||marked text|| and ^||marked text with warning smell||.
+
+$$subscript$$ and ^$$superscript$$.
+
+This is __a self-defined link``https://go101.org__,
+this is __a broken link__,
+and this is ^__underlined text__.
+
+This is a code span: ` var ok = x && y `.
+
+^`text with mono font`.
+}
+
+##::::::::::::::::::::::::::::::::::::::::::::::::::::
+	Demo 2 (line leading marks)
+
+TMD source:
+
+'''''
+A comment line is between the following two words: foo
+// comment text
+bar.
+
+This block
+\\ is
+\\ line-broken
+\\ several times.
+\\ The following is an image.
+
+:: ./static/image/sample-image.png
+'''''
+
+Render result:
+
+!
+{
+A comment line is between the following two words: foo
+// comment text
+bar.
+
+This block
+\\ is
+\\ line-broken
+\\ several times.
+\\ The following is an image.
+
+:: ./static/image/sample-image.png
+}
+
+##::::::::::::::::::::::::::::::::::::::::::::::::::::
+	Demo 3 (link definitions)
+
+TMD source:
+
+'''''
+////__Go 101 website ``https://go101.org
+
+Visit __Go 101 website__ (the link is defined above).
+
+Go 1.22 broke backwards compatibility. More information
+is on __`for` Loop Semantic Changes in Go 1.22:
+Be Aware of the Impact__ (the link is defined below).
+
+////__for Loop... ``https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+
+__No Safe Efficient Ways to Do Three-way String Comparisons in Go__
+(the link is defined below).
+
+////__...in Go `` https://go101.org/blog/2022-10-01-three-way-string-comparison.html
+'''''
+
+Render result:
+
+!
+{
+////__Go 101 website ``https://go101.org
+
+Visit __Go 101 website__ (the link is defined above).
+
+Go 1.22 broke backwards compatibility. More information
+is on __`for` Loop Semantic Changes in Go 1.22:
+Be Aware of the Impact__ (the link is defined below).
+
+////__for Loop... ``https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+
+__No Safe Efficient Ways to Do Three-way String Comparisons in Go__
+(the link is defined below).
+
+////__...in Go `` https://go101.org/blog/2022-10-01-three-way-string-comparison.html
+}
+
+##::::::::::::::::::::::::::::::::::::::::::::::::::::
+	Demo 4 (built-in containers)
+
+TMD source:
+
+'''''
+* This is a 1st-level list item.
+  -. This is a 2nd-level list item (ordered).
+  -. This is another 2nd-level list item (ordered).
+* This is another 1st-level list item.
+  - This is a 2nd-level list item (unordered).
+  - This is another 2nd-level list item (unordered).
+
+**TMD
+	: a markup language which is much more powerful than traditional markdown.
+
+> This is a quotation text.
+
+! This is a note box without header.
+
+! ## WARNING!
+  {
+  This is a note box with header.
+  }
+
+? This is a disclosure box without summary.
+
+? ## Why TMD?
+  {
+  Because traditional markdown formats have many ambiguities and not powerful enough.
+  }
+'''''
+
+Render result:
+
+!
+{
+* This is a 1st-level list item.
+  -. This is a 2nd-level list item (ordered).
+  -. This is another 2nd-level list item (ordered).
+* This is another 1st-level list item.
+  - This is a 2nd-level list item (unordered).
+  - This is another 2nd-level list item (unordered).
+
+**TMD
+	: a markup language which is much more powerful than traditional markdown.
+
+> This is a quotation text.
+
+! This is a note box without header.
+
+! ## WARNING!
+  {
+  This is a note box with header.
+  }
+
+? This is a disclosure box without summary.
+
+? ## Why TMD?
+  {
+  Because traditional markdown formats have many ambiguities and not powerful enough.
+  }
+}
+
+##::::::::::::::::::::::::::::::::::::::::::::::::::::
+	Demo 5 (atom blocks)
+
+'''''
+####### Header 1
+
+##====== Header 2
+
+##:::::: Header 3
+
+##------ Header 4
+
+This is a usual block. Nothing special.
+
+//// This is a directive block.
+//// We can define links here and specify IDs for blocks.
+
+////==code-snippert-1
+'''zig
+	const std = @import("std");
+	
+	pub fn main() void {
+		std.log.info("TMD, yes!", .{});
+	}
+'''
+'''''
+
+Render result:
+
+!
+{
+####### Header 1
+
+##====== Header 2
+
+##:::::: Header 3
+
+##------ Header 4
+
+This is a usual block. Nothing special.
+
+//// This is a directive block.
+//// We can define links here and specify IDs for blocks.
+
+////==code-snippert-1
+'''zig
+	const std = @import("std");
+	
+	pub fn main() void {
+		std.log.info("TMD, yes!", .{});
+	}
+'''
+}
+
+##::::::::::::::::::::::::::::::::::::::::::::::::::::
+	Demo 6 (line spacing)
+
+TMD source:
+
+'''
+hello
+world
+
+hello`
+`world
+
+你好
+世界
+
+hello
+世界
+
+你好
+world
+
+你好 ``
+世界
+
+hello
+`` 世界
+
+你好 ``
+world
+'''
+
+
+
+Render result:
+
+!
+{
+
+hello
+world
+
+hello`
+`world
+
+你好
+世界
+
+hello
+世界
+
+你好
+world
+
+你好 ``
+世界
+
+hello
+`` 世界
+
+你好 ``
+world
+}
+
+##::::::::::::::::::::::::::::::::::::::::::::::::::::
+	Demo 7 (character escaping)
+
+TMD source:
+
+'''''
+!! ** all marks %% are escaped ** `` !!!. !!
+
+Backticks in code span: `!!`code`!!`
+
+`` ! This is not a note box.
+
+`` // This is not a comment line.
+'''''
+
+Render result:
+
+!
+{
+!! ** all marks %% are escaped ** `` !!!. !!
+
+Backticks in code span: `!!`code`!!`
+
+`` ! This is not a note box.
+
+`` // This is not a comment line.
+}
+
+

@@ -1,0 +1,7 @@
+
+## Tapir's markdown (TMD) format
+
+Run `zig build-exe tmd.zig` to build the `tmd` command.
+Now only support `tmd render --full-html example.tmd`.
+
+Please visit __https://tmd.tapirgames.com__ for more information.

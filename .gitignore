@@ -1,0 +1,5 @@
+tmd
+main
+*.o
+**/*.html
+
