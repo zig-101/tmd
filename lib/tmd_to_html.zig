@@ -1,11 +1,11 @@
 const std = @import("std");
 const mem = std.mem;
 
-const tmd = @import("tmd-types.zig");
+const tmd = @import("tmd.zig");
 const parser = @import("tmd_parser.zig");
 const list = @import("list.zig");
 
-pub fn render(tmdDoc: tmd.Doc, writer: anytype, completeHTML: bool) !void {
+pub fn tmd_to_html(tmdDoc: tmd.Doc, writer: anytype, completeHTML: bool) !void {
     var r = TmdRender{
         .doc = tmdDoc,
     };

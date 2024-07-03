@@ -1,5 +1,3 @@
-tmd
-main
-*.o
+zig-out
+.zig-cache
 **/*.html
-

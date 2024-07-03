@@ -1,9 +1,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const tmd = @import("tmd-types.zig");
-const tmd_parser = @import("tmd_parser.zig");
-const tmd_to_html = @import("tmd_to_html.zig");
+const tmd = @import("tmd");
+//const tmd_parser = @import("tmd_parser.zig");
+//const tmd_to_html = @import("tmd_to_html.zig");
 
 const demo3 = @embedFile("demo3.tmd");
 
@@ -75,8 +75,8 @@ pub fn main() !void {
 
         // parse file
 
-        var tmdDoc = try tmd_parser.parseTmdDoc(tmdContent, fbaAllocator);
-        defer tmd_parser.destroyTmdDoc(&tmdDoc, fbaAllocator); // if fba, then this is actually not necessary.
+        var tmdDoc = try tmd.parser.parse_tmd_doc(tmdContent, fbaAllocator);
+        defer tmd.parser.destroy_tmd_doc(&tmdDoc, fbaAllocator); // if fba, then this is actually not necessary.
 
         // render file
 
@@ -100,7 +100,7 @@ pub fn main() !void {
         const renderBuffer = try fbaAllocator.alloc(u8, MaxOutFileSize);
         defer fbaAllocator.free(renderBuffer);
         var fbs = std.io.fixedBufferStream(renderBuffer);
-        try tmd_to_html.render(tmdDoc, fbs.writer(), option_full_html);
+        try tmd.render.tmd_to_html(tmdDoc, fbs.writer(), option_full_html);
 
         // write file
 

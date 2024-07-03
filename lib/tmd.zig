@@ -1,3 +1,6 @@
+pub const parser = @import("tmd_parser.zig");
+pub const render = @import("tmd_to_html.zig");
+
 const std = @import("std");
 const builtin = @import("builtin");
 const list = @import("list.zig");

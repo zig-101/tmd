@@ -2,13 +2,13 @@ const std = @import("std");
 const mem = std.mem;
 const builtin = @import("builtin");
 
-const tmd = @import("tmd-types.zig");
+const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 const utf8 = @import("utf8.zig");
 const url = @import("url.zig");
 
-pub fn destroyTmdDoc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
+pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
     destroyListElements(tmd.BlockInfo, tmdDoc.blocks, null, allocator);
 
     const T = struct {
@@ -25,10 +25,10 @@ pub fn destroyTmdDoc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
     tmdDoc.* = .{ .data = "" };
 }
 
-pub fn parseTmdDoc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
+pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     var tmdDoc = tmd.Doc{ .data = tmdData };
 
-    errdefer destroyTmdDoc(&tmdDoc, allocator);
+    errdefer destroy_tmd_doc(&tmdDoc, allocator);
 
     var docParser = DocParser{ .tmdDoc = &tmdDoc };
     try docParser.parseAll(tmdData, allocator);
