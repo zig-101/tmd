@@ -4,6 +4,9 @@
 pub const parser = @import("tmd_parser.zig");
 pub const render = @import("tmd_to_html.zig");
 
+// The above two sub-namespaces and the following pub declartions
+// in the current namespace are visible to the "tmd" module users.
+
 const std = @import("std");
 const builtin = @import("builtin");
 const list = @import("list.zig");
@@ -201,6 +204,8 @@ pub const BlockType = union(enum) {
         //},
 
         _markTypeIndex: ListMarkTypeIndex,
+
+        listAttributes: ?*BlockAttibutes = null, // only meaningful when .isFirst == true.
 
         const Container = void;
 
