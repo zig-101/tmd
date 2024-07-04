@@ -752,12 +752,11 @@ const ContentParser = struct {
     //       *. When starts with ##, then the content after close ## mark will be ignored.
     //       *. For other cases, all content will be ignored.
     fn parse_directive_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32, isPureComment: bool) !u32 {
-        self.on_new_atomic_block();
-        defer self.on_new_atomic_block();
-
         const lineScanner = self.lineScanner;
 
         if (isPureComment) { // 3 / chars
+            self.set_currnet_line(lineInfo, lineStart);
+
             const textStart = lineScanner.cursor;
             const numBlanks = lineScanner.readUntilLineEnd();
             const textEnd = lineScanner.cursor - numBlanks;
@@ -2524,13 +2523,14 @@ const DocParser = struct {
                             .markEndWithSpaces = playloadStart,
                         } };
 
-                        if (currentAtomicBlockInfo.blockType != .directive) {
+                        if (isContainerFirstLine or currentAtomicBlockInfo.blockType != .directive) {
                             const commentBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                             commentBlockInfo.blockType = .{
                                 .directive = .{
                                     .startLine = lineInfo,
                                 },
                             };
+
                             try blockArranger.stackAtomicBlock(commentBlockInfo, isContainerFirstLine);
 
                             parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
