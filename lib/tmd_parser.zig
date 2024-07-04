@@ -2450,17 +2450,21 @@ const DocParser = struct {
                             break :handle;
                         }
 
-                        lineScanner.advance(2);
+                        lineScanner.advance(1);
                         const markLen = if (lineScanner.peekNext()) |c| blk: {
                             switch (c) {
-                                '=', ':', '-' => |mark| {
-                                    break :blk 2 + lineScanner.readUntilNotChar(mark);
+                                '#', '=', ':', '-' => |mark| {
+                                    lineScanner.advance(3);
+                                    break :blk 3 + lineScanner.readUntilNotChar(mark);
                                 },
-                                else => {
-                                    break :blk 2 + lineScanner.readUntilNotChar('#');
-                                },
+                                else => break :blk 2,
                             }
                         } else 2;
+
+                        if (markLen == 2) {
+                            lineScanner.setCursor(contentStart);
+                            break :handle;
+                        }
 
                         const markEnd = lineScanner.cursor;
                         if (lineScanner.lineEnd) |_| {
