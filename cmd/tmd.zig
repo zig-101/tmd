@@ -110,8 +110,8 @@ pub fn main() !void {
         try htmlFile.writeAll(fbs.getWritten());
 
         try stdout.print(
-            \\tmd file: {s} ({} bytes)
-            \\  -> {s} ({} bytes)
+            \\{s} ({} bytes)
+            \\   -> {s} ({} bytes)
             \\
         , .{ arg, stat.size, outputFilename, fbs.getWritten().len });
     }

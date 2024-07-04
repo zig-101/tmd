@@ -789,23 +789,26 @@ const ContentParser = struct {
                 if (LineScanner.leadingMarksTable[c]) |leadingMarkType| handle_leading_mark: {
                     lineScanner.advance(1);
                     const markLen = lineScanner.readUntilNotChar(c) + 1;
-                    if (markLen < 2) break :handle_leading_mark;
+                    if (markLen != 2) break :handle_leading_mark;
 
                     const markEnd = lineScanner.cursor;
                     std.debug.assert(markEnd == textStart + markLen);
 
-                    const leadingMark = try self.create_leading_mark(leadingMarkType, textStart, markLen);
-
-                    leadingMark.isBare = check_bare: {
+                    const isBare = check_bare: {
                         if (lineScanner.lineEnd != null) break :check_bare true;
 
-                        _ = lineScanner.readUntilNotBlank();
+                        const numSpaces = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd != null) break :check_bare true;
+
+                        if (numSpaces == 0) break :handle_leading_mark;
 
                         break :check_bare false;
                     };
 
-                    if (leadingMark.isBare) {
+                    const leadingMark = try self.create_leading_mark(leadingMarkType, textStart, markLen);
+                    leadingMark.isBare = isBare;
+
+                    if (isBare) {
                         leadingMark.blankLen = 0;
                         break :parse_tokens markEnd;
                     }
