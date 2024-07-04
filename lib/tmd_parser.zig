@@ -2043,38 +2043,29 @@ const LineScanner = struct {
 const DocParser = struct {
     tmdDoc: *tmd.Doc,
 
-    nextBlockAttributes: ?*tmd.BlockAttibutes = null,
+    nextBlockAttributes: ?tmd.BlockAttibutes = null,
 
     fn createAndPushBlockInfoElement(parser: *DocParser, allocator: mem.Allocator) !*tmd.BlockInfo {
         var blockInfoElement = try createListElement(tmd.BlockInfo, allocator);
         parser.tmdDoc.blocks.push(blockInfoElement);
 
-        //if (parser.nextBlockAttributes) |attrs| {
-        //    blockInfoElement.value.attributes = attrs;
-        //}
-        //if (parser.nextBlockAttributes) |attrs| {
-        //    std.debug.print("=== block id: {s}\n", .{attrs.id});
-        //}
-        blockInfoElement.value.attributes = parser.nextBlockAttributes;
-        parser.nextBlockAttributes = null;
+        if (parser.nextBlockAttributes) |as| {
+            var blockAttributesElement = try createListElement(tmd.BlockAttibutes, allocator);
+            parser.tmdDoc.blockAttributes.push(blockAttributesElement);
+
+            const attrs = &blockAttributesElement.value;
+            attrs.* = as;
+            blockInfoElement.value.attributes = attrs;
+
+            parser.nextBlockAttributes = null;
+        } else {
+            blockInfoElement.value.attributes = null; // !important
+        }
 
         return &blockInfoElement.value;
     }
 
-    fn getNextBlockAttributes(parser: *DocParser, allocator: mem.Allocator) !*tmd.BlockAttibutes {
-        if (parser.nextBlockAttributes) |attrs| {
-            return attrs;
-        }
-
-        var blockAttributesElement = try createListElement(tmd.BlockAttibutes, allocator);
-        parser.tmdDoc.blockAttributes.push(blockAttributesElement);
-
-        parser.nextBlockAttributes = &blockAttributesElement.value;
-
-        return &blockAttributesElement.value;
-    }
-
-    fn onNewDirectiveLine(parser: *DocParser, lineInfo: *const tmd.LineInfo, allocator: mem.Allocator) !void {
+    fn onNewDirectiveLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void {
         std.debug.assert(lineInfo.lineType == .directive);
         const tokens = lineInfo.lineType.directive.tokens;
         const headElement = tokens.head() orelse return;
@@ -2087,7 +2078,12 @@ const DocParser = struct {
         const anchorInfo = parser.tmdDoc.data[commentToken.start()..commentToken.end()];
         const id = parse_anchor_id(anchorInfo);
         if (id.len > 0) {
-            (try parser.getNextBlockAttributes(allocator)).id = id;
+            if (parser.nextBlockAttributes) |*as| {
+                //if (as.id.len == 0)
+                as.id = id;
+            } else {
+                parser.nextBlockAttributes = .{ .id = id };
+            }
         }
     }
 
@@ -2562,7 +2558,7 @@ const DocParser = struct {
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
 
-                        try parser.onNewDirectiveLine(lineInfo, allocator);
+                        try parser.onNewDirectiveLine(lineInfo);
                     },
                     else => {},
                 }

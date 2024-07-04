@@ -122,7 +122,7 @@ pub const BlockInfo = struct {
 
     blockType: BlockType,
 
-    attributes: ?*BlockAttibutes = null, // ToDo: maintain a list in doc for destroying
+    attributes: ?*BlockAttibutes = null,
 
     pub fn typeName(self: *@This()) []const u8 {
         return @tagName(self.blockType);
@@ -205,7 +205,7 @@ pub const BlockType = union(enum) {
 
         _markTypeIndex: ListMarkTypeIndex,
 
-        listAttributes: ?*BlockAttibutes = null, // only meaningful when .isFirst == true.
+        // listAttributes: ?*BlockAttibutes = null, // ToDo: only meaningful when .isFirst == true.
 
         const Container = void;
 

@@ -146,7 +146,6 @@ const TmdRender = struct {
                                 .unordered => _ = try w.write("\n<ul"),
                                 .ordered => _ = try w.write("\n<ol"),
                             }
-                            try writeBlockID(w, listItem.listAttributes);
                             _ = try w.write(" class='tmd-list'>\n");
                         }
                         _ = try w.write("\n<li");
