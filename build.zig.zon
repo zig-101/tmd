@@ -5,6 +5,9 @@
 
     .paths = .{
         "LICENSE",
+        "README.tmd",
+        "build.zig",
+        "build.zig.zon",
         "lib",
     },
 }
