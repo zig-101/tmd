@@ -62,15 +62,19 @@ const TmdRender = struct {
 
     fn renderBlockChildrenForNoteBox(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
         var afterElement = parentElement;
-        if (afterElement.next) |element| {
+        while (afterElement.next) |element| {
             const blockInfo = &element.value;
-            if (blockInfo.blockType == .header) {
-                if (blockInfo.blockType.header.level(self.doc.data) == 1) {
-                    _ = try w.write("<div class='tmd-note_box-header'>");
+            switch (blockInfo.blockType) {
+                .directive => afterElement = element,
+                .header => if (blockInfo.blockType.header.level(self.doc.data) == 1) {
+                    _ = try w.write("<div");
+                    try writeBlockID(w, blockInfo.attributes);
+                    _ = try w.write(" class='tmd-note_box-header'>");
                     try self.writeUsualContentBlockLines(w, blockInfo);
                     _ = try w.write("</div>");
                     afterElement = element;
-                }
+                } else break,
+                else => break,
             }
         }
 
@@ -82,22 +86,31 @@ const TmdRender = struct {
     }
 
     fn renderBlockChildrenForDisclosure(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
-        _ = try w.write("\n<details><summary>\n");
+        _ = try w.write("\n<details>\n");
 
         var afterElement = parentElement;
-        if (afterElement.next) |element| {
+        const summaryWritten = while (afterElement.next) |element| {
             const blockInfo = &element.value;
-            if (blockInfo.blockType == .header) {
-                if (blockInfo.blockType.header.level(self.doc.data) == 1) {
+            switch (blockInfo.blockType) {
+                .directive => afterElement = element,
+                .header => if (blockInfo.blockType.header.level(self.doc.data) == 1) {
+                    _ = try w.write("<summary");
+                    try writeBlockID(w, blockInfo.attributes);
+                    _ = try w.write(">\n");
                     try self.writeUsualContentBlockLines(w, blockInfo);
+                    _ = try w.write("</summary>\n");
                     afterElement = element;
-                }
+                    break true;
+                } else break false,
+                else => break false,
             }
+        } else false;
+
+        if (!summaryWritten) {
+            _ = try w.write("<summary></summary>\n");
         }
 
-        _ = try w.write("\n</summary>");
-
-        _ = try w.write("\n<div class='tmd-disclosure_box-content'>");
+        _ = try w.write("<div class='tmd-disclosure_box-content'>");
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
         _ = try w.write("\n</div></details>\n");
         return element;

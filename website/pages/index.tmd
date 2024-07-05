@@ -171,14 +171,14 @@ TMD source:
 
 ! This is a note box without header.
 
-! ## WARNING!
+! ### WARNING!
   {
   This is a note box with header.
   }
 
 ? This is a disclosure box without summary.
 
-? ## Why TMD?
+? ### Why TMD?
   {
   Because traditional markdown formats have many ambiguities and not powerful enough.
   }
@@ -202,14 +202,14 @@ Render result:
 
 ! This is a note box without header.
 
-! ## WARNING!
+! ### WARNING!
   {
   This is a note box with header.
   }
 
 ? This is a disclosure box without summary.
 
-? ## Why TMD?
+? ### Why TMD?
   {
   Because traditional markdown formats have many ambiguities and not powerful enough.
   }
@@ -232,7 +232,7 @@ This is a usual block. Nothing special.
 //// This is a directive block.
 //// We can define links here and specify IDs for blocks.
 
-////==code-snippert-1
+////== code-snippert-1
 '''zig
 	const std = @import("std");
 	
