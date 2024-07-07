@@ -31,7 +31,7 @@ pub fn headerLevel(headeMark: []const u8) ?u8 {
     return switch (headeMark[headeMark.len - 1]) {
         '#' => 1,
         '=' => 2,
-        ':' => 3,
+        '+' => 3,
         '-' => 4,
         else => null,
     };

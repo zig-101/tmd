@@ -7,7 +7,7 @@ TMD is also much more specified than traditional markdown.
 
 ##======= Demos
 
-##::::::::::::::::::::::::::::::::::::::::::::::::::::
+##+++++++++++++++++++++++++++++++++++++++++
 	Demo 1 (span styles)
 
 TMD source:
@@ -73,7 +73,7 @@ This is a code span: ` var ok = x && y `.
 ^`text with mono font`.
 }
 
-##::::::::::::::::::::::::::::::::::::::::::::::::::::
+##+++++++++++++++++++++++++++++++++++++++++
 	Demo 2 (line leading marks)
 
 TMD source:
@@ -109,7 +109,7 @@ This block
 :: ./static/image/sample-image.png
 }
 
-##::::::::::::::::::::::::::::::::::::::::::::::::::::
+##+++++++++++++++++++++++++++++++++++++++++
 	Demo 3 (link definitions)
 
 TMD source:
@@ -151,7 +151,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ////__...in Go `` https://go101.org/blog/2022-10-01-three-way-string-comparison.html
 }
 
-##::::::::::::::::::::::::::::::::::::::::::::::::::::
+##+++++++++++++++++++++++++++++++++++++++++
 	Demo 4 (built-in containers)
 
 TMD source:
@@ -215,7 +215,7 @@ Render result:
   }
 }
 
-##::::::::::::::::::::::::::::::::::::::::::::::::::::
+##+++++++++++++++++++++++++++++++++++++++++
 	Demo 5 (atom blocks)
 
 '''''
@@ -223,7 +223,7 @@ Render result:
 
 ##====== Header 2
 
-##:::::: Header 3
+##++++++ Header 3
 
 ##------ Header 4
 
@@ -250,7 +250,7 @@ Render result:
 
 ##====== Header 2
 
-##:::::: Header 3
+##++++++ Header 3
 
 ##------ Header 4
 
@@ -269,7 +269,7 @@ This is a usual block. Nothing special.
 '''
 }
 
-##::::::::::::::::::::::::::::::::::::::::::::::::::::
+##+++++++++++++++++++++++++++++++++++++++++
 	Demo 6 (line spacing)
 
 TMD source:
@@ -332,7 +332,7 @@ hello
 world
 }
 
-##::::::::::::::::::::::::::::::::::::::::::::::::::::
+##+++++++++++++++++++++++++++++++++++++++++
 	Demo 7 (character escaping)
 
 TMD source:

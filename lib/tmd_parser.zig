@@ -2449,7 +2449,7 @@ const DocParser = struct {
                         lineScanner.advance(1);
                         const markLen = if (lineScanner.peekNext()) |c| blk: {
                             switch (c) {
-                                '#', '=', ':', '-' => |mark| {
+                                '#', '=', '+', '-' => |mark| {
                                     lineScanner.advance(3);
                                     break :blk 3 + lineScanner.readUntilNotChar(mark);
                                 },

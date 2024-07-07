@@ -9,5 +9,7 @@
         "build.zig",
         "build.zig.zon",
         "lib",
+        "cmd",
+        "website",
     },
 }
