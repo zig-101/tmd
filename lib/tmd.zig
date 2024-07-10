@@ -128,7 +128,7 @@ pub const BlockInfo = struct {
         return @tagName(self.blockType);
     }
 
-    // for atomic blocks
+    // for atom blocks
 
     pub fn isContainer(self: @This()) bool {
         return switch (self.blockType) {
@@ -136,16 +136,16 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn isAtomic(self: @This()) bool {
+    pub fn isAtom(self: @This()) bool {
         return switch (self.blockType) {
-            inline else => |bt| @hasDecl(@TypeOf(bt), "Atomic"),
+            inline else => |bt| @hasDecl(@TypeOf(bt), "Atom"),
         };
     }
 
     pub fn getStartLine(self: @This()) *LineInfo {
         return switch (self.blockType) {
             inline else => |bt| {
-                if (@hasDecl(@TypeOf(bt), "Atomic")) {
+                if (@hasDecl(@TypeOf(bt), "Atom")) {
                     return bt.startLine;
                 }
                 unreachable;
@@ -156,7 +156,7 @@ pub const BlockInfo = struct {
     pub fn setStartLine(self: *@This(), lineInfo: *LineInfo) void {
         return switch (self.blockType) {
             inline else => |*bt| {
-                if (@hasDecl(@TypeOf(bt.*), "Atomic")) {
+                if (@hasDecl(@TypeOf(bt.*), "Atom")) {
                     bt.startLine = lineInfo;
                     return;
                 }
@@ -168,7 +168,7 @@ pub const BlockInfo = struct {
     pub fn getEndLine(self: @This()) *LineInfo {
         return switch (self.blockType) {
             inline else => |bt| {
-                if (@hasDecl(@TypeOf(bt), "Atomic")) {
+                if (@hasDecl(@TypeOf(bt), "Atom")) {
                     return bt.endLine;
                 }
                 unreachable;
@@ -179,7 +179,7 @@ pub const BlockInfo = struct {
     pub fn setEndLine(self: *@This(), lineInfo: *LineInfo) void {
         return switch (self.blockType) {
             inline else => |*bt| {
-                if (@hasDecl(@TypeOf(bt.*), "Atomic")) {
+                if (@hasDecl(@TypeOf(bt.*), "Atom")) {
                     bt.endLine = lineInfo;
                     return;
                 }
@@ -276,14 +276,14 @@ pub const BlockType = union(enum) {
     //tableRow: struct {},
     //tableCell: struct {},
 
-    // atomic block types
+    // atom block types
 
     blank: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
 
         // traits:
-        const Atomic = void;
+        const Atom = void;
     },
 
     header: struct {
@@ -294,7 +294,7 @@ pub const BlockType = union(enum) {
         // nextInBase: ?*BlockInfo = null,
 
         // traits:
-        const Atomic = void;
+        const Atom = void;
 
         pub fn level(self: @This(), tmdData: []const u8) u8 {
             const headerLine = self.startLine;
@@ -314,7 +314,7 @@ pub const BlockType = union(enum) {
         // hasContent: bool = false,
 
         // traits:
-        const Atomic = void;
+        const Atom = void;
     },
 
     footer: struct {
@@ -327,7 +327,7 @@ pub const BlockType = union(enum) {
         // hasContent: bool = false,
 
         // traits:
-        const Atomic = void;
+        const Atom = void;
     },
 
     directive: struct {
@@ -335,7 +335,7 @@ pub const BlockType = union(enum) {
         endLine: *LineInfo = undefined,
 
         // traits:
-        const Atomic = void;
+        const Atom = void;
     },
 
     code_snippet: struct {
@@ -346,7 +346,7 @@ pub const BlockType = union(enum) {
         //       It can be also of .code or .codeSnippetStart.
 
         // traits:
-        const Atomic = void;
+        const Atom = void;
 
         pub fn startPlayloadRange(self: @This()) Range {
             return switch (self.startLine.lineType) {
@@ -372,7 +372,7 @@ pub const BlockType = union(enum) {
 
 pub const LineInfo = struct {
     index: u32, // one basedd (for debug purpose only)
-    atomicBlockIndex: u32, // one based (for debug purpose only)
+    atomBlockIndex: u32, // one based (for debug purpose only)
 
     range: Range,
     rangeTrimmed: Range, // without leanding and traling blanks (except .code lines)

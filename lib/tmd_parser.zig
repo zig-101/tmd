@@ -330,8 +330,8 @@ const BlockArranger = struct {
         self.stackedBlocks[self.count_1] = blockInfo;
     }
 
-    fn stackAtomicBlock(self: *BlockArranger, blockInfo: *tmd.BlockInfo, firstInContainer: bool) !void {
-        std.debug.assert(blockInfo.isAtomic());
+    fn stackAtomBlock(self: *BlockArranger, blockInfo: *tmd.BlockInfo, firstInContainer: bool) !void {
+        std.debug.assert(blockInfo.isAtom());
 
         if (firstInContainer) {
             try self.stackAsFirstInContainer(blockInfo);
@@ -443,7 +443,7 @@ const ContentParser = struct {
         return &self.blockSession.spanStatuses[markType.asInt()];
     }
 
-    fn on_new_atomic_block(self: *ContentParser) void {
+    fn on_new_atom_block(self: *ContentParser) void {
         self.close_opening_spans(); // for the last block
 
         //if (self.blockSession.endLine) |line| {
@@ -2087,15 +2087,15 @@ const DocParser = struct {
         }
     }
 
-    // atomicBlockInfo is an atomic block, or a base/root block.
-    fn setEndLineForAtomicBlock(parser: *DocParser, atomicBlockInfo: *tmd.BlockInfo) void {
+    // atomBlockInfo is an atom block, or a base/root block.
+    fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) void {
         if (parser.tmdDoc.lines.tail()) |lastLineInfoElement| {
             std.debug.assert(!parser.tmdDoc.blocks.empty());
-            std.debug.assert(atomicBlockInfo.blockType != .root);
-            if (atomicBlockInfo.blockType != .base) {
-                atomicBlockInfo.setEndLine(&lastLineInfoElement.value);
+            std.debug.assert(atomBlockInfo.blockType != .root);
+            if (atomBlockInfo.blockType != .base) {
+                atomBlockInfo.setEndLine(&lastLineInfoElement.value);
             }
-        } else std.debug.assert(atomicBlockInfo.blockType == .root);
+        } else std.debug.assert(atomBlockInfo.blockType == .root);
     }
 
     fn parseAll(parser: *DocParser, tmdData: []const u8, allocator: mem.Allocator) !void {
@@ -2112,9 +2112,9 @@ const DocParser = struct {
 
         var codeSnippetStartInfo: ?*std.meta.FieldType(tmd.LineType, .codeSnippetStart) = null;
 
-        // An atomic block, or a base/root block.
-        var currentAtomicBlockInfo = rootBlockInfo;
-        var atomicBlockCount: u32 = 0;
+        // An atom block, or a base/root block.
+        var currentAtomBlockInfo = rootBlockInfo;
+        var atomBlockCount: u32 = 0;
 
         while (lineScanner.proceedToNextLine()) {
             var lineInfoElement = try createListElement(tmd.LineInfo, allocator);
@@ -2193,18 +2193,18 @@ const DocParser = struct {
                     lineInfo.lineType = .{ .blank = .{} };
                     lineInfo.rangeTrimmed.end = leadingBlankEnd;
 
-                    if (currentAtomicBlockInfo.blockType != .blank) {
+                    if (currentAtomBlockInfo.blockType != .blank) {
                         const blankBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                         blankBlockInfo.blockType = .{
                             .blank = .{
                                 .startLine = lineInfo,
                             },
                         };
-                        try blockArranger.stackAtomicBlock(blankBlockInfo, false);
+                        try blockArranger.stackAtomBlock(blankBlockInfo, false);
 
-                        parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                        currentAtomicBlockInfo = blankBlockInfo;
-                        atomicBlockCount += 1;
+                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        currentAtomBlockInfo = blankBlockInfo;
+                        atomBlockCount += 1;
                     }
 
                     break :parse_line;
@@ -2212,7 +2212,7 @@ const DocParser = struct {
 
                 var isContainerFirstLine: bool = false;
                 var contentStart: u32 = lineScanner.cursor;
-                var noAtomicBlockMarkForSure = false;
+                var noAtomBlockMarkForSure = false;
 
                 // try to parse leading container mark.
                 switch (lineScanner.peekCursor()) {
@@ -2230,7 +2230,7 @@ const DocParser = struct {
                             if (lineScanner.cursor == markEnd and lineScanner.peekCursor() == lastMark) {
                                 lineScanner.setCursor(markEnd - 1);
                             }
-                            noAtomicBlockMarkForSure = true;
+                            noAtomBlockMarkForSure = true;
                             lineInfo.containerMark = null;
                             break :handle;
                         }
@@ -2268,7 +2268,7 @@ const DocParser = struct {
                             if (lineScanner.cursor == markEnd and lineScanner.peekCursor() == mark) {
                                 lineScanner.setCursor(markEnd - 1);
                             }
-                            noAtomicBlockMarkForSure = true;
+                            noAtomBlockMarkForSure = true;
                             lineInfo.containerMark = null;
                             break :handle;
                         }
@@ -2338,10 +2338,10 @@ const DocParser = struct {
                     },
                 }
 
-                // try to parse atomic block mark.
-                if (noAtomicBlockMarkForSure or lineScanner.lineEnd != null) {
+                // try to parse atom block mark.
+                if (noAtomBlockMarkForSure or lineScanner.lineEnd != null) {
                     // contentStart keeps unchanged.
-                } else switch (lineScanner.peekCursor()) { // try to parse atomic block mark
+                } else switch (lineScanner.peekCursor()) { // try to parse atom block mark
                     '{', '}' => |mark| handle: {
                         const isOpenMark = mark == '{';
                         if (isOpenMark) {
@@ -2381,9 +2381,9 @@ const DocParser = struct {
                             };
                             try blockArranger.openBaseBlock(baseBlockInfo, isContainerFirstLine);
 
-                            parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                            currentAtomicBlockInfo = baseBlockInfo;
-                            atomicBlockCount += 1;
+                            parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                            currentAtomBlockInfo = baseBlockInfo;
+                            atomBlockCount += 1;
                         } else {
                             lineInfo.lineType = .{ .baseBlockClose = .{
                                 .markLen = markLen,
@@ -2393,9 +2393,9 @@ const DocParser = struct {
                             const baseBlockInfo = try blockArranger.closeCurrentBaseBlock();
                             baseBlockInfo.blockType.base.closeLine = lineInfo;
 
-                            parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                            currentAtomicBlockInfo = baseBlockInfo;
-                            atomicBlockCount += 1;
+                            parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                            currentAtomBlockInfo = baseBlockInfo;
+                            atomBlockCount += 1;
                         }
                     },
                     '\'' => |mark| handle: {
@@ -2433,11 +2433,11 @@ const DocParser = struct {
                                 .startLine = lineInfo,
                             },
                         } };
-                        try blockArranger.stackAtomicBlock(codeSnippetBlockInfo, isContainerFirstLine);
+                        try blockArranger.stackAtomBlock(codeSnippetBlockInfo, isContainerFirstLine);
 
-                        parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                        currentAtomicBlockInfo = codeSnippetBlockInfo;
-                        atomicBlockCount += 1;
+                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        currentAtomBlockInfo = codeSnippetBlockInfo;
+                        atomBlockCount += 1;
                     },
                     '#' => handle: {
                         // Must starts with 2 #.
@@ -2483,13 +2483,13 @@ const DocParser = struct {
                                 .startLine = lineInfo,
                             },
                         };
-                        try blockArranger.stackAtomicBlock(headerBlockInfo, isContainerFirstLine);
+                        try blockArranger.stackAtomBlock(headerBlockInfo, isContainerFirstLine);
 
-                        parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                        currentAtomicBlockInfo = headerBlockInfo;
-                        atomicBlockCount += 1;
+                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        currentAtomBlockInfo = headerBlockInfo;
+                        atomBlockCount += 1;
 
-                        contentParser.on_new_atomic_block();
+                        contentParser.on_new_atom_block();
 
                         if (lineScanner.lineEnd != null) {
                             // lineInfo.rangeTrimmed.end has been determined.
@@ -2547,13 +2547,13 @@ const DocParser = struct {
                             break :blk footerBlockInfo;
                         };
 
-                        try blockArranger.stackAtomicBlock(newAtomBlock, isContainerFirstLine);
+                        try blockArranger.stackAtomBlock(newAtomBlock, isContainerFirstLine);
 
-                        parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                        currentAtomicBlockInfo = newAtomBlock;
-                        atomicBlockCount += 1;
+                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        currentAtomBlockInfo = newAtomBlock;
+                        atomBlockCount += 1;
 
-                        contentParser.on_new_atomic_block();
+                        contentParser.on_new_atom_block();
 
                         if (lineScanner.lineEnd != null) {
                             // lineInfo.rangeTrimmed.end has been determined.
@@ -2590,7 +2590,7 @@ const DocParser = struct {
                             .markEndWithSpaces = playloadStart,
                         } };
 
-                        if (isContainerFirstLine or currentAtomicBlockInfo.blockType != .directive) {
+                        if (isContainerFirstLine or currentAtomBlockInfo.blockType != .directive) {
                             const commentBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                             commentBlockInfo.blockType = .{
                                 .directive = .{
@@ -2598,18 +2598,18 @@ const DocParser = struct {
                                 },
                             };
 
-                            try blockArranger.stackAtomicBlock(commentBlockInfo, isContainerFirstLine);
+                            try blockArranger.stackAtomBlock(commentBlockInfo, isContainerFirstLine);
 
-                            parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                            currentAtomicBlockInfo = commentBlockInfo;
-                            atomicBlockCount += 1;
+                            parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                            currentAtomBlockInfo = commentBlockInfo;
+                            atomBlockCount += 1;
 
                             // No need to do this.
-                            // contentParser.on_new_atomic_block();
+                            // contentParser.on_new_atom_block();
                         }
 
-                        contentParser.on_new_atomic_block();
-                        defer contentParser.on_new_atomic_block(); // ToDo: might be unnecessary
+                        contentParser.on_new_atom_block();
+                        defer contentParser.on_new_atom_block(); // ToDo: might be unnecessary
 
                         if (lineScanner.lineEnd != null) {
                             // lineInfo.rangeTrimmed.end has been determined.
@@ -2635,7 +2635,7 @@ const DocParser = struct {
                     } };
 
                     if (isContainerFirstLine or
-                        currentAtomicBlockInfo.blockType != .usual and currentAtomicBlockInfo.blockType != .header)
+                        currentAtomBlockInfo.blockType != .usual and currentAtomBlockInfo.blockType != .header)
                     {
                         const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                         usualBlockInfo.blockType = .{
@@ -2643,20 +2643,20 @@ const DocParser = struct {
                                 .startLine = lineInfo,
                             },
                         };
-                        try blockArranger.stackAtomicBlock(usualBlockInfo, isContainerFirstLine);
+                        try blockArranger.stackAtomBlock(usualBlockInfo, isContainerFirstLine);
 
-                        parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
-                        currentAtomicBlockInfo = usualBlockInfo;
-                        atomicBlockCount += 1;
+                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        currentAtomBlockInfo = usualBlockInfo;
+                        atomBlockCount += 1;
 
-                        contentParser.on_new_atomic_block();
+                        contentParser.on_new_atom_block();
                     }
 
                     if (lineScanner.lineEnd == null) {
                         const contentEnd = try contentParser.parse_line_tokens(
                             lineInfo,
                             contentStart,
-                            currentAtomicBlockInfo.blockType != .header and contentStart == lineScanner.cursor,
+                            currentAtomBlockInfo.blockType != .header and contentStart == lineScanner.cursor,
                         );
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
@@ -2669,17 +2669,17 @@ const DocParser = struct {
                 lineInfo.range.end = lineScanner.cursor;
             } else unreachable;
 
-            lineInfo.atomicBlockIndex = atomicBlockCount;
+            lineInfo.atomBlockIndex = atomBlockCount;
             lineInfo.index = lineScanner.cursorLineIndex;
 
             parser.tmdDoc.lines.push(lineInfoElement);
         }
 
         // Meaningful only for code snippet block (and popential later custom app block).
-        parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
+        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
 
         // ToDo: remove this line. (Forget the reason.;( )
-        contentParser.on_new_atomic_block(); // try to determine line-end render manner for the last coment line.
+        contentParser.on_new_atom_block(); // try to determine line-end render manner for the last coment line.
 
         try contentParser.matchLinks(); // ToDo: same effect when being put in the above else-block.
     }
@@ -2710,7 +2710,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
             else => {},
         }
         std.debug.print("\n", .{});
-        if (blockInfo.isAtomic()) {
+        if (blockInfo.isAtom()) {
             var lineInfo = blockInfo.getStartLine();
             const end = blockInfo.getEndLine();
             while (true) {
@@ -2720,7 +2720,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                 }
                 std.debug.print("- L{} @{}: <{s}> ({}..{}) ({}..{}) ({}..{}) <{s}> {}\n", .{
                     lineInfo.number(),
-                    lineInfo.atomicBlockIndex,
+                    lineInfo.atomBlockIndex,
                     lineInfo.typeName(),
                     lineInfo.rangeTrimmed.start - lineInfo.range.start + 1,
                     lineInfo.rangeTrimmed.end - lineInfo.range.start + 1,

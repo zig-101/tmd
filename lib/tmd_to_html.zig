@@ -210,7 +210,7 @@ const TmdRender = struct {
                         _ = try w.write("\n</div>\n");
                     },
 
-                    // atomic
+                    // atom
 
                     .header => |header| {
                         const level = header.level(self.doc.data);
