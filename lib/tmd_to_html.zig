@@ -70,7 +70,7 @@ const TmdRender = struct {
                     _ = try w.write("<div");
                     try writeBlockID(w, blockInfo.attributes);
                     _ = try w.write(" class='tmd-note_box-header'>");
-                    try self.writeUsualContentBlockLines(w, blockInfo);
+                    try self.writeUsualContentBlockLines(w, blockInfo, false);
                     _ = try w.write("</div>");
                     afterElement = element;
                 } else break,
@@ -97,7 +97,7 @@ const TmdRender = struct {
                     _ = try w.write("<summary");
                     try writeBlockID(w, blockInfo.attributes);
                     _ = try w.write(">\n");
-                    try self.writeUsualContentBlockLines(w, blockInfo);
+                    try self.writeUsualContentBlockLines(w, blockInfo, false);
                     _ = try w.write("</summary>\n");
                     afterElement = element;
                     break true;
@@ -221,20 +221,33 @@ const TmdRender = struct {
 
                         self.lastRenderedBlockIsBlank = false;
 
-                        try self.writeUsualContentBlockLines(w, blockInfo);
+                        try self.writeUsualContentBlockLines(w, blockInfo, false);
 
                         element = element.next orelse &self.nullBlockInfoElement;
 
                         _ = try w.print("</h{}>\n", .{level});
                     },
-
-                    .usual => {
+                    .footer => {
                         self.lastRenderedBlockIsBlank = false;
+
+                        _ = try w.write("\n<footer");
+                        try writeBlockID(w, blockInfo.attributes);
+                        _ = try w.write(" class='tmd-footer'>\n");
+                        try self.writeUsualContentBlockLines(w, blockInfo, false);
+                        _ = try w.write("\n</footer>\n");
+
+                        element = element.next orelse &self.nullBlockInfoElement;
+                    },
+                    .usual => |usual| {
+                        self.lastRenderedBlockIsBlank = false;
+
+                        const usualLine = usual.startLine.lineType.usual;
+                        const writeBlank = usualLine.markLen > 0 and usualLine.tokens.empty();
 
                         _ = try w.write("\n<div");
                         try writeBlockID(w, blockInfo.attributes);
                         _ = try w.write(" class='tmd-usual'>\n");
-                        try self.writeUsualContentBlockLines(w, blockInfo);
+                        try self.writeUsualContentBlockLines(w, blockInfo, writeBlank);
                         _ = try w.write("\n</div>\n");
 
                         element = element.next orelse &self.nullBlockInfoElement;
@@ -346,7 +359,9 @@ const TmdRender = struct {
         _ = try w.write("</pre>\n");
     }
 
-    fn writeUsualContentBlockLines(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo) !void {
+    fn writeUsualContentBlockLines(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo, writeBlank: bool) !void {
+        if (writeBlank) _ = try w.write("<p></p>\n");
+
         var tracker: MarkStatusesTracker = .{};
 
         const endLine = blockInfo.getEndLine();
@@ -838,7 +853,6 @@ const css_style =
     \\  background: #ddd;
     \\  padding: 3px 6px;
     \\}
-    \\
     \\
     \\.tmd-bold {
     \\  font-weight: bold;

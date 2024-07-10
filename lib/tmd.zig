@@ -278,6 +278,14 @@ pub const BlockType = union(enum) {
 
     // atomic block types
 
+    blank: struct {
+        startLine: *LineInfo = undefined,
+        endLine: *LineInfo = undefined,
+
+        // traits:
+        const Atomic = void;
+    },
+
     header: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
@@ -296,15 +304,20 @@ pub const BlockType = union(enum) {
         }
     },
 
-    blank: struct {
+    usual: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
+
+        // ToDo: when false, no need to render.
+        //       So a block with a singal ` will outout nothing.
+        //       Maybe needless with .blankSpan.
+        // hasContent: bool = false,
 
         // traits:
         const Atomic = void;
     },
 
-    usual: struct {
+    footer: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
 
@@ -411,8 +424,12 @@ pub const LineInfo = struct {
 
     pub fn tokens(self: *@This()) ?*list.List(TokenInfo) {
         return switch (self.lineType) {
-            inline .usual, .header, .directive => |*lt| &lt.tokens,
-            else => null,
+            inline else => |*lt| {
+                if (@hasField(@TypeOf(lt.*), "tokens")) {
+                    return &lt.tokens;
+                }
+                return null;
+            },
         };
     }
 
@@ -475,9 +492,18 @@ pub const ContainerLeadingMark = union(enum) {
 pub const LineType = union(enum) {
     blank: struct {},
     usual: struct {
+        // A usual line might start with 3+ semicolon or nothing.
+        // So either markLen == 0, or markLen >= 3
+        markLen: u32,
+        markEndWithSpaces: u32,
         tokens: list.List(TokenInfo) = .{},
     },
     header: struct {
+        markLen: u32,
+        markEndWithSpaces: u32,
+        tokens: list.List(TokenInfo) = .{},
+    },
+    footer: struct {
         markLen: u32,
         markEndWithSpaces: u32,
         tokens: list.List(TokenInfo) = .{},

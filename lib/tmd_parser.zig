@@ -2501,6 +2501,70 @@ const DocParser = struct {
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
                     },
+                    ';', '&' => |mark| handle: {
+                        lineScanner.advance(1);
+                        const markLen = lineScanner.readUntilNotChar(mark) + 1;
+                        if (markLen < 3) {
+                            lineScanner.setCursor(contentStart);
+                            break :handle;
+                        }
+
+                        const markEnd = lineScanner.cursor;
+                        if (lineScanner.lineEnd) |_| {
+                            lineInfo.rangeTrimmed.end = markEnd;
+                        } else {
+                            _ = lineScanner.readUntilNotBlank();
+                            if (lineScanner.lineEnd) |_| {
+                                lineInfo.rangeTrimmed.end = markEnd;
+                            }
+                        }
+
+                        const newAtomBlock = if (mark == ';') blk: {
+                            lineInfo.lineType = .{ .usual = .{
+                                .markLen = markLen,
+                                .markEndWithSpaces = lineScanner.cursor,
+                            } };
+
+                            const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            usualBlockInfo.blockType = .{
+                                .usual = .{
+                                    .startLine = lineInfo,
+                                },
+                            };
+                            break :blk usualBlockInfo;
+                        } else blk: {
+                            lineInfo.lineType = .{ .footer = .{
+                                .markLen = markLen,
+                                .markEndWithSpaces = lineScanner.cursor,
+                            } };
+
+                            const footerBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            footerBlockInfo.blockType = .{
+                                .footer = .{
+                                    .startLine = lineInfo,
+                                },
+                            };
+                            break :blk footerBlockInfo;
+                        };
+
+                        try blockArranger.stackAtomicBlock(newAtomBlock, isContainerFirstLine);
+
+                        parser.setEndLineForAtomicBlock(currentAtomicBlockInfo);
+                        currentAtomicBlockInfo = newAtomBlock;
+                        atomicBlockCount += 1;
+
+                        contentParser.on_new_atomic_block();
+
+                        if (lineScanner.lineEnd != null) {
+                            // lineInfo.rangeTrimmed.end has been determined.
+                            // And no data for parsing tokens.
+                            break :handle;
+                        }
+
+                        const contentEnd = try contentParser.parse_line_tokens(lineInfo, lineScanner.cursor, true);
+                        lineInfo.rangeTrimmed.end = contentEnd;
+                        std.debug.assert(lineScanner.lineEnd != null);
+                    },
                     '/' => |mark| handle: {
                         lineScanner.advance(1);
                         const markLen = lineScanner.readUntilNotChar(mark) + 1;
@@ -2565,7 +2629,10 @@ const DocParser = struct {
 
                 // If line type is still not determined, then it is just a usual line.
                 if (lineInfo.lineType == .blank) {
-                    lineInfo.lineType = .{ .usual = .{} };
+                    lineInfo.lineType = .{ .usual = .{
+                        .markLen = 0,
+                        .markEndWithSpaces = lineScanner.cursor,
+                    } };
 
                     if (isContainerFirstLine or
                         currentAtomicBlockInfo.blockType != .usual and currentAtomicBlockInfo.blockType != .header)
