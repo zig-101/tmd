@@ -17,7 +17,7 @@ TMD source:
 
 %%italic text%% and ^%%revert italic text%%.
 
-++larger font size++ and ^++smaller font size++.
+::smaller font size:: and ^::larger font size::.
 
 spoiler text: ??spoiler text?? (selectable, 
 invisible when unslected, visible when selected),
@@ -49,7 +49,7 @@ Render result:
 
 %%italic text%% and ^%%revert italic text%%.
 
-++larger font size++ and ^++smaller font size++.
+::smaller font size:: and ^::larger font size::.
 
 spoiler text: ??spoiler text?? (selectable, 
 invisible when unslected, visible when selected),
@@ -89,7 +89,7 @@ This block
 \\ several times.
 \\ The following is an image.
 
-:: ./static/image/sample-image.png
+@@ ./static/image/sample-image.png
 '''''
 
 Render result:
@@ -106,7 +106,7 @@ This block
 \\ several times.
 \\ The following is an image.
 
-:: ./static/image/sample-image.png
+@@ ./static/image/sample-image.png
 }
 
 ##+++++++++++++++++++++++++++++++++++++++++

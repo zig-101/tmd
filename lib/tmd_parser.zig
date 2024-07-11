@@ -1821,7 +1821,7 @@ const LineScanner = struct {
         var table = [1]?tmd.LineSpanMarkType{null} ** 256;
         table['\\'] = .lineBreak;
         table['/'] = .comment;
-        table[':'] = .media;
+        table['@'] = .media;
         table['='] = .anchor;
         break :blk table;
     };
@@ -1831,7 +1831,7 @@ const LineScanner = struct {
             var table: @TypeOf(run()) = .{null} ** 256;
             table['*'] = .{ .markType = .fontWeight, .precedence = 1, .minLen = 2 };
             table['%'] = .{ .markType = .fontStyle, .precedence = 1, .minLen = 2 };
-            table['+'] = .{ .markType = .fontSize, .precedence = 1, .minLen = 2 };
+            table[':'] = .{ .markType = .fontSize, .precedence = 1, .minLen = 2 };
             table['?'] = .{ .markType = .spoiler, .precedence = 1, .minLen = 2 };
             table['~'] = .{ .markType = .deleted, .precedence = 1, .minLen = 2 };
             table['|'] = .{ .markType = .marked, .precedence = 1, .minLen = 2 };
@@ -2635,7 +2635,9 @@ const DocParser = struct {
                     } };
 
                     if (isContainerFirstLine or
-                        currentAtomBlockInfo.blockType != .usual and currentAtomBlockInfo.blockType != .header)
+                        currentAtomBlockInfo.blockType != .usual and
+                        currentAtomBlockInfo.blockType != .header and
+                        currentAtomBlockInfo.blockType != .footer)
                     {
                         const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                         usualBlockInfo.blockType = .{

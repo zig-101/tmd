@@ -60,6 +60,31 @@ const TmdRender = struct {
         return self.renderNextBlocks(w, parentElement.value.nestingDepth, parentElement, atMostCount);
     }
 
+    fn renderBlockChildrenForIndented(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
+        var afterElement = parentElement;
+        while (afterElement.next) |element| {
+            const blockInfo = &element.value;
+            switch (blockInfo.blockType) {
+                .directive => afterElement = element,
+                .header => if (blockInfo.blockType.header.level(self.doc.data) == 1) {
+                    _ = try w.write("<div");
+                    try writeBlockID(w, blockInfo.attributes);
+                    _ = try w.write(" class='tmd-indented-header'>");
+                    try self.writeUsualContentBlockLines(w, blockInfo, false);
+                    _ = try w.write("</div>");
+                    afterElement = element;
+                } else break,
+                else => break,
+            }
+        }
+
+        _ = try w.write("\n<div class='tmd-note_box-content'>\n");
+
+        const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
+        _ = try w.write("\n</div>\n");
+        return element;
+    }
+
     fn renderBlockChildrenForNoteBox(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
         var afterElement = parentElement;
         while (afterElement.next) |element| {
@@ -177,7 +202,7 @@ const TmdRender = struct {
                         _ = try w.write("\n<div");
                         try writeBlockID(w, blockInfo.attributes);
                         _ = try w.write(" class='tmd-indented'>\n");
-                        element = try self.renderBlockChildren(w, element, 0);
+                        element = try self.renderBlockChildrenForIndented(w, element, 0);
                         _ = try w.write("\n</div>\n");
                     },
                     .block_quote => {
@@ -625,9 +650,9 @@ const TmdRender = struct {
             },
             .fontSize => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-smaller-size'>");
-                } else {
                     _ = try w.write("<span class='tmd-larger-size'>");
+                } else {
+                    _ = try w.write("<span class='tmd-smaller-size'>");
                 }
             },
             .spoiler => {

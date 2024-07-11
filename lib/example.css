@@ -27,11 +27,29 @@ img {
   margin-left: 32px;
 }
 
+.tmd-indented-header {
+  margin-left: -32px;
+  font-weight: bold;
+}
+
 .tmd-block_quote {
-  border-left: solid 3px #888;
-  color: #666;
+  border-left: solid 6px #888;
   margin-left: 6px;
   padding-left: 6px;
+}
+
+.tmd-block_quote > footer {
+  color: #666;
+  font-style: italic;
+  position: relative;
+  margin-left: 1em;
+}
+
+.tmd-block_quote > footer:first-of-type:before {
+  content: '--';
+  margin-left: -1em;
+  color: #666;
+  position: absolute;
 }
 
 .tmd-note_box {
@@ -65,6 +83,22 @@ img {
   margin-bottom: 0px;
   background: #ddd;
   padding: 3px 6px;
+}
+
+.tmd-header-1 {
+  font-size: xxx-large;
+}
+
+.tmd-header-2 {
+  font-size: xx-large;
+}
+
+.tmd-header-3 {
+  font-size: x-large;
+}
+
+.tmd-header-4 {
+  font-size: large;
 }
 
 .tmd-bold {
