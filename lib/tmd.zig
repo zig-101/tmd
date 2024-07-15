@@ -115,7 +115,7 @@ pub const CustomBlockAttibutes = struct {
 
 // Note: keep the two consistent.
 pub const MaxBlockNestingDepth = 64; // should be 2^N
-pub const BlockNestingDepthType = u6; // must be capable of storing (count of stacked blocks)-1
+pub const BlockNestingDepthType = u6; // must be capable of storing MaxBlockNestingDepth-1
 
 pub const BlockInfo = struct {
     nestingDepth: u32 = 0,
@@ -198,14 +198,16 @@ pub const BlockType = union(enum) {
         isFirst: bool,
         isLast: bool,
 
-        //bulletType: enum {
-        //    unordered,
-        //    ordered,
-        //},
+        isTab: bool = false, // only valid when ifFirst == true
+        firstItem: *BlockInfo = undefined,
+
+        // ToDo: only meaningful when .isFirst == true.
+        //       Can be unioned with .firstItem.
+        //       Note: in parsing phase, the union is always .firstItem.
+        //       The parse should maintain tmmp list to record listAttributes.
+        // listAttributes: ?*BlockAttibutes = null,
 
         _markTypeIndex: ListMarkTypeIndex,
-
-        // listAttributes: ?*BlockAttibutes = null, // ToDo: only meaningful when .isFirst == true.
 
         const Container = void;
 
@@ -217,6 +219,14 @@ pub const BlockType = union(enum) {
         pub fn bulletType(self: @This()) BulletType {
             if (self._markTypeIndex & 0b100 != 0) return .ordered;
             return .unordered;
+        }
+
+        pub fn isTabItem(self: @This()) bool {
+            return if (self.isFirst) self.isTab else self.firstItem.blockType.list_item.isTab;
+        }
+
+        pub fn confirmTabItem(self: *@This()) void {
+            if (self.isFirst) self.isTab = true else self.firstItem.blockType.list_item.isTab = true;
         }
     },
 

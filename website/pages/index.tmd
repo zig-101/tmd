@@ -28,7 +28,7 @@ secure spoiler text: ^??secure spoiler text??
 ~~deleted text~~ and invisible text:
 ^~~invisible text~~ (non-selectable, still occupy space).
 
-||marked text|| and ^||marked text with warning smell||.
+||marked text|| and ^||marked text with mistake smell||.
 
 $$subscript$$ and ^$$superscript$$.
 
@@ -60,7 +60,7 @@ secure spoiler text: ^??secure spoiler text??
 ~~deleted text~~ and invisible text:
 ^~~invisible text~~ (non-selectable, still occupy space).
 
-||marked text|| and ^||marked text with warning smell||.
+||marked text|| and ^||marked text with mistake smell||.
 
 $$subscript$$ and ^$$superscript$$.
 

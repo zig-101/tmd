@@ -8,6 +8,7 @@ img {
 }
 
 .tmd-doc {
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -16,6 +17,46 @@ img {
   margin-bottom: 0px;
   padding-top: 0px;
   padding-bottom: 0px;
+}
+
+.tmd-tab {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.tmd-tab-label {
+  padding: .2em 1em;
+  margin-bottom: 0;
+  margin-left: 2px;
+  margin-right: 2px;
+  cursor: pointer;
+  border-top: solid 1px #666;
+  border-left: solid 1px #666;
+  border-right: solid 1px #666;
+}
+
+.tmd-tab-radio {
+  display: none;
+}
+
+.tmd-tab-content {
+  order: 1;
+  width: 100%;
+  display: none;
+  padding: .5em 1em;
+  background: #eee;
+}
+
+.tmd-tab-radio:checked + .tmd-tab-label {
+  font-weight: bold;
+  background: #eee;
+  margin-bottom: -1px;
+  z-index: 1;
+}
+
+.tmd-tab-radio:checked + .tmd-tab-label + .tmd-tab-content {
+  display: block;
+  border: solid 1px #666;
 }
 
 .tmd-list {
@@ -52,6 +93,30 @@ img {
   position: absolute;
 }
 
+.tmd-block_quote-large {
+  margin-left: 6px;
+  padding-left: 6px;
+  font-size: xx-large;
+  padding: 0.3em 2em;
+}
+
+.tmd-block_quote-large > footer {
+  color: #888;
+  font-style: italic;
+  position: relative;
+  margin-left: 1em;
+  font-size: large;
+}
+
+.tmd-block_quote-large > footer:first-of-type:before {
+  content: '--';
+  margin-left: -1em;
+  color: #888;
+  position: absolute;
+}
+
+
+
 .tmd-note_box {
   border: solid 1px #000;
   margin: 3px 32px;
@@ -78,7 +143,14 @@ img {
 .tmd-unstyled_box {
 }
 
-.tmd-code-block {
+.tmd-code_snippet-header {
+  font-weight: bold;
+  font-style: italic;
+  background: #fcdba5;
+  padding-left: 6px;
+}
+
+.tmd-code_snippet {
   margin-top: 0px;
   margin-bottom: 0px;
   background: #ddd;

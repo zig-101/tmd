@@ -33,7 +33,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     var docParser = DocParser{ .tmdDoc = &tmdDoc };
     try docParser.parseAll(tmdData, allocator);
 
-    if (false and builtin.mode == .Debug)
+    if (true and builtin.mode == .Debug)
         dumpTmdDoc(&tmdDoc);
 
     return tmdDoc;
@@ -226,6 +226,7 @@ const BlockArranger = struct {
 
         if (isFirstInList) {
             newListItem.isFirst = true;
+            newListItem.firstItem = listItemBlock;
 
             listItemBlock.nestingDepth = self.count_1;
             self.stackedBlocks[self.count_1] = listItemBlock;
@@ -244,6 +245,7 @@ const BlockArranger = struct {
                 std.debug.assert(self.stackedBlocks[depth].blockType == .list_item);
                 var item = &self.stackedBlocks[depth].blockType.list_item;
                 if (item._markTypeIndex == newListItem._markTypeIndex) {
+                    newListItem.firstItem = item.firstItem;
                     break;
                 }
                 item.isLast = true;
@@ -350,6 +352,31 @@ const BlockArranger = struct {
 
         blockInfo.nestingDepth = self.count_1;
         self.stackedBlocks[self.count_1] = blockInfo;
+    }
+
+    fn stackFirstLevelHeaderBlock(self: *BlockArranger, blockInfo: *tmd.BlockInfo, firstInContainer: bool) !void {
+        if (firstInContainer) {
+            const last = self.stackedBlocks[self.count_1];
+            std.debug.assert(last.isContainer());
+            std.debug.assert(last.nestingDepth == self.count_1);
+            switch (last.blockType) {
+                .list_item => |*listItem| listItem.confirmTabItem(),
+                else => {},
+            }
+        } else {
+            const last = self.stackedBlocks[self.count_1];
+            std.debug.assert(last.nestingDepth == self.count_1 or last.blockType == .base or last.blockType == .root);
+            std.debug.assert(!last.isContainer());
+            if (last.blockType == .directive) {
+                const container = self.stackedBlocks[self.count_1 - 1];
+                switch (container.blockType) {
+                    .list_item => |*listItem| listItem.confirmTabItem(),
+                    else => {},
+                }
+            }
+        }
+
+        try self.stackAtomBlock(blockInfo, firstInContainer);
     }
 };
 
@@ -2446,10 +2473,13 @@ const DocParser = struct {
                             break :handle;
                         }
 
+                        var isFirstLevel = false;
+
                         lineScanner.advance(1);
                         const markLen = if (lineScanner.peekNext()) |c| blk: {
                             switch (c) {
                                 '#', '=', '+', '-' => |mark| {
+                                    isFirstLevel = mark == '#';
                                     lineScanner.advance(3);
                                     break :blk 3 + lineScanner.readUntilNotChar(mark);
                                 },
@@ -2483,7 +2513,7 @@ const DocParser = struct {
                                 .startLine = lineInfo,
                             },
                         };
-                        try blockArranger.stackAtomBlock(headerBlockInfo, isContainerFirstLine);
+                        if (isFirstLevel) try blockArranger.stackFirstLevelHeaderBlock(headerBlockInfo, isContainerFirstLine) else try blockArranger.stackAtomBlock(headerBlockInfo, isContainerFirstLine);
 
                         parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = headerBlockInfo;
@@ -2707,6 +2737,9 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                     std.debug.print(" (first)", .{});
                 } else if (item.isLast) {
                     std.debug.print(" (last)", .{});
+                }
+                if (item.isTabItem()) {
+                    std.debug.print(" (tab)", .{});
                 }
             },
             else => {},

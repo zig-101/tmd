@@ -22,18 +22,13 @@ const BlockInfoElement = list.Element(tmd.BlockInfo);
 const LineInfoElement = list.Element(tmd.LineInfo);
 const TokenInfoElement = list.Element(tmd.TokenInfo);
 
-const nullBlockInfoElement = &list.Element(tmd.BlockInfo){
-    .value = tmd.BlockInfo{
-        // only use the nestingDepth field.
-        .nestingDepth = 0,
-        .blockType = undefined,
-    },
+const TabListInfo = struct {
+    orderId: u32,
+    nextItemOrderId: u32 = 0,
 };
 
 const TmdRender = struct {
     doc: tmd.Doc,
-
-    lastRenderedBlockIsBlank: bool = true, // ToDo: need this?
 
     nullBlockInfoElement: list.Element(tmd.BlockInfo) = .{
         .value = .{
@@ -44,6 +39,10 @@ const TmdRender = struct {
             },
         },
     },
+
+    tabListInfos: [tmd.MaxBlockNestingDepth]TabListInfo = undefined,
+    currentTabListDepth: i32 = -1,
+    nextTabListOrderId: u32 = 0,
 
     fn render(self: *TmdRender, w: anytype, renderRoot: bool) !void {
         const element = self.doc.blocks.head();
@@ -60,23 +59,33 @@ const TmdRender = struct {
         return self.renderNextBlocks(w, parentElement.value.nestingDepth, parentElement, atMostCount);
     }
 
-    fn renderBlockChildrenForIndented(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
+    fn getFollowingLevel1HeaderBlockElement(self: *TmdRender, parentElement: *BlockInfoElement) ?*BlockInfoElement {
         var afterElement = parentElement;
         while (afterElement.next) |element| {
             const blockInfo = &element.value;
             switch (blockInfo.blockType) {
                 .directive => afterElement = element,
                 .header => if (blockInfo.blockType.header.level(self.doc.data) == 1) {
-                    _ = try w.write("<div");
-                    try writeBlockID(w, blockInfo.attributes);
-                    _ = try w.write(" class='tmd-indented-header'>");
-                    try self.writeUsualContentBlockLines(w, blockInfo, false);
-                    _ = try w.write("</div>");
-                    afterElement = element;
+                    return element;
                 } else break,
                 else => break,
             }
         }
+        return null;
+    }
+
+    fn renderBlockChildrenForIndented(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
+        const afterElement = if (self.getFollowingLevel1HeaderBlockElement(parentElement)) |headerElement| blk: {
+            const blockInfo = &headerElement.value;
+
+            _ = try w.write("<div");
+            try writeBlockID(w, blockInfo.attributes);
+            _ = try w.write(" class='tmd-indented-header'>");
+            try self.writeUsualContentBlockLines(w, blockInfo, false);
+            _ = try w.write("</div>");
+
+            break :blk headerElement;
+        } else parentElement;
 
         _ = try w.write("\n<div class='tmd-note_box-content'>\n");
 
@@ -85,23 +94,35 @@ const TmdRender = struct {
         return element;
     }
 
+    fn renderBlockChildrenForLargeBlockQuote(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
+        const afterElement = if (self.getFollowingLevel1HeaderBlockElement(parentElement)) |headerElement| blk: {
+            const blockInfo = &headerElement.value;
+
+            _ = try w.write("<div");
+            try writeBlockID(w, blockInfo.attributes);
+            _ = try w.write(" class='tmd-usual'>");
+            try self.writeUsualContentBlockLines(w, blockInfo, false);
+            _ = try w.write("</div>");
+
+            break :blk headerElement;
+        } else parentElement;
+
+        const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
+        return element;
+    }
+
     fn renderBlockChildrenForNoteBox(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
-        var afterElement = parentElement;
-        while (afterElement.next) |element| {
-            const blockInfo = &element.value;
-            switch (blockInfo.blockType) {
-                .directive => afterElement = element,
-                .header => if (blockInfo.blockType.header.level(self.doc.data) == 1) {
-                    _ = try w.write("<div");
-                    try writeBlockID(w, blockInfo.attributes);
-                    _ = try w.write(" class='tmd-note_box-header'>");
-                    try self.writeUsualContentBlockLines(w, blockInfo, false);
-                    _ = try w.write("</div>");
-                    afterElement = element;
-                } else break,
-                else => break,
-            }
-        }
+        const afterElement = if (self.getFollowingLevel1HeaderBlockElement(parentElement)) |headerElement| blk: {
+            const blockInfo = &headerElement.value;
+
+            _ = try w.write("<div");
+            try writeBlockID(w, blockInfo.attributes);
+            _ = try w.write(" class='tmd-note_box-header'>");
+            try self.writeUsualContentBlockLines(w, blockInfo, false);
+            _ = try w.write("</div>");
+
+            break :blk headerElement;
+        } else parentElement;
 
         _ = try w.write("\n<div class='tmd-note_box-content'>\n");
 
@@ -113,27 +134,21 @@ const TmdRender = struct {
     fn renderBlockChildrenForDisclosure(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
         _ = try w.write("\n<details>\n");
 
-        var afterElement = parentElement;
-        const summaryWritten = while (afterElement.next) |element| {
-            const blockInfo = &element.value;
-            switch (blockInfo.blockType) {
-                .directive => afterElement = element,
-                .header => if (blockInfo.blockType.header.level(self.doc.data) == 1) {
-                    _ = try w.write("<summary");
-                    try writeBlockID(w, blockInfo.attributes);
-                    _ = try w.write(">\n");
-                    try self.writeUsualContentBlockLines(w, blockInfo, false);
-                    _ = try w.write("</summary>\n");
-                    afterElement = element;
-                    break true;
-                } else break false,
-                else => break false,
-            }
-        } else false;
+        const afterElement = if (self.getFollowingLevel1HeaderBlockElement(parentElement)) |headerElement| blk: {
+            const blockInfo = &headerElement.value;
 
-        if (!summaryWritten) {
+            _ = try w.write("<summary");
+            try writeBlockID(w, blockInfo.attributes);
+            _ = try w.write(">\n");
+            try self.writeUsualContentBlockLines(w, blockInfo, false);
+            _ = try w.write("</summary>\n");
+
+            break :blk headerElement;
+        } else blk: {
             _ = try w.write("<summary></summary>\n");
-        }
+
+            break :blk parentElement;
+        };
 
         _ = try w.write("<div class='tmd-disclosure_box-content'>");
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
@@ -179,22 +194,84 @@ const TmdRender = struct {
                     // containers
 
                     .list_item => |listItem| {
-                        if (listItem.isFirst) {
-                            switch (listItem.bulletType()) {
-                                .unordered => _ = try w.write("\n<ul"),
-                                .ordered => _ = try w.write("\n<ol"),
+                        if (listItem.isTabItem()) {
+                            const tabInfo = if (listItem.isFirst) blk: {
+                                _ = try w.write("\n<div");
+                                _ = try w.write(" class='tmd-tab'>\n");
+
+                                const orderId = self.nextTabListOrderId;
+                                self.nextTabListOrderId += 1;
+
+                                std.debug.assert(self.currentTabListDepth >= -1 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
+                                self.currentTabListDepth += 1;
+                                self.tabListInfos[@intCast(self.currentTabListDepth)] = TabListInfo{
+                                    .orderId = orderId,
+                                };
+
+                                break :blk self.tabListInfos[@intCast(self.currentTabListDepth)];
+                            } else blk: {
+                                std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
+                                self.tabListInfos[@intCast(self.currentTabListDepth)].nextItemOrderId += 1;
+                                break :blk self.tabListInfos[@intCast(self.currentTabListDepth)];
+                            };
+
+                            _ = try w.print("<input type='radio' class='tmd-tab-radio' name='tmd-tab-{d}' id='tmd-tab-{d}-input-{d}'", .{
+                                tabInfo.orderId, tabInfo.orderId, tabInfo.nextItemOrderId,
+                            });
+                            if (listItem.isFirst) {
+                                _ = try w.write(" checked");
                             }
-                            _ = try w.write(" class='tmd-list'>\n");
-                        }
-                        _ = try w.write("\n<li");
-                        try writeBlockID(w, blockInfo.attributes);
-                        _ = try w.write(">\n");
-                        element = try self.renderBlockChildren(w, element, 0);
-                        _ = try w.write("\n</li>\n");
-                        if (listItem.isLast) {
-                            switch (listItem.bulletType()) {
-                                .unordered => _ = try w.write("\n</ul>\n"),
-                                .ordered => _ = try w.write("\n</ol>\n"),
+                            _ = try w.write(">\n");
+                            _ = try w.print("<label for='tmd-tab-{d}-input-{d}' class='tmd-tab-label'", .{
+                                tabInfo.orderId, tabInfo.nextItemOrderId,
+                            });
+
+                            const afterElement2 = if (self.getFollowingLevel1HeaderBlockElement(element)) |headerElement| blk: {
+                                const headerBlockInfo = &headerElement.value;
+
+                                try writeBlockID(w, headerBlockInfo.attributes);
+                                _ = try w.write(">\n");
+
+                                try self.writeUsualContentBlockLines(w, headerBlockInfo, false);
+
+                                break :blk headerElement;
+                            } else blk: {
+                                _ = try w.write(">\n");
+                                break :blk element;
+                            };
+
+                            _ = try w.write("</label>\n");
+
+                            _ = try w.write("\n<div");
+                            try writeBlockID(w, blockInfo.attributes);
+                            _ = try w.write(" class='tmd-tab-content'>\n");
+                            element = try self.renderNextBlocks(w, element.value.nestingDepth, afterElement2, 0);
+                            _ = try w.write("\n</div>\n");
+
+                            if (listItem.isLast) {
+                                _ = try w.write("\n</div>\n");
+
+                                std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
+                                self.currentTabListDepth -= 1;
+                            }
+                        } else {
+                            if (listItem.isFirst) {
+                                switch (listItem.bulletType()) {
+                                    .unordered => _ = try w.write("\n<ul"),
+                                    .ordered => _ = try w.write("\n<ol"),
+                                }
+                                _ = try w.write(" class='tmd-list'>\n");
+                            }
+                            _ = try w.write("\n<li");
+                            try writeBlockID(w, blockInfo.attributes);
+                            _ = try w.write(">\n");
+                            element = try self.renderBlockChildren(w, element, 0);
+                            _ = try w.write("\n</li>\n");
+                            if (listItem.isLast) {
+                                switch (listItem.bulletType()) {
+                                    .unordered => _ = try w.write("\n</ul>\n"),
+                                    .ordered => _ = try w.write("\n</ol>\n"),
+                                }
                             }
                         }
                     },
@@ -208,8 +285,13 @@ const TmdRender = struct {
                     .block_quote => {
                         _ = try w.write("\n<div");
                         try writeBlockID(w, blockInfo.attributes);
-                        _ = try w.write(" class='tmd-block_quote'>\n");
-                        element = try self.renderBlockChildren(w, element, 0);
+                        if (self.getFollowingLevel1HeaderBlockElement(element)) |_| {
+                            _ = try w.write(" class='tmd-block_quote-large'>\n");
+                            element = try self.renderBlockChildrenForLargeBlockQuote(w, element, 0);
+                        } else {
+                            _ = try w.write(" class='tmd-block_quote'>\n");
+                            element = try self.renderBlockChildren(w, element, 0);
+                        }
                         _ = try w.write("\n</div>\n");
                     },
                     .note_box => {
@@ -238,23 +320,29 @@ const TmdRender = struct {
                     // atom
 
                     .header => |header| {
-                        const level = header.level(self.doc.data);
-
-                        _ = try w.print("\n<h{}", .{level});
-                        try writeBlockID(w, blockInfo.attributes);
-                        _ = try w.print(" class='tmd-header-{}'>", .{level});
-
-                        self.lastRenderedBlockIsBlank = false;
-
-                        try self.writeUsualContentBlockLines(w, blockInfo, false);
-
                         element = element.next orelse &self.nullBlockInfoElement;
 
-                        _ = try w.print("</h{}>\n", .{level});
+                        const level = header.level(self.doc.data);
+
+                        if (level == 1 and element.value.blockType == .code_snippet) {
+                            _ = try w.print("\n<div", .{});
+                            try writeBlockID(w, blockInfo.attributes);
+                            _ = try w.print(" class='tmd-code_snippet-header'>", .{});
+
+                            try self.writeUsualContentBlockLines(w, blockInfo, false);
+
+                            _ = try w.print("</div>\n", .{});
+                        } else {
+                            _ = try w.print("\n<h{}", .{level});
+                            try writeBlockID(w, blockInfo.attributes);
+                            _ = try w.print(" class='tmd-header-{}'>", .{level});
+
+                            try self.writeUsualContentBlockLines(w, blockInfo, false);
+
+                            _ = try w.print("</h{}>\n", .{level});
+                        }
                     },
                     .footer => {
-                        self.lastRenderedBlockIsBlank = false;
-
                         _ = try w.write("\n<footer");
                         try writeBlockID(w, blockInfo.attributes);
                         _ = try w.write(" class='tmd-footer'>\n");
@@ -264,8 +352,6 @@ const TmdRender = struct {
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
                     .usual => |usual| {
-                        self.lastRenderedBlockIsBlank = false;
-
                         const usualLine = usual.startLine.lineType.usual;
                         const writeBlank = usualLine.markLen > 0 and usualLine.tokens.empty();
 
@@ -290,8 +376,6 @@ const TmdRender = struct {
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
                     .code_snippet => |code_snippet| {
-                        self.lastRenderedBlockIsBlank = false;
-
                         const r = code_snippet.startPlayloadRange();
                         const playload = self.doc.data[r.start..r.end];
                         const attrs = parser.parse_code_block_open_playload(playload);
@@ -351,7 +435,7 @@ const TmdRender = struct {
 
         _ = try w.write("<pre");
         try writeBlockID(w, blockInfo.attributes);
-        _ = try w.write(" class='tmd-code-block");
+        _ = try w.write(" class='tmd-code_snippet");
         if (attrs.language.len > 0) {
             _ = try w.write("'><code class='language-");
             try writeHtmlAttributeValue(w, attrs.language);
