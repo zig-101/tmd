@@ -164,10 +164,24 @@ TMD source:
   - This is a 2nd-level list item (unordered).
   - This is another 2nd-level list item (unordered).
 
-**TMD
-	: a markup language which is much more powerful than traditional markdown.
+. // force ending of a container
+
+* ### Tab 1
+  -. This is a 2nd-level list item (ordered).
+  -. This is another 2nd-level list item (ordered).
+* ### Tab 2
+  - This is a 2nd-level list item (unordered).
+  - This is another 2nd-level list item (unordered).
+
+: This is an intended block.
+
+: ### TMD
+  ;;; a markup language which is much more powerful than traditional markdown.
 
 > This is a quotation text.
+
+> ### This is a quotation text looking larger.
+  ;;; Yes, it is larger.
 
 ! This is a note box without header.
 
@@ -195,10 +209,24 @@ Render result:
   - This is a 2nd-level list item (unordered).
   - This is another 2nd-level list item (unordered).
 
-**TMD
-	: a markup language which is much more powerful than traditional markdown.
+. // force ending of a container
+
+* ### Tab 1
+  -. This is a 2nd-level list item (ordered).
+  -. This is another 2nd-level list item (ordered).
+* ### Tab 2
+  - This is a 2nd-level list item (unordered).
+  - This is another 2nd-level list item (unordered).
+
+: This is an intended block.
+
+: ### TMD
+  ;;; a markup language which is much more powerful than traditional markdown.
 
 > This is a quotation text.
+
+> ### This is a quotation text looking larger.
+  ;;; Yes, it is larger.
 
 ! This is a note box without header.
 
