@@ -173,22 +173,36 @@ const TmdRender = struct {
                 }
                 switch (blockInfo.blockType) {
                     .root => unreachable,
-                    .base => |base| blk: {
-                        _ = try w.write("\n<div");
-                        if (base.openPlayloadRange()) |r| {
+                    .base => |base| handle: {
+                        const attrs = if (base.openPlayloadRange()) |r| blk: {
                             const playload = self.doc.data[r.start..r.end];
-                            const attrs = parser.parse_base_block_open_playload(playload);
-                            if (attrs.commentedOut) {
-                                _ = try w.write("></div>\n");
-                                element = try self.renderBlockChildren(std.io.null_writer, element, 0);
-                                break :blk;
-                            }
+                            break :blk parser.parse_base_block_open_playload(playload);
+                        } else tmd.BaseBlockAttibutes{};
+
+                        if (attrs.commentedOut) {
+                            element = try self.renderBlockChildren(std.io.null_writer, element, 0);
+                            break :handle;
                         }
 
+                        if (attrs.isFooter) _ = try w.write("\n<footer")
+                        else _ = try w.write("\n<div");
+
                         try writeBlockID(w, blockInfo.attributes);
-                        _ = try w.write(" class='tmd-base'>");
+
+                        if (attrs.isFooter) _ = try w.write(" class='tmd-base tmd-footer'")
+                        else _ = try w.write(" class='tmd-base'");
+
+                        switch (attrs.horizontalAlign) {
+                            .none => {},
+                            .left => _ = try w.write(" style='text-align: left;'"),
+                            .center => _ = try w.write(" style='text-align: center;'"),
+                            .justify => _ = try w.write(" style='text-align: justify;'"),
+                            .right => _ = try w.write(" style='text-align: right;'"),
+                        }
+                        _ = try w.write(">");
                         element = try self.renderBlockChildren(w, element, 0);
-                        _ = try w.write("\n</div>\n");
+                        if (attrs.isFooter) _ = try w.write("\n</footer>\n")
+                        else _ = try w.write("\n</div>\n");
                     },
 
                     // containers
@@ -342,15 +356,15 @@ const TmdRender = struct {
                             _ = try w.print("</h{}>\n", .{level});
                         }
                     },
-                    .footer => {
-                        _ = try w.write("\n<footer");
-                        try writeBlockID(w, blockInfo.attributes);
-                        _ = try w.write(" class='tmd-footer'>\n");
-                        try self.writeUsualContentBlockLines(w, blockInfo, false);
-                        _ = try w.write("\n</footer>\n");
-
-                        element = element.next orelse &self.nullBlockInfoElement;
-                    },
+                    //.footer => {
+                    //    _ = try w.write("\n<footer");
+                    //    try writeBlockID(w, blockInfo.attributes);
+                    //    _ = try w.write(" class='tmd-footer'>\n");
+                    //    try self.writeUsualContentBlockLines(w, blockInfo, false);
+                    //    _ = try w.write("\n</footer>\n");
+                    //
+                    //    element = element.next orelse &self.nullBlockInfoElement;
+                    //},
                     .usual => |usual| {
                         const usualLine = usual.startLine.lineType.usual;
                         const writeBlank = usualLine.markLen > 0 and usualLine.tokens.empty();
@@ -383,8 +397,18 @@ const TmdRender = struct {
                             _ = try w.write("\n<div");
                             try writeBlockID(w, blockInfo.attributes);
                             _ = try w.write("></div>\n");
-                        } else {
+                        } else blk: {
                             try self.writeCodeBlockLines(w, blockInfo, attrs);
+
+                            const r2 = code_snippet.endPlayloadRange() orelse break :blk;
+                            const closePlayload = self.doc.data[r2.start..r2.end];
+                            const streamAttrs = parser.parse_block_close_playload(closePlayload);
+                            const content = streamAttrs.content;
+                            if (content.len == 0) break :blk;
+                            if (std.ascii.startsWithIgnoreCase(content, "./") or std.ascii.startsWithIgnoreCase(content, "../")) {
+                                // ToDo: ...
+                            } else {
+                            }
                         }
 
                         element = element.next orelse &self.nullBlockInfoElement;
@@ -564,6 +588,7 @@ const TmdRender = struct {
                                     }
 
                                     const mediaInfoElement = tokenInfoElement.next.?;
+                                    const isInline = tokenInfoElement.prev == null and mediaInfoElement.next == null;
 
                                     writeMedia: {
                                         const mediaInfoToken = mediaInfoElement.value;
@@ -581,7 +606,11 @@ const TmdRender = struct {
 
                                         _ = try w.write("<img src=\"");
                                         try writeHtmlAttributeValue(w, src);
-                                        _ = try w.write("\"/>");
+                                        if (isInline) {
+                                            _ = try w.write("\" class='tmd-inline-media'/>");
+                                        } else {
+                                            _ = try w.write("\"/>");
+                                        }
                                     }
 
                                     element = mediaInfoElement.next;

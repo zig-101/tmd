@@ -255,5 +255,10 @@ img {
   white-space: break-spaces;
 }
 
+.tmd-inline-media {
+  height: 1em;
+  vertical-align:middle;
+}
+
 </style>
 

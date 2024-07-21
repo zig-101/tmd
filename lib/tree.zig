@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 // Ported from https://raw.githubusercontent.com/HuKeping/rbtree/master/rbtree.go,
 // which might be ported from https://www.eecs.umich.edu/courses/eecs380/ALG/niemann/s_rbt.txt.
 
-pub fn RedBlack(comptime Value: type, comptime Size: type) type {
+pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
     return struct {
         pub const Color = enum { red, black };
 
@@ -50,7 +50,7 @@ pub fn RedBlack(comptime Value: type, comptime Size: type) type {
 
         pub const Tree = struct {
             root: *Node = undefined,
-            count: Size = 0,
+            count: usize = 0,
 
             _nilNodePtr: *Node = undefined, // ToDo: use true null instead
             _redNode: NodeWithoutValue = undefined,
@@ -108,7 +108,7 @@ pub fn RedBlack(comptime Value: type, comptime Size: type) type {
             pub fn search(t: *const Tree, v: Value) ?*Node {
                 var p = t.root;
                 while (p != t._nilNodePtr) {
-                    const c = Value.compare(p.value, v);
+                    const c = CompareNamespace.compare(p.value, v);
                     if (c == 0) {
                         return p;
                     }
@@ -123,8 +123,8 @@ pub fn RedBlack(comptime Value: type, comptime Size: type) type {
             }
 
             // Please make sure that the life time of the tree in within the lifetime of z.
-            // z must not be in t now. If the return Node is z, then insertion succeeds;
-            // otherwise means duplication is found (so the insertion is not made).
+            // If the return Node is z, then insertion succeeds;
+            // otherwise it means duplication is found (so the insertion is not made).
             pub fn insert(t: *Tree, z: *Node) *Node {
                 // Done in the following while loop.
                 //if (builtin.mode == .Debug) {
@@ -138,7 +138,7 @@ pub fn RedBlack(comptime Value: type, comptime Size: type) type {
 
                 var less: bool = undefined;
                 while (x != t._nilNodePtr) {
-                    const c = Value.compare(z.value, x.value);
+                    const c = CompareNamespace.compare(z.value, x.value);
                     if (c == 0) {
                         std.debug.assert(z != x);
                         return x;

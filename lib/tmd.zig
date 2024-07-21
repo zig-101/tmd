@@ -10,12 +10,20 @@ pub const render = @import("tmd_to_html.zig");
 const std = @import("std");
 const builtin = @import("builtin");
 const list = @import("list.zig");
+const tree = @import("tree.zig");
+
+pub const BlockInfoRedBlack = tree.RedBlack(*BlockInfo, BlockInfo);
 
 pub const Doc = struct {
     data: []const u8,
     blocks: list.List(BlockInfo) = .{},
-    blockAttributes: list.List(BlockAttibutes) = .{},
     lines: list.List(LineInfo) = .{},
+
+    blocksByID: BlockInfoRedBlack.Tree = .{},
+
+    blockAttributes: list.List(BlockAttibutes) = .{},
+    blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{},
+
     pendingLinks: list.List(*LinkInfo) = .{}, // ToDo
 };
 
@@ -74,14 +82,6 @@ pub fn listBulletIndex(bulletMark: []const u8) ListMarkTypeIndex {
 pub const BlockAttibutes = struct {
     //keepFormat: bool = false,
 
-    //horizontalAlign: enum {
-    //    none,
-    //    left,
-    //    center,
-    //    justify,
-    //    right,
-    //} = .none,
-
     id: []const u8 = "", // ToDo: should be a Range?
 
     //classes: []const u8 = "", // ToDo: should be Range list?
@@ -94,23 +94,39 @@ pub const BlockAttibutes = struct {
 };
 
 pub const BaseBlockAttibutes = struct {
-    commentedOut: bool = false,
+    commentedOut: bool = false, // ToDo: use Range
+    isFooter: bool = false, // ToDo: use Range
+    horizontalAlign: enum {
+        none,
+        left,
+        center,
+        right,
+        justify,
+    } = .none,
 };
 
 pub const CodeBlockAttibutes = struct {
-    commentedOut: bool = false,
-    language: []const u8 = "",
+    commentedOut: bool = false, // ToDo: use Range
+    language: []const u8 = "", // ToDo: use Range
     // ToDo
     // startLineNumber: u32 = 0, // ++n 0 means not show line numbers
     // filepath: []const u8 = "", // @@path
 };
 
+pub const ContentStreamAttributes = struct {
+    content: []const u8 = "", // ToDo: use Range
+};
+
 pub const CustomBlockAttibutes = struct {
-    commentedOut: bool = false,
-    customApp: []const u8 = "",
-    arguments: []const u8 = "",
+    commentedOut: bool = false, // ToDo: use Range
+    customApp: []const u8 = "", // ToDo: use Range
+    arguments: []const u8 = "", // ToDo: use Range
     // The argument is the content in the following custom block.
     // It might be a file path.
+};
+
+pub const MediaAttributes = struct {
+    // ToDo: ...
 };
 
 // Note: keep the two consistent.
@@ -186,6 +202,26 @@ pub const BlockInfo = struct {
                 unreachable;
             },
         };
+    }
+
+    pub fn compare(x: *const @This(), y: *const @This()) isize {
+        const xAttributes = x.attributes orelse unreachable;
+        const yAttributes = y.attributes orelse unreachable;
+        const xID = if (xAttributes.id.len > 0) xAttributes.id else unreachable;
+        const yID = if (yAttributes.id.len > 0) yAttributes.id else unreachable;
+        const i = std.mem.indexOfDiff(u8, xID, yID) orelse return 0;
+        if (xID.len == i) {
+            std.debug.assert(yID.len > i);
+            return -1;
+        }
+        std.debug.assert(xID.len > i);
+        if (yID.len == i) {
+            return 1;
+        }
+        std.debug.assert(yID.len > i);
+        std.debug.assert(xID[i] != yID[i]);
+        if (xID[i] < yID[i]) return -1;
+        return 1;
     }
 };
 
@@ -327,18 +363,18 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
-    footer: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
-
-        // ToDo: when false, no need to render.
-        //       So a block with a singal ` will outout nothing.
-        //       Maybe needless with .blankSpan.
-        // hasContent: bool = false,
-
-        // traits:
-        const Atom = void;
-    },
+    //footer: struct {
+    //    startLine: *LineInfo = undefined,
+    //    endLine: *LineInfo = undefined,
+    //
+    //    // ToDo: when false, no need to render.
+    //    //       So a block with a singal ` will outout nothing.
+    //    //       Maybe needless with .blankSpan.
+    //    // hasContent: bool = false,
+    //
+    //    // traits:
+    //    const Atom = void;
+    //},
 
     directive: struct {
         startLine: *LineInfo = undefined,

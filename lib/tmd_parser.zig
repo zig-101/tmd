@@ -21,14 +21,23 @@ pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
 
     destroyListElements(tmd.LineInfo, tmdDoc.lines, T.destroyLineTokens, allocator);
     destroyListElements(tmd.BlockAttibutes, tmdDoc.blockAttributes, null, allocator);
+    destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
 
     tmdDoc.* = .{ .data = "" };
 }
 
 pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     var tmdDoc = tmd.Doc{ .data = tmdData };
-
     errdefer destroy_tmd_doc(&tmdDoc, allocator);
+
+    const nilBlockTreeNodeElement = try createListElement(tmd.BlockInfoRedBlack.Node, allocator);
+    tmdDoc.blockTreeNodes.push(nilBlockTreeNodeElement);
+    const nilBlockTreeNode = &nilBlockTreeNodeElement.value;
+    nilBlockTreeNode.* = .{
+        .color = .black,
+        .value = undefined,
+    };
+    tmdDoc.blocksByID.init(nilBlockTreeNode);
 
     var docParser = DocParser{ .tmdDoc = &tmdDoc };
     try docParser.parseAll(tmdData, allocator);
@@ -805,9 +814,15 @@ const ContentParser = struct {
         const lineScanner = self.lineScanner;
 
         const contentEnd = parse_tokens: {
+            const escapedSpanStatus = self.escapedSpanStatus;
+            const codeSpanStatus = self.codeSpanStatus;
+
             var textStart = lineStart;
 
-            if (handlLineSpanMark) {
+            if (handlLineSpanMark
+                //and escapedSpanStatus.openMark == null
+                //and codeSpanStatus.openMark == null
+                ) {
                 std.debug.assert(textStart == lineScanner.cursor);
 
                 const c = lineScanner.peekCursor();
@@ -860,9 +875,6 @@ const ContentParser = struct {
                     break :parse_tokens textEnd;
                 }
             }
-
-            const escapedSpanStatus = self.escapedSpanStatus;
-            const codeSpanStatus = self.codeSpanStatus;
 
             search_marks: while (true) {
                 std.debug.assert(lineScanner.lineEnd == null);
@@ -1290,7 +1302,7 @@ const ContentParser = struct {
             freeNodeList: ?*Node = null,
             //freeLinkInfoElement: list.List(*tmd.LinkInfo) = .{},
 
-            const rbtree = tree.RedBlack(NodeValue, u32);
+            const rbtree = tree.RedBlack(NodeValue, NodeValue);
             const Tree = rbtree.Tree;
             const Node = rbtree.Node;
 
@@ -1338,7 +1350,7 @@ const ContentParser = struct {
             }
 
             fn getFreeNode(self: *@This()) !*Node {
-                const n = if (self.tryToGetFreeNode()) |node| node else try self.allocator.create(Node);
+                const n = self.tryToGetFreeNode() orelse try self.allocator.create(Node);
 
                 n.* = .{
                     .value = .{},
@@ -2531,7 +2543,8 @@ const DocParser = struct {
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
                     },
-                    ';', '&' => |mark| handle: {
+                    //'&',
+                    ';' => |mark| handle: {
                         lineScanner.advance(1);
                         const markLen = lineScanner.readUntilNotChar(mark) + 1;
                         if (markLen < 3) {
@@ -2549,7 +2562,7 @@ const DocParser = struct {
                             }
                         }
 
-                        const newAtomBlock = if (mark == ';') blk: {
+                        //const newAtomBlock = if (mark == ';') blk: {
                             lineInfo.lineType = .{ .usual = .{
                                 .markLen = markLen,
                                 .markEndWithSpaces = lineScanner.cursor,
@@ -2561,21 +2574,22 @@ const DocParser = struct {
                                     .startLine = lineInfo,
                                 },
                             };
-                            break :blk usualBlockInfo;
-                        } else blk: {
-                            lineInfo.lineType = .{ .footer = .{
-                                .markLen = markLen,
-                                .markEndWithSpaces = lineScanner.cursor,
-                            } };
-
-                            const footerBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
-                            footerBlockInfo.blockType = .{
-                                .footer = .{
-                                    .startLine = lineInfo,
-                                },
-                            };
-                            break :blk footerBlockInfo;
-                        };
+                            //break :blk usualBlockInfo;
+                            const newAtomBlock = usualBlockInfo;
+                        //} else blk: {
+                        //    lineInfo.lineType = .{ .footer = .{
+                        //        .markLen = markLen,
+                        //        .markEndWithSpaces = lineScanner.cursor,
+                        //    } };
+                        //
+                        //    const footerBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        //    footerBlockInfo.blockType = .{
+                        //        .footer = .{
+                        //            .startLine = lineInfo,
+                        //        },
+                        //    };
+                        //    break :blk footerBlockInfo;
+                        //};
 
                         try blockArranger.stackAtomBlock(newAtomBlock, isContainerFirstLine);
 
@@ -2665,9 +2679,10 @@ const DocParser = struct {
                     } };
 
                     if (isContainerFirstLine or
-                        currentAtomBlockInfo.blockType != .usual and
-                        currentAtomBlockInfo.blockType != .header and
-                        currentAtomBlockInfo.blockType != .footer)
+                        currentAtomBlockInfo.blockType != .usual
+                        and currentAtomBlockInfo.blockType != .header
+                        //and currentAtomBlockInfo.blockType != .footer
+                        )
                     {
                         const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                         usualBlockInfo.blockType = .{
@@ -2714,6 +2729,29 @@ const DocParser = struct {
         contentParser.on_new_atom_block(); // try to determine line-end render manner for the last coment line.
 
         try contentParser.matchLinks(); // ToDo: same effect when being put in the above else-block.
+        
+        // 
+        {
+            var blockElement = parser.tmdDoc.blocks.head();
+            while (blockElement) |be| {
+                defer blockElement = be.next;
+                const blockInfo = &be.value;
+                const attributes = blockInfo.attributes orelse continue;
+                if (attributes.id.len == 0) continue;
+
+                const blockTreeNodeElement = try createListElement(tmd.BlockInfoRedBlack.Node, allocator);
+                parser.tmdDoc.blockTreeNodes.push(blockTreeNodeElement);
+                const blockTreeNode = &blockTreeNodeElement.value;
+                blockTreeNode.value = blockInfo;
+                const n = parser.tmdDoc.blocksByID.insert(blockTreeNode);
+                if (n != blockTreeNode) {
+                    // ToDo: maybe, should destroy the memory ... ?
+                    std.debug.print("duplicated block ID: {s}.\n", .{attributes.id});
+                } else {
+                    std.debug.print("block #{s} registered.\n", .{attributes.id});
+                }
+            }
+        }
     }
 };
 
@@ -2861,51 +2899,55 @@ pub fn parse_anchor_id(anchorInfo: []const u8) []const u8 {
     return anchorInfo; // ToDo: return the valid prefix
 }
 
-//pub fn parse_block_close_playload(playload: []const u8) ?tmd.BlockContentFlow {
-//    return null;
-//}
 
-// ToDo: remove this function.
+// ToDo: remove the following parse functions (use tokens instead).
+
 pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibutes {
     var attrs = tmd.BaseBlockAttibutes{};
 
     const commentedOut = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "commentedOut").?;
-    //const horizontalAlign = std.meta.fieldIndex(tmd.BlockAttibutes, "horizontalAlign").?;
-    //const id = std.meta.fieldIndex(tmd.BlockAttibutes, "id").?;
-    //const classes = std.meta.fieldIndex(tmd.BlockAttibutes, "classes").?;
+    const isFooter = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "isFooter").?;
+    const horizontalAlign = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "horizontalAlign").?;
+    //const classes = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "classes").?;
 
-    const lastOrder: isize = -1;
+    var lastOrder: isize = -1;
 
     var it = mem.splitAny(u8, playload, " \t");
     var item = it.first();
     while (true) {
-        if (item.len != 0) handle: {
+        if (item.len != 0) {
             switch (item[0]) {
                 '/' => {
-                    if (lastOrder >= commentedOut) break :handle;
-                    if (item.len == 1) break :handle;
+                    if (lastOrder >= commentedOut) break;
+                    if (item.len == 1) break;
                     for (item[1..]) |c| {
-                        if (c != '/') break :handle;
+                        if (c != '/') break;
                     }
                     attrs.commentedOut = true;
-                    //lastOrder = commentedOut;
-                    return attrs;
+                    lastOrder = commentedOut;
                 },
-                //'>', '<' => {
-                //    if (lastOrder >= horizontalAlign) break :handle;
-                //    if (item.len != 2) break :handle;
-                //    if (item[1] != '>' and item[1] != '<') break :handle;
-                //    if (mem.eql(u8, item, "<<"))
-                //        attrs.horizontalAlign = .left
-                //    else if (mem.eql(u8, item, ">>"))
-                //        attrs.horizontalAlign = .right
-                //    else if (mem.eql(u8, item, "><"))
-                //        attrs.horizontalAlign = .center
-                //    else if (mem.eql(u8, item, "<>"))
-                //        attrs.horizontalAlign = .justify
-                //    ;
-                //    lastOrder = horizontalAlign;
-                //},
+                '&' => {
+                    if (lastOrder >= isFooter) break;
+                    if (item.len != 2) break;
+                    if (item[1] != '&') break;
+                    attrs.isFooter = true;
+                    lastOrder = horizontalAlign;
+                },
+                '>', '<' => {
+                    if (lastOrder >= horizontalAlign) break;
+                    if (item.len != 2) break;
+                    if (item[1] != '>' and item[1] != '<') break;
+                    if (mem.eql(u8, item, "<<"))
+                        attrs.horizontalAlign = .left
+                    else if (mem.eql(u8, item, ">>"))
+                        attrs.horizontalAlign = .right
+                    else if (mem.eql(u8, item, "><"))
+                        attrs.horizontalAlign = .center
+                    else if (mem.eql(u8, item, "<>"))
+                        attrs.horizontalAlign = .justify
+                    ;
+                    lastOrder = horizontalAlign;
+                },
                 //'#' => {
                 //    if (lastOrder >= id) break :handle;
                 //    if (item.len == 1) break :handle;
@@ -2967,6 +3009,36 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
             item = next;
         } else break;
     }
+    return attrs;
+}
+
+pub fn parse_block_close_playload(playload: []const u8) tmd.ContentStreamAttributes {
+    var attrs = tmd.ContentStreamAttributes{};
+
+    var arrowFound = false;
+    var content: []const u8 = "";
+
+    var it = mem.splitAny(u8, playload, " \t");
+    var item = it.first();
+    while (true) {
+        if (item.len != 0) {
+            if (!arrowFound) {
+                if (item.len != 2) return attrs;
+                for (item) |c| if (c != '<') return attrs;
+                arrowFound = true;
+            } else if (content.len > 0) {
+                return attrs;
+            } else if (item.len > 0) {
+                content = item;
+            }
+        }
+
+        if (it.next()) |next| {
+            item = next;
+        } else break;
+    }
+
+    attrs.content = content;
     return attrs;
 }
 
