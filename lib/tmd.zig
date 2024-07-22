@@ -23,8 +23,21 @@ pub const Doc = struct {
 
     blockAttributes: list.List(BlockAttibutes) = .{},
     blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{},
+    freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null,
 
     pendingLinks: list.List(*LinkInfo) = .{}, // ToDo
+
+    pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
+        var a = BlockAttibutes{
+            .id = id,
+        };
+        var b = BlockInfo{
+            .blockType = undefined,
+            .attributes = &a,
+        };
+
+        return if (self.blocksByID.search(&b)) |node| node.value else null;
+    }
 };
 
 pub const Range = struct {
@@ -80,17 +93,8 @@ pub fn listBulletIndex(bulletMark: []const u8) ListMarkTypeIndex {
 
 // A BlockAttibutes directive line
 pub const BlockAttibutes = struct {
-    //keepFormat: bool = false,
-
     id: []const u8 = "", // ToDo: should be a Range?
-
-    //classes: []const u8 = "", // ToDo: should be Range list?
-
-    // ToDo: RangeListElement should be union {
-    //    range: Range,
-    //    next: *RangeListElement,
-    // }
-    // So that Ranges can be batch allocated together.
+    classes: []const u8 = "", // ToDo: should be Range list?
 };
 
 pub const BaseBlockAttibutes = struct {
@@ -804,11 +808,9 @@ pub const SpanMarkType = enum(u8) {
     }
 };
 
+// used in usual blocks:
 pub const LineSpanMarkType = enum(u8) {
-    // used in usual blocks:
     lineBreak, // \\
     comment, // //
-    media, // ::
-    anchor, // ==
-    //class,   // ..
+    media, // @@
 };

@@ -184,13 +184,11 @@ const TmdRender = struct {
                             break :handle;
                         }
 
-                        if (attrs.isFooter) _ = try w.write("\n<footer")
-                        else _ = try w.write("\n<div");
+                        if (attrs.isFooter) _ = try w.write("\n<footer") else _ = try w.write("\n<div");
 
                         try writeBlockID(w, blockInfo.attributes);
 
-                        if (attrs.isFooter) _ = try w.write(" class='tmd-base tmd-footer'")
-                        else _ = try w.write(" class='tmd-base'");
+                        if (attrs.isFooter) _ = try w.write(" class='tmd-base tmd-footer'") else _ = try w.write(" class='tmd-base'");
 
                         switch (attrs.horizontalAlign) {
                             .none => {},
@@ -201,8 +199,7 @@ const TmdRender = struct {
                         }
                         _ = try w.write(">");
                         element = try self.renderBlockChildren(w, element, 0);
-                        if (attrs.isFooter) _ = try w.write("\n</footer>\n")
-                        else _ = try w.write("\n</div>\n");
+                        if (attrs.isFooter) _ = try w.write("\n</footer>\n") else _ = try w.write("\n</div>\n");
                     },
 
                     // containers
@@ -397,18 +394,8 @@ const TmdRender = struct {
                             _ = try w.write("\n<div");
                             try writeBlockID(w, blockInfo.attributes);
                             _ = try w.write("></div>\n");
-                        } else blk: {
+                        } else {
                             try self.writeCodeBlockLines(w, blockInfo, attrs);
-
-                            const r2 = code_snippet.endPlayloadRange() orelse break :blk;
-                            const closePlayload = self.doc.data[r2.start..r2.end];
-                            const streamAttrs = parser.parse_block_close_playload(closePlayload);
-                            const content = streamAttrs.content;
-                            if (content.len == 0) break :blk;
-                            if (std.ascii.startsWithIgnoreCase(content, "./") or std.ascii.startsWithIgnoreCase(content, "../")) {
-                                // ToDo: ...
-                            } else {
-                            }
                         }
 
                         element = element.next orelse &self.nullBlockInfoElement;
@@ -473,7 +460,10 @@ const TmdRender = struct {
                 const lineInfo = &lineInfoElement.value;
                 switch (lineInfo.lineType) {
                     .codeSnippetEnd => break,
-                    .code => _ = try w.write(self.doc.data[lineInfo.range.start..lineInfo.range.end]),
+                    .code => {
+                        const r = lineInfo.range;
+                        try writeHtmlContentText(w, self.doc.data[r.start..r.end]);
+                    },
                     else => unreachable,
                 }
 
@@ -484,6 +474,22 @@ const TmdRender = struct {
                     lineInfoElement = next;
                 } else unreachable;
             }
+        }
+
+        blk: {
+            const r = blockInfo.blockType.code_snippet.endPlayloadRange() orelse break :blk;
+            const closePlayload = self.doc.data[r.start..r.end];
+            const streamAttrs = parser.parse_block_close_playload(closePlayload);
+            const content = streamAttrs.content;
+            if (content.len == 0) break :blk;
+            if (std.ascii.startsWithIgnoreCase(content, "./") or std.ascii.startsWithIgnoreCase(content, "../")) {
+                // ToDo: ...
+            } else if (std.ascii.startsWithIgnoreCase(content, "#")) {
+                const id = content[1..];
+                const b = if (self.doc.getBlockByID(id)) |b| b else break :blk;
+                const be: *list.Element(tmd.BlockInfo) = @alignCast(@fieldParentPtr("value", b));
+                _ = try self.renderCodeForBlockChildren(w, be);
+            } else break :blk;
         }
 
         if (attrs.language.len > 0) {
@@ -616,29 +622,30 @@ const TmdRender = struct {
                                     element = mediaInfoElement.next;
                                     continue;
                                 },
-                                .anchor => blk: {
-                                    if (m.isBare) {
-                                        break :blk;
-                                    }
-
-                                    const anchorInfoElement = tokenInfoElement.next.?;
-
-                                    {
-                                        const anchorInfoToken = anchorInfoElement.value;
-                                        std.debug.assert(anchorInfoToken.tokenType == .commentText);
-
-                                        const anchorInfo = self.doc.data[anchorInfoToken.start()..anchorInfoToken.end()];
-                                        const id = parser.parse_anchor_id(anchorInfo);
-                                        if (id.len > 0) {
-                                            _ = try w.write("<span id=\"");
-                                            try writeHtmlAttributeValue(w, anchorInfo);
-                                            _ = try w.write("\"/>");
-                                        }
-                                    }
-
-                                    element = tokenInfoElement.next;
-                                    continue;
-                                },
+                                //else => {},
+                                //.blockAttributes => blk: {
+                                //    if (m.isBare) {
+                                //        break :blk;
+                                //    }
+                                //
+                                //    const anchorInfoElement = tokenInfoElement.next.?;
+                                //
+                                //    {
+                                //        const anchorInfoToken = anchorInfoElement.value;
+                                //        std.debug.assert(anchorInfoToken.tokenType == .commentText);
+                                //
+                                //        const anchorInfo = self.doc.data[anchorInfoToken.start()..anchorInfoToken.end()];
+                                //        const id = parser.parse_anchor_id(anchorInfo);
+                                //        if (id.len > 0) {
+                                //            _ = try w.write("<span id=\"");
+                                //            try writeHtmlAttributeValue(w, anchorInfo);
+                                //            _ = try w.write("\"/>");
+                                //        }
+                                //    }
+                                //
+                                //    element = tokenInfoElement.next;
+                                //    continue;
+                                //},
                             }
                         },
                     }
@@ -919,6 +926,60 @@ const TmdRender = struct {
                 item = next;
             } else break;
         }
+    }
+
+    fn renderCodeForBlockChildren(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement) !*BlockInfoElement {
+        const parentNestingDepth = parentElement.value.nestingDepth;
+
+        if (parentElement.next) |nextElement| {
+            var element = nextElement;
+            while (true) {
+                const blockInfo = &element.value;
+                if (blockInfo.nestingDepth <= parentNestingDepth) {
+                    return element;
+                }
+                switch (blockInfo.blockType) {
+                    .root => unreachable,
+                    .base => |base| {
+                        try self.renderCodeOfLine(w, base.openLine);
+                        element = try self.renderCodeForBlockChildren(w, element);
+                        if (base.closeLine) |closeLine| try self.renderCodeOfLine(w, closeLine);
+                    },
+
+                    // containers
+
+                    .list_item, .indented, .block_quote, .note_box, .disclosure_box, .unstyled_box => {
+                        element = try self.renderCodeForBlockChildren(w, element);
+                    },
+
+                    // atom
+
+                    .header, .usual, .blank, .code_snippet, .directive => {
+                        const endLine = blockInfo.getEndLine();
+                        var lineInfo = blockInfo.getStartLine();
+                        while (true) {
+                            try self.renderCodeOfLine(w, lineInfo);
+                            if (lineInfo == endLine) break;
+
+                            const lineElement: *list.Element(tmd.LineInfo) = @alignCast(@fieldParentPtr("value", lineInfo));
+                            if (lineElement.next) |next| {
+                                lineInfo = &next.value;
+                            } else break;
+                        }
+
+                        element = element.next orelse &self.nullBlockInfoElement;
+                    },
+                }
+            }
+        }
+
+        return &self.nullBlockInfoElement;
+    }
+
+    fn renderCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *tmd.LineInfo) !void {
+        const r = lineInfo.range;
+        try writeHtmlContentText(w, self.doc.data[r.start..r.end]);
+        _ = try w.write("\n");
     }
 };
 

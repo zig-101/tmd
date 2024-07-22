@@ -783,16 +783,23 @@ const ContentParser = struct {
         }
     }
 
-    // ToDo: need a more specific and restricted implementation.
-    //       *. When starts with __, then the content after close __ mark will be ignored.
-    //       *. When starts with ##, then the content after close ## mark will be ignored.
-    //       *. For other cases, all content will be ignored.
     fn parse_directive_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32, isPureComment: bool) !u32 {
         const lineScanner = self.lineScanner;
 
-        if (isPureComment) { // 3 / chars
-            self.set_currnet_line(lineInfo, lineStart);
+        self.set_currnet_line(lineInfo, lineStart);
 
+        const isComment = if (isPureComment) true else blk: {
+            const c = lineScanner.peekCursor();
+            switch (c) {
+                '_' => {
+                    if (lineScanner.peekNext() != '_') break :blk true;
+                    break :blk false;
+                },
+                else => break :blk true,
+            }
+        };
+
+        if (isComment) {
             const textStart = lineScanner.cursor;
             const numBlanks = lineScanner.readUntilLineEnd();
             const textEnd = lineScanner.cursor - numBlanks;
@@ -803,26 +810,30 @@ const ContentParser = struct {
             return textEnd;
         }
 
-        return try self.parse_line_tokens(lineInfo, lineStart, true);
+        return try self.parse_line_tokens(false);
     }
 
-    fn parse_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32, handlLineSpanMark: bool) !u32 {
+    fn parse_usual_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32, handleLineSpanMark: bool) !u32 {
         self.set_currnet_line(lineInfo, lineStart);
 
-        std.debug.assert(self.lineScanner.lineEnd == null);
+        return try self.parse_line_tokens(handleLineSpanMark);
+    }
 
+    fn parse_header_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32) !u32 {
+        self.set_currnet_line(lineInfo, lineStart);
+
+        return try self.parse_line_tokens(false);
+    }
+
+    fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
+        const lineStart = self.lineSession.contentStart;
         const lineScanner = self.lineScanner;
+        std.debug.assert(lineScanner.lineEnd == null);
 
         const contentEnd = parse_tokens: {
-            const escapedSpanStatus = self.escapedSpanStatus;
-            const codeSpanStatus = self.codeSpanStatus;
-
             var textStart = lineStart;
 
-            if (handlLineSpanMark
-                //and escapedSpanStatus.openMark == null
-                //and codeSpanStatus.openMark == null
-                ) {
+            if (handleLineSpanMark) {
                 std.debug.assert(textStart == lineScanner.cursor);
 
                 const c = lineScanner.peekCursor();
@@ -868,13 +879,15 @@ const ContentParser = struct {
                     _ = switch (leadingMarkType) {
                         .comment => try self.create_comment_text_token(textStart, textEnd),
                         .media => try self.create_plain_text_token(textStart, textEnd),
-                        .anchor => try self.create_comment_text_token(textStart, textEnd),
                         else => unreachable,
                     };
 
                     break :parse_tokens textEnd;
                 }
             }
+
+            const escapedSpanStatus = self.escapedSpanStatus;
+            const codeSpanStatus = self.codeSpanStatus;
 
             search_marks: while (true) {
                 std.debug.assert(lineScanner.lineEnd == null);
@@ -1861,7 +1874,6 @@ const LineScanner = struct {
         table['\\'] = .lineBreak;
         table['/'] = .comment;
         table['@'] = .media;
-        table['='] = .anchor;
         break :blk table;
     };
 
@@ -1938,6 +1950,10 @@ const LineScanner = struct {
         const k = ls.cursor + 1;
         if (k < ls.data.len) return ls.data[k];
         return null;
+    }
+
+    fn peekPrefix(ls: *LineScanner, prefix: []const u8) bool {
+        return std.mem.startsWith(u8, ls.data[ls.cursor..], prefix);
     }
 
     // ToDo: return the blankStart instead?
@@ -2087,6 +2103,7 @@ const DocParser = struct {
     fn createAndPushBlockInfoElement(parser: *DocParser, allocator: mem.Allocator) !*tmd.BlockInfo {
         var blockInfoElement = try createListElement(tmd.BlockInfo, allocator);
         parser.tmdDoc.blocks.push(blockInfoElement);
+        const blockInfo = &blockInfoElement.value;
 
         if (parser.nextBlockAttributes) |as| {
             var blockAttributesElement = try createListElement(tmd.BlockAttibutes, allocator);
@@ -2094,34 +2111,50 @@ const DocParser = struct {
 
             const attrs = &blockAttributesElement.value;
             attrs.* = as;
-            blockInfoElement.value.attributes = attrs;
+            blockInfo.attributes = attrs;
+
+            if (attrs.id.len > 0) {
+                const blockTreeNodeElement = parser.tmdDoc.freeBlockTreeNodeElement orelse try createListElement(tmd.BlockInfoRedBlack.Node, allocator);
+                const blockTreeNode = &blockTreeNodeElement.value;
+                blockTreeNode.value = blockInfo;
+                const n = parser.tmdDoc.blocksByID.insert(blockTreeNode);
+                if (n != blockTreeNode) {
+                    std.debug.print("duplicated block ID: {s}.\n", .{attrs.id});
+                    parser.tmdDoc.freeBlockTreeNodeElement = blockTreeNodeElement;
+                } else {
+                    std.debug.print("block #{s} registered.\n", .{attrs.id});
+                    parser.tmdDoc.blockTreeNodes.push(blockTreeNodeElement);
+                }
+            }
 
             parser.nextBlockAttributes = null;
         } else {
-            blockInfoElement.value.attributes = null; // !important
+            blockInfo.attributes = null; // !important
         }
 
-        return &blockInfoElement.value;
+        return blockInfo;
     }
 
     fn onNewDirectiveLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void {
         std.debug.assert(lineInfo.lineType == .directive);
         const tokens = lineInfo.lineType.directive.tokens;
         const headElement = tokens.head() orelse return;
-        if (headElement.value.tokenType != .leadingMark) return;
-        const leadingMark = &headElement.value.tokenType.leadingMark;
-        if (leadingMark.markType != .anchor) return;
-        const commentElement = headElement.next orelse return;
-        const commentToken = &commentElement.value;
+        if (headElement.value.tokenType != .commentText) return;
+        std.debug.assert(headElement.next == null);
+        const commentToken = &headElement.value;
+        const comment = parser.tmdDoc.data[commentToken.start()..commentToken.end()];
+        const playload = for (comment, 0..) |c, i| {
+            if (c == '@') continue;
+            if (i < 2) return;
+            break comment[i..];
+        } else return;
 
-        const anchorInfo = parser.tmdDoc.data[commentToken.start()..commentToken.end()];
-        const id = parse_anchor_id(anchorInfo);
-        if (id.len > 0) {
+        const attrs = parse_block_attributes(playload);
+        if (attrs.id.len > 0) {
             if (parser.nextBlockAttributes) |*as| {
-                //if (as.id.len == 0)
-                as.id = id;
+                as.id = attrs.id;
             } else {
-                parser.nextBlockAttributes = .{ .id = id };
+                parser.nextBlockAttributes = .{ .id = attrs.id };
             }
         }
     }
@@ -2539,7 +2572,7 @@ const DocParser = struct {
                             break :handle;
                         }
 
-                        const contentEnd = try contentParser.parse_line_tokens(lineInfo, lineScanner.cursor, false);
+                        const contentEnd = try contentParser.parse_header_line_tokens(lineInfo, lineScanner.cursor);
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
                     },
@@ -2563,19 +2596,19 @@ const DocParser = struct {
                         }
 
                         //const newAtomBlock = if (mark == ';') blk: {
-                            lineInfo.lineType = .{ .usual = .{
-                                .markLen = markLen,
-                                .markEndWithSpaces = lineScanner.cursor,
-                            } };
+                        lineInfo.lineType = .{ .usual = .{
+                            .markLen = markLen,
+                            .markEndWithSpaces = lineScanner.cursor,
+                        } };
 
-                            const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
-                            usualBlockInfo.blockType = .{
-                                .usual = .{
-                                    .startLine = lineInfo,
-                                },
-                            };
-                            //break :blk usualBlockInfo;
-                            const newAtomBlock = usualBlockInfo;
+                        const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        usualBlockInfo.blockType = .{
+                            .usual = .{
+                                .startLine = lineInfo,
+                            },
+                        };
+                        //break :blk usualBlockInfo;
+                        const newAtomBlock = usualBlockInfo;
                         //} else blk: {
                         //    lineInfo.lineType = .{ .footer = .{
                         //        .markLen = markLen,
@@ -2605,7 +2638,7 @@ const DocParser = struct {
                             break :handle;
                         }
 
-                        const contentEnd = try contentParser.parse_line_tokens(lineInfo, lineScanner.cursor, true);
+                        const contentEnd = try contentParser.parse_usual_line_tokens(lineInfo, lineScanner.cursor, true);
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
                     },
@@ -2679,11 +2712,9 @@ const DocParser = struct {
                     } };
 
                     if (isContainerFirstLine or
-                        currentAtomBlockInfo.blockType != .usual
-                        and currentAtomBlockInfo.blockType != .header
-                        //and currentAtomBlockInfo.blockType != .footer
-                        )
-                    {
+                        currentAtomBlockInfo.blockType != .usual and currentAtomBlockInfo.blockType != .header
+                    //and currentAtomBlockInfo.blockType != .footer
+                    ) {
                         const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                         usualBlockInfo.blockType = .{
                             .usual = .{
@@ -2700,7 +2731,7 @@ const DocParser = struct {
                     }
 
                     if (lineScanner.lineEnd == null) {
-                        const contentEnd = try contentParser.parse_line_tokens(
+                        const contentEnd = try contentParser.parse_usual_line_tokens(
                             lineInfo,
                             contentStart,
                             currentAtomBlockInfo.blockType != .header and contentStart == lineScanner.cursor,
@@ -2729,29 +2760,6 @@ const DocParser = struct {
         contentParser.on_new_atom_block(); // try to determine line-end render manner for the last coment line.
 
         try contentParser.matchLinks(); // ToDo: same effect when being put in the above else-block.
-        
-        // 
-        {
-            var blockElement = parser.tmdDoc.blocks.head();
-            while (blockElement) |be| {
-                defer blockElement = be.next;
-                const blockInfo = &be.value;
-                const attributes = blockInfo.attributes orelse continue;
-                if (attributes.id.len == 0) continue;
-
-                const blockTreeNodeElement = try createListElement(tmd.BlockInfoRedBlack.Node, allocator);
-                parser.tmdDoc.blockTreeNodes.push(blockTreeNodeElement);
-                const blockTreeNode = &blockTreeNodeElement.value;
-                blockTreeNode.value = blockInfo;
-                const n = parser.tmdDoc.blocksByID.insert(blockTreeNode);
-                if (n != blockTreeNode) {
-                    // ToDo: maybe, should destroy the memory ... ?
-                    std.debug.print("duplicated block ID: {s}.\n", .{attributes.id});
-                } else {
-                    std.debug.print("block #{s} registered.\n", .{attributes.id});
-                }
-            }
-        }
     }
 };
 
@@ -2895,12 +2903,80 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
     }
 }
 
-pub fn parse_anchor_id(anchorInfo: []const u8) []const u8 {
-    return anchorInfo; // ToDo: return the valid prefix
+// ToDo: remove the following parse functions (use tokens instead)?
+
+// Use HTML4 spec:
+//     ID and NAME tokens must begin with a letter ([A-Za-z]) and
+//     may be followed by any number of letters, digits ([0-9]),
+//     hyphens ("-"), underscores ("_"), colons (":"), and periods (".").
+const charIdLevels = blk: {
+    var table = [1]u2{0} ** 127;
+
+    for ('a'..'z', 'A'..'Z') |i, j| {
+        table[i] = 2;
+        table[j] = 2;
+    }
+    for ('0'..'9') |i| table[i] = 1;
+    table['_'] = 1;
+    table['-'] = 1;
+    table[':'] = 1;
+    table['.'] = 1;
+    break :blk table;
+};
+
+pub fn parse_block_attributes(playload: []const u8) tmd.BlockAttibutes {
+    var attrs = tmd.BlockAttibutes{};
+
+    const id = std.meta.fieldIndex(tmd.BlockAttibutes, "id").?;
+    const classes = std.meta.fieldIndex(tmd.BlockAttibutes, "classes").?;
+
+    var lastOrder: isize = -1;
+
+    var it = mem.splitAny(u8, playload, " \t");
+    var item = it.first();
+    while (true) {
+        if (item.len != 0) {
+            switch (item[0]) {
+                '#' => {
+                    if (lastOrder >= id) break;
+                    if (item.len == 1) break;
+                    if (item[1] >= 128 or charIdLevels[item[1]] != 2) break;
+                    for (item[2..]) |c| {
+                        if (c >= 128 or charIdLevels[c] == 0) break;
+                    }
+                    attrs.id = item[1..];
+                    lastOrder = id;
+                },
+                '.' => {
+                    if (lastOrder >= classes) break;
+                    if (item.len == 1) break;
+                    if (item[1] >= 128 or charIdLevels[item[1]] != 2) break;
+                    var canSep = false;
+                    for (item[2..]) |c| {
+                        if (canSep and c == ';') {
+                            canSep = false;
+                            continue;
+                        }
+                        if (c >= 128 or charIdLevels[c] == 0) break;
+                        canSep = true;
+                    }
+                    attrs.classes = item[1..];
+                    lastOrder = classes;
+                },
+                else => {
+                    break; // break the loop
+                },
+            }
+        }
+
+        ////##id .class1;class2;class3
+
+        if (it.next()) |next| {
+            item = next;
+        } else break;
+    }
+    return attrs;
 }
-
-
-// ToDo: remove the following parse functions (use tokens instead).
 
 pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibutes {
     var attrs = tmd.BaseBlockAttibutes{};
@@ -2944,22 +3020,9 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
                     else if (mem.eql(u8, item, "><"))
                         attrs.horizontalAlign = .center
                     else if (mem.eql(u8, item, "<>"))
-                        attrs.horizontalAlign = .justify
-                    ;
+                        attrs.horizontalAlign = .justify;
                     lastOrder = horizontalAlign;
                 },
-                //'#' => {
-                //    if (lastOrder >= id) break :handle;
-                //    if (item.len == 1) break :handle;
-                //    attrs.id = item[1..];
-                //    lastOrder = id;
-                //},
-                //'.' => {
-                //    if (lastOrder >= classes) break :handle;
-                //    if (item.len == 1) break :handle;
-                //    attrs.classes = item[1..];
-                //    lastOrder = classes;
-                //},
                 else => {
                     break; // break the loop
                 },
@@ -2970,6 +3033,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
             item = next;
         } else break;
     }
+
     return attrs;
 }
 
@@ -3009,6 +3073,7 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
             item = next;
         } else break;
     }
+
     return attrs;
 }
 
