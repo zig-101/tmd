@@ -404,6 +404,8 @@ const ContentParser = struct {
     linkSpanStatus: *SpanStatus = undefined,
 
     blockSession: struct {
+        atomBlock: *tmd.BlockInfo = undefined,
+
         spanStatuses: [MarkCount]SpanStatus = .{.{}} ** MarkCount,
         currentTextNumber: u32 = 0,
 
@@ -479,7 +481,7 @@ const ContentParser = struct {
         return &self.blockSession.spanStatuses[markType.asInt()];
     }
 
-    fn on_new_atom_block(self: *ContentParser) void {
+    fn on_new_atom_block(self: *ContentParser, atomBlock: *tmd.BlockInfo) void {
         self.close_opening_spans(); // for the last block
 
         //if (self.blockSession.endLine) |line| {
@@ -489,7 +491,9 @@ const ContentParser = struct {
             line.treatEndAsSpace = false;
         }
 
-        self.blockSession = .{};
+        self.blockSession = .{
+            .atomBlock = atomBlock,
+        };
     }
 
     fn set_currnet_line(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32) void {
@@ -1172,6 +1176,14 @@ const ContentParser = struct {
                 } // non_escape_context
             } // while search_marks
         }; // parse_tokens
+
+        if (self.lineSession.tokens.head()) |head| blk: {
+            switch (head.value.tokenType) {
+                .leadingMark => |m| if (m.markType == .media) break :blk,
+                else => {},
+            }
+            self.blockSession.atomBlock.hasNonMediaTokens = true;
+        }
 
         std.debug.assert(lineScanner.lineEnd != null);
 
@@ -2564,7 +2576,7 @@ const DocParser = struct {
                         currentAtomBlockInfo = headerBlockInfo;
                         atomBlockCount += 1;
 
-                        contentParser.on_new_atom_block();
+                        contentParser.on_new_atom_block(currentAtomBlockInfo);
 
                         if (lineScanner.lineEnd != null) {
                             // lineInfo.rangeTrimmed.end has been determined.
@@ -2630,7 +2642,7 @@ const DocParser = struct {
                         currentAtomBlockInfo = newAtomBlock;
                         atomBlockCount += 1;
 
-                        contentParser.on_new_atom_block();
+                        contentParser.on_new_atom_block(currentAtomBlockInfo);
 
                         if (lineScanner.lineEnd != null) {
                             // lineInfo.rangeTrimmed.end has been determined.
@@ -2682,11 +2694,11 @@ const DocParser = struct {
                             atomBlockCount += 1;
 
                             // No need to do this.
-                            // contentParser.on_new_atom_block();
+                            // contentParser.on_new_atom_block(currentAtomBlockInfo);
                         }
 
-                        contentParser.on_new_atom_block();
-                        defer contentParser.on_new_atom_block(); // ToDo: might be unnecessary
+                        contentParser.on_new_atom_block(currentAtomBlockInfo);
+                        //defer contentParser.on_new_atom_block(); // ToDo: might be unnecessary
 
                         if (lineScanner.lineEnd != null) {
                             // lineInfo.rangeTrimmed.end has been determined.
@@ -2727,7 +2739,7 @@ const DocParser = struct {
                         currentAtomBlockInfo = usualBlockInfo;
                         atomBlockCount += 1;
 
-                        contentParser.on_new_atom_block();
+                        contentParser.on_new_atom_block(currentAtomBlockInfo);
                     }
 
                     if (lineScanner.lineEnd == null) {
@@ -2757,7 +2769,7 @@ const DocParser = struct {
         parser.setEndLineForAtomBlock(currentAtomBlockInfo);
 
         // ToDo: remove this line. (Forget the reason.;( )
-        contentParser.on_new_atom_block(); // try to determine line-end render manner for the last coment line.
+        contentParser.on_new_atom_block(currentAtomBlockInfo); // try to determine line-end render manner for the last coment line.
 
         try contentParser.matchLinks(); // ToDo: same effect when being put in the above else-block.
     }

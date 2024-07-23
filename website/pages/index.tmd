@@ -163,11 +163,11 @@ Render result:
 	Demo 5 (atom blocks)
 
 '''''
-''''' << #demo-6
+''''' << #demo-5
 
 Render result:
 
-! ////@@ #demo-6
+! ////@@ #demo-5
 {
 ####### Header 1
 
@@ -199,13 +199,13 @@ This is a usual block. Nothing special.
 TMD source:
 
 '''
-''' << #demo-7
+''' << #demo-6
 
 
 
 Render result:
 
-! ////@@ #demo-7
+! ////@@ #demo-6
 {
 
 hello
@@ -239,11 +239,11 @@ world
 TMD source:
 
 '''''
-''''' << #demo-8
+''''' << #demo-7
 
 Render result:
 
-! ////@@ #demo-8
+! ////@@ #demo-7
 {
 !! ** all marks %% are escaped ** `` !!!. !!
 

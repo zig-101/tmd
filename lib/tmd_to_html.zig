@@ -594,7 +594,7 @@ const TmdRender = struct {
                                     }
 
                                     const mediaInfoElement = tokenInfoElement.next.?;
-                                    const isInline = tokenInfoElement.prev == null and mediaInfoElement.next == null;
+                                    const isInline = blockInfo.hasNonMediaTokens;
 
                                     writeMedia: {
                                         const mediaInfoToken = mediaInfoElement.value;

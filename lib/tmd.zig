@@ -144,6 +144,8 @@ pub const BlockInfo = struct {
 
     attributes: ?*BlockAttibutes = null,
 
+    hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual?)
+
     pub fn typeName(self: *@This()) []const u8 {
         return @tagName(self.blockType);
     }
