@@ -495,6 +495,19 @@ pub const LineInfo = struct {
     pub fn ownerListElement(self: *@This()) *list.Element(@This()) {
         return @alignCast(@fieldParentPtr("value", self));
     }
+
+    pub fn start(self: *const @This(), trimContainerMark: bool, trimLeadingSpaces: bool) u32 {
+        if (trimContainerMark) {
+            if (self.containerMark) |mark| switch (mark) {
+                inline else => |m| return m.markEndWithSpaces,
+            };
+        }
+        return if (trimLeadingSpaces) self.rangeTrimmed.start else self.range.start;
+    }
+
+    pub fn end(self: *const @This(), trimmTrailingSpaces: bool) u32 {
+        return if (trimmTrailingSpaces) self.rangeTrimmed.end else self.range.end;
+    }
 };
 
 pub const LineEndType = enum {

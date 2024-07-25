@@ -229,7 +229,16 @@ const BlockArranger = struct {
         const newListItem = &listItemBlock.blockType.list_item;
 
         const isFirstInList = if (baseContext.openingListCount == 0) blk: {
+            if (baseContext.nestingDepth >= tmd.MaxBlockNestingDepth - 1) {
+                return error.NestingDepthTooLarge;
+            }
+            const last = self.stackedBlocks[self.count_1];
             self.count_1 = baseContext.nestingDepth + 1;
+            if (last.blockType == .blank) {
+                // Ensure the nestingDepth of the blank block.
+                last.nestingDepth = self.count_1;
+            }
+
             break :blk true;
         } else baseContext.openingListNestingDepths[newListItem._markTypeIndex] == 0;
 

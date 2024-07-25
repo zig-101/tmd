@@ -487,13 +487,13 @@ const TmdRender = struct {
             const streamAttrs = parser.parse_block_close_playload(closePlayload);
             const content = streamAttrs.content;
             if (content.len == 0) break :blk;
-            if (std.ascii.startsWithIgnoreCase(content, "./") or std.ascii.startsWithIgnoreCase(content, "../")) {
+            if (std.mem.startsWith(u8, content, "./") or std.mem.startsWith(u8, content, "../")) {
                 // ToDo: ...
-            } else if (std.ascii.startsWithIgnoreCase(content, "#")) {
+            } else if (std.mem.startsWith(u8, content, "#")) {
                 const id = content[1..];
                 const b = if (self.doc.getBlockByID(id)) |b| b else break :blk;
                 const be: *list.Element(tmd.BlockInfo) = @alignCast(@fieldParentPtr("value", b));
-                _ = try self.renderCodeForBlockChildren(w, be);
+                _ = try self.renderTmdCode(w, be);
             } else break :blk;
         }
 
@@ -608,8 +608,8 @@ const TmdRender = struct {
                                         const mediaInfo = self.doc.data[mediaInfoToken.start()..mediaInfoToken.end()];
                                         var it = mem.splitAny(u8, mediaInfo, " \t");
                                         const src = it.first();
-                                        if (!std.ascii.startsWithIgnoreCase(src, "./") and !std.ascii.startsWithIgnoreCase(src, "../") and !std.ascii.startsWithIgnoreCase(src, "https://") and !std.ascii.startsWithIgnoreCase(src, "http://")) break :writeMedia;
-                                        if (!std.ascii.endsWithIgnoreCase(src, ".png") and !std.ascii.endsWithIgnoreCase(src, ".gif") and !std.ascii.endsWithIgnoreCase(src, ".jpg") and !std.ascii.endsWithIgnoreCase(src, ".jpeg")) break :writeMedia;
+                                        if (!std.mem.startsWith(u8, src, "./") and !std.mem.startsWith(u8, src, "../") and !std.mem.startsWith(u8, src, "https://") and !std.mem.startsWith(u8, src, "http://")) break :writeMedia;
+                                        if (!std.mem.endsWith(u8, src, ".png") and !std.mem.endsWith(u8, src, ".gif") and !std.mem.endsWith(u8, src, ".jpg") and !std.mem.endsWith(u8, src, ".jpeg")) break :writeMedia;
 
                                         // ToDo: read more arguments.
 
@@ -972,8 +972,17 @@ const TmdRender = struct {
         }
     }
 
-    fn renderCodeForBlockChildren(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement) !*BlockInfoElement {
+    fn renderTmdCode(self: *TmdRender, w: anytype, element: *BlockInfoElement) !void {
+        if (element.value.isAtom()) {
+            try self.renderTmdCodeForAtomBlock(w, &element.value, true);
+        } else {
+            _ = try self.renderTmdCodeForBlockChildren(w, element, true);
+        }
+    }
+
+    fn renderTmdCodeForBlockChildren(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, trimContainerMark0: bool) !*BlockInfoElement {
         const parentNestingDepth = parentElement.value.nestingDepth;
+        var trimContainerMark = trimContainerMark0;
 
         if (parentElement.next) |nextElement| {
             var element = nextElement;
@@ -985,44 +994,51 @@ const TmdRender = struct {
                 switch (blockInfo.blockType) {
                     .root => unreachable,
                     .base => |base| {
-                        try self.renderCodeOfLine(w, base.openLine);
-                        element = try self.renderCodeForBlockChildren(w, element);
-                        if (base.closeLine) |closeLine| try self.renderCodeOfLine(w, closeLine);
+                        try self.renderTmdCodeOfLine(w, base.openLine, trimContainerMark);
+                        element = try self.renderTmdCodeForBlockChildren(w, element, true);
+                        if (base.closeLine) |closeLine| try self.renderTmdCodeOfLine(w, closeLine, false); // or trimContainerMark, no matter
                     },
 
                     // containers
 
                     .list_item, .indented, .block_quote, .note_box, .disclosure_box, .unstyled_box => {
-                        element = try self.renderCodeForBlockChildren(w, element);
+                        element = try self.renderTmdCodeForBlockChildren(w, element, true);
                     },
 
                     // atom
 
                     .header, .usual, .blank, .code_snippet, .directive => {
-                        const endLine = blockInfo.getEndLine();
-                        var lineInfo = blockInfo.getStartLine();
-                        while (true) {
-                            try self.renderCodeOfLine(w, lineInfo);
-                            if (lineInfo == endLine) break;
-
-                            const lineElement: *list.Element(tmd.LineInfo) = @alignCast(@fieldParentPtr("value", lineInfo));
-                            if (lineElement.next) |next| {
-                                lineInfo = &next.value;
-                            } else break;
-                        }
+                        try self.renderTmdCodeForAtomBlock(w, blockInfo, trimContainerMark);
 
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
                 }
+                trimContainerMark = false;
             }
         }
 
         return &self.nullBlockInfoElement;
     }
 
-    fn renderCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *tmd.LineInfo) !void {
-        const r = lineInfo.range;
-        try writeHtmlContentText(w, self.doc.data[r.start..r.end]);
+    fn renderTmdCodeForAtomBlock(self: *TmdRender, w: anytype, atomBlock: *tmd.BlockInfo, trimContainerMark: bool) !void {
+        var lineInfo = atomBlock.getStartLine();
+        try self.renderTmdCodeOfLine(w, lineInfo, trimContainerMark);
+
+        const endLine = atomBlock.getEndLine();
+        while (lineInfo != endLine) {
+            const lineElement: *list.Element(tmd.LineInfo) = @alignCast(@fieldParentPtr("value", lineInfo));
+            if (lineElement.next) |next| {
+                lineInfo = &next.value;
+            } else break;
+
+            try self.renderTmdCodeOfLine(w, lineInfo, false);
+        }
+    }
+
+    fn renderTmdCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *tmd.LineInfo, trimContainerMark: bool) !void {
+        const start = lineInfo.start(trimContainerMark, false);
+        const end = lineInfo.end(false);
+        try writeHtmlContentText(w, self.doc.data[start..end]);
         _ = try w.write("\n");
     }
 };
