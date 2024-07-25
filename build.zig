@@ -4,6 +4,16 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+	// lib
+    const tmdLib = b.addStaticLibrary(.{
+        .name = "tmd",
+        .root_source_file = b.path("lib/tmd.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(tmdLib);
+
+	// cmd
     const tmdLibModule = b.addModule("tmd", .{
         .root_source_file = b.path("lib/tmd.zig"),
         .target = target,

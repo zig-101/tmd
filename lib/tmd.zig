@@ -93,8 +93,15 @@ pub fn listBulletIndex(bulletMark: []const u8) ListMarkTypeIndex {
 
 // A BlockAttibutes directive line
 pub const BlockAttibutes = struct {
+    // For any block:
     id: []const u8 = "", // ToDo: should be a Range?
     classes: []const u8 = "", // ToDo: should be Range list?
+
+    extra: union(enum) {
+        base: BaseBlockAttibutes,
+        code: CodeBlockAttibutes, // ToDo: when become large, use a pointer type.
+        none: void,
+    } = .none,
 };
 
 pub const BaseBlockAttibutes = struct {

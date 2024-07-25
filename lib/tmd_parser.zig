@@ -2131,10 +2131,8 @@ const DocParser = struct {
                 blockTreeNode.value = blockInfo;
                 const n = parser.tmdDoc.blocksByID.insert(blockTreeNode);
                 if (n != blockTreeNode) {
-                    std.debug.print("duplicated block ID: {s}.\n", .{attrs.id});
                     parser.tmdDoc.freeBlockTreeNodeElement = blockTreeNodeElement;
                 } else {
-                    std.debug.print("block #{s} registered.\n", .{attrs.id});
                     parser.tmdDoc.blockTreeNodes.push(blockTreeNodeElement);
                 }
             }
@@ -2167,6 +2165,13 @@ const DocParser = struct {
                 as.id = attrs.id;
             } else {
                 parser.nextBlockAttributes = .{ .id = attrs.id };
+            }
+        }
+        if (attrs.classes.len > 0) {
+            if (parser.nextBlockAttributes) |*as| {
+                as.classes = attrs.classes;
+            } else {
+                parser.nextBlockAttributes = .{ .classes = attrs.classes };
             }
         }
     }
@@ -2588,7 +2593,6 @@ const DocParser = struct {
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
                     },
-                    //'&',
                     ';' => |mark| handle: {
                         lineScanner.advance(1);
                         const markLen = lineScanner.readUntilNotChar(mark) + 1;
@@ -2619,22 +2623,7 @@ const DocParser = struct {
                                 .startLine = lineInfo,
                             },
                         };
-                        //break :blk usualBlockInfo;
                         const newAtomBlock = usualBlockInfo;
-                        //} else blk: {
-                        //    lineInfo.lineType = .{ .footer = .{
-                        //        .markLen = markLen,
-                        //        .markEndWithSpaces = lineScanner.cursor,
-                        //    } };
-                        //
-                        //    const footerBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
-                        //    footerBlockInfo.blockType = .{
-                        //        .footer = .{
-                        //            .startLine = lineInfo,
-                        //        },
-                        //    };
-                        //    break :blk footerBlockInfo;
-                        //};
 
                         try blockArranger.stackAtomBlock(newAtomBlock, isContainerFirstLine);
 
@@ -2980,8 +2969,6 @@ pub fn parse_block_attributes(playload: []const u8) tmd.BlockAttibutes {
                 },
             }
         }
-
-        ////##id .class1;class2;class3
 
         if (it.next()) |next| {
             item = next;
