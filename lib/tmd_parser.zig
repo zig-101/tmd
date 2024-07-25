@@ -2536,13 +2536,12 @@ const DocParser = struct {
                         }
 
                         var isFirstLevel = false;
-
                         lineScanner.advance(1);
                         const markLen = if (lineScanner.peekNext()) |c| blk: {
                             switch (c) {
                                 '#', '=', '+', '-' => |mark| {
                                     isFirstLevel = mark == '#';
-                                    lineScanner.advance(3);
+                                    lineScanner.advance(2);
                                     break :blk 3 + lineScanner.readUntilNotChar(mark);
                                 },
                                 else => break :blk 2,

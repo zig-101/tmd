@@ -10,14 +10,12 @@ TMD is also much more specified than traditional markdown.
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 1 (span styles)
 
-TMD source:
-
+### TMD source of demo 1
 '''''
 ''''' << #demo-1
 
-Render result:
-
-! ////@@ #demo-1
+! ### **Render result of demo 1
+  ////@@ #demo-1
 {
 **bold text** and ^**pale text**.
 
