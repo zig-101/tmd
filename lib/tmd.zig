@@ -449,7 +449,7 @@ pub const LineInfo = struct {
     //   containing plainText tokens starts with a CJK char.
     treatEndAsSpace: bool = false,
 
-    containerMark: ?ContainerLeadingMark,
+    containerMark: ?ContainerLeadingMark, // !!! remember init it after alloc
     lineType: LineType, // ToDo: renamed to lineType
 
     pub fn number(self: @This()) usize {
@@ -499,7 +499,9 @@ pub const LineInfo = struct {
     pub fn start(self: *const @This(), trimContainerMark: bool, trimLeadingSpaces: bool) u32 {
         if (trimContainerMark) {
             if (self.containerMark) |mark| switch (mark) {
-                inline else => |m| return m.markEndWithSpaces,
+                inline else => |m| {
+                    return m.markEndWithSpaces;
+                },
             };
         }
         return if (trimLeadingSpaces) self.rangeTrimmed.start else self.range.start;

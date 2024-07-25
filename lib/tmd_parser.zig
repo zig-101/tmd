@@ -1894,7 +1894,7 @@ const LineScanner = struct {
         var table = [1]?tmd.LineSpanMarkType{null} ** 256;
         table['\\'] = .lineBreak;
         table['/'] = .comment;
-        table['@'] = .media;
+        table['&'] = .media;
         break :blk table;
     };
 
@@ -2217,6 +2217,7 @@ const DocParser = struct {
         while (lineScanner.proceedToNextLine()) {
             var lineInfoElement = try createListElement(tmd.LineInfo, allocator);
             var lineInfo = &lineInfoElement.value;
+            lineInfo.containerMark = null;
             lineInfo.range.start = lineScanner.cursor;
             // ToDo: remove this line.
             //lineInfo.tokens = .{}; // !! Must be initialized. Otherwise undefined behavior.

@@ -15,7 +15,7 @@ TMD is also much more specified than traditional markdown.
 ''''' << #demo-1
 
 ! ### **Render result of demo 1
-  ////@@ #demo-1
+////@@ #demo-1
 {
 **bold text** and ^**pale text**.
 
@@ -48,14 +48,12 @@ This is a code span: ` var ok = x && y `.
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 2 (line leading marks)
 
-TMD source:
-
+### TMD source of demo 2
 '''''
 ''''' << #demo-2
 
-Render result:
-
-! ////@@ #demo-2
+! ### **Render result of demo 2
+////@@ #demo-2
 {
 A comment line is between the following two words: foo
 // comment text
@@ -67,20 +65,18 @@ This block
 \\ several times.
 \\ The following is an image.
 
-@@ ./static/image/sample-image.png
+&& ./static/image/sample-image.png
 }
 
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 3 (link definitions)
 
-TMD source:
-
+### TMD source of demo 3
 '''''
 ''''' << #demo-3
 
-Render result:
-
-! ////@@ #demo-3
+! ### **Render result of demo 3
+////@@ #demo-3
 {
 ////__Go 101 website ``https://go101.org
 
@@ -101,14 +97,12 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 4 (built-in containers)
 
-TMD source:
-
+### TMD source of demo 4
 '''''
 ''''' << #demo-4
 
-Render result:
-
-! ////@@ #demo-4
+! ### **Render result of demo 4
+////@@ #demo-4
 {
 * This is a 1st-level list item.
   -. This is a 2nd-level list item (ordered).
@@ -160,12 +154,12 @@ Render result:
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 5 (atom blocks)
 
+### TMD source of demo 5
 '''''
 ''''' << #demo-5
 
-Render result:
-
-! ////@@ #demo-5
+! ### **Render result of demo 5
+////@@ #demo-5
 {
 ####### Header 1
 
@@ -194,16 +188,12 @@ This is a usual block. Nothing special.
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 6 (line spacing)
 
-TMD source:
-
+### TMD source of demo 6
 '''
 ''' << #demo-6
 
-
-
-Render result:
-
-! ////@@ #demo-6
+! ### **Render result of demo 6
+////@@ #demo-6
 {
 
 hello
@@ -234,14 +224,12 @@ world
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 7 (character escaping)
 
-TMD source:
-
+### TMD source of demo 7
 '''''
 ''''' << #demo-7
 
-Render result:
-
-! ////@@ #demo-7
+! ### **Render result of demo 7
+////@@ #demo-7
 {
 !! ** all marks %% are escaped ** `` !!!. !!
 
