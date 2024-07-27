@@ -2208,7 +2208,23 @@ const DocParser = struct {
         contentParser.init();
         defer contentParser.deinit(); // ToDo: needed?
 
-        var codeSnippetStartInfo: ?*std.meta.FieldType(tmd.LineType, .codeSnippetStart) = null;
+        var boundedBlockStartInfo: ?union(enum) {
+            codeSnippetStart: *std.meta.FieldType(tmd.LineType, .codeSnippetStart),
+            customStart: *std.meta.FieldType(tmd.LineType, .customStart),
+
+            fn markLen(self: @This()) u32 {
+                return switch (self) {
+                    inline else => |t| t.markLen,
+                };
+            }
+
+            fn markChar(self: @This()) u8 {
+                return switch (self) {
+                    .codeSnippetStart => '\'',
+                    .customStart => '"',
+                };
+            }
+        } = null;
 
         // An atom block, or a base/root block.
         var currentAtomBlockInfo = rootBlockInfo;
@@ -2231,24 +2247,22 @@ const DocParser = struct {
                 const leadingBlankEnd = lineScanner.cursor;
 
                 // handle code block context.
-                if (codeSnippetStartInfo) |codeSnippetStart| {
-                    if (lineScanner.lineEnd) |_| {} else if (lineScanner.peekCursor() != '\'') {
+                if (boundedBlockStartInfo) |boundedBlockStart| {
+                    const markChar = boundedBlockStart.markChar();
+                    if (lineScanner.lineEnd) |_| {} else if (lineScanner.peekCursor() != markChar) {
                         _ = lineScanner.readUntilLineEnd();
                     } else handle: {
-                        defer if (lineInfo.lineType != .codeSnippetEnd) {
-                            if (lineScanner.lineEnd == null)
-                                _ = lineScanner.readUntilLineEnd();
-                        };
-
                         lineScanner.advance(1);
-                        const markLen = lineScanner.readUntilNotChar('\'') + 1;
-                        if (markLen < 3) break :handle;
+                        const markLen = lineScanner.readUntilNotChar(markChar) + 1;
 
                         //const codeSnippetStartLineType: *tmd.LineType = @alignCast(@fieldParentPtr("codeSnippetStart", codeSnippetStart));
                         //const codeSnippetStartLineInfo: *tmd.LineInfo = @alignCast(@fieldParentPtr("lineType", codeSnippetStartLineType));
-                        //std.debug.print("=== {}, {}, {s}\n", .{codeSnippetStart.markLen, markLen, tmdData[lineInfo.rangeTrimmed.start..lineInfo.rangeTrimmed.end]});
+                        //std.debug.print("=== {}, {}, {s}\n", .{boundedBlockStart.markLen(), markLen, tmdData[lineInfo.rangeTrimmed.start..lineInfo.rangeTrimmed.end]});
 
-                        if (markLen != codeSnippetStart.markLen) break :handle;
+                        if (markLen != boundedBlockStart.markLen()) {
+                            if (lineScanner.lineEnd == null) _ = lineScanner.readUntilLineEnd();
+                            break :handle;
+                        }
 
                         lineInfo.rangeTrimmed.start = leadingBlankEnd;
 
@@ -2266,21 +2280,36 @@ const DocParser = struct {
                             }
                         }
 
-                        lineInfo.lineType = .{ .codeSnippetEnd = .{
-                            .markLen = markLen,
-                            .markEndWithSpaces = playloadStart,
-                        } };
+                        lineInfo.lineType = switch (boundedBlockStart) {
+                            .codeSnippetStart => .{ .codeSnippetEnd = .{
+                                .markLen = markLen,
+                                .markEndWithSpaces = playloadStart,
+                            } },
+                            .customStart => .{ .customEnd = .{
+                                .markLen = markLen,
+                                .markEndWithSpaces = playloadStart,
+                            } },
+                        };
 
-                        codeSnippetStartInfo = null;
+                        boundedBlockStartInfo = null;
                     }
 
                     if (lineInfo.lineType == .blank) {
                         std.debug.assert(lineScanner.lineEnd != null);
+                        std.debug.assert(boundedBlockStartInfo != null);
 
-                        lineInfo.lineType = .{ .code = .{} };
+                        lineInfo.lineType = switch (boundedBlockStart) {
+                            .codeSnippetStart => .{ .code = .{} },
+                            .customStart => .{ .data = .{} },
+                        };
                         lineInfo.rangeTrimmed.start = lineInfo.range.start;
                         lineInfo.rangeTrimmed.end = lineScanner.cursor;
-                    } else std.debug.assert(lineInfo.lineType == .codeSnippetEnd);
+                    } else {
+                        std.debug.assert(boundedBlockStartInfo == null);
+
+                        std.debug.assert(lineInfo.lineType == .codeSnippetEnd or
+                            lineInfo.lineType == .customEnd);
+                    }
 
                     break :parse_line;
                 } // code block context
@@ -2497,7 +2526,7 @@ const DocParser = struct {
                             atomBlockCount += 1;
                         }
                     },
-                    '\'' => |mark| handle: {
+                    '\'', '"' => |mark| handle: {
                         lineScanner.advance(1);
                         const markLen = lineScanner.readUntilNotChar(mark) + 1;
                         if (markLen < 3) {
@@ -2519,23 +2548,48 @@ const DocParser = struct {
                             }
                         }
 
-                        lineInfo.lineType = .{ .codeSnippetStart = .{
-                            .markLen = markLen,
-                            .markEndWithSpaces = playloadStart,
-                        } };
+                        const atomBlock = if (mark == '\'') blk: {
+                            lineInfo.lineType = .{ .codeSnippetStart = .{
+                                .markLen = markLen,
+                                .markEndWithSpaces = playloadStart,
+                            } };
 
-                        codeSnippetStartInfo = &lineInfo.lineType.codeSnippetStart;
+                            boundedBlockStartInfo = .{
+                                .codeSnippetStart = &lineInfo.lineType.codeSnippetStart,
+                            };
 
-                        const codeSnippetBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
-                        codeSnippetBlockInfo.* = .{ .blockType = .{
-                            .code_snippet = .{
-                                .startLine = lineInfo,
-                            },
-                        } };
-                        try blockArranger.stackAtomBlock(codeSnippetBlockInfo, isContainerFirstLine);
+                            const codeSnippetBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            codeSnippetBlockInfo.* = .{ .blockType = .{
+                                .code_snippet = .{
+                                    .startLine = lineInfo,
+                                },
+                            } };
+                            break :blk codeSnippetBlockInfo;
+                        } else blk: {
+                            std.debug.assert(mark == '"');
+
+                            lineInfo.lineType = .{ .customStart = .{
+                                .markLen = markLen,
+                                .markEndWithSpaces = playloadStart,
+                            } };
+
+                            boundedBlockStartInfo = .{
+                                .customStart = &lineInfo.lineType.customStart,
+                            };
+
+                            const customBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            customBlockInfo.* = .{ .blockType = .{
+                                .custom = .{
+                                    .startLine = lineInfo,
+                                },
+                            } };
+                            break :blk customBlockInfo;
+                        };
+
+                        try blockArranger.stackAtomBlock(atomBlock, isContainerFirstLine);
 
                         parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                        currentAtomBlockInfo = codeSnippetBlockInfo;
+                        currentAtomBlockInfo = atomBlock;
                         atomBlockCount += 1;
                     },
                     '#' => handle: {
@@ -3071,6 +3125,46 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
                 else => {
                     if (item.len > 0) {
                         attrs.language = item;
+                    }
+                    break; // break the loop
+                },
+            }
+        }
+
+        if (it.next()) |next| {
+            item = next;
+        } else break;
+    }
+
+    return attrs;
+}
+
+pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAttibutes {
+    var attrs = tmd.CustomBlockAttibutes{};
+
+    const commentedOut = std.meta.fieldIndex(tmd.CustomBlockAttibutes, "commentedOut").?;
+    //const app = std.meta.fieldIndex(tmd.CustomBlockAttibutes, "app").?;
+
+    const lastOrder: isize = -1;
+
+    var it = mem.splitAny(u8, playload, " \t");
+    var item = it.first();
+    while (true) {
+        if (item.len != 0) handle: {
+            switch (item[0]) {
+                '/' => {
+                    if (lastOrder >= commentedOut) break :handle;
+                    if (item.len == 1) break :handle;
+                    for (item[1..]) |c| {
+                        if (c != '/') break :handle;
+                    }
+                    attrs.commentedOut = true;
+                    //lastOrder = commentedOut;
+                    return attrs;
+                },
+                else => {
+                    if (item.len > 0) {
+                        attrs.app = item;
                     }
                     break; // break the loop
                 },

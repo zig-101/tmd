@@ -376,6 +376,10 @@ const TmdRender = struct {
 
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
+                    .directive => {
+                        //_ = try w.write("\n<div></div>\n");
+                        element = element.next orelse &self.nullBlockInfoElement;
+                    },
                     .blank => {
                         //if (!self.lastRenderedBlockIsBlank) {
 
@@ -406,8 +410,20 @@ const TmdRender = struct {
 
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
-                    .directive => {
-                        _ = try w.write("\n<div></div>\n");
+                    .custom => |custom| {
+                        const r = custom.startPlayloadRange();
+                        const playload = self.doc.data[r.start..r.end];
+                        const attrs = parser.parse_custom_block_open_playload(playload);
+                        if (attrs.commentedOut) {
+                            _ = try w.write("\n<div");
+                            if (blockInfo.attributes) |as| {
+                                try writeID(w, as.id);
+                            }
+                            _ = try w.write("></div>\n");
+                        } else {
+                            try self.writeCustomBlock(w, blockInfo, attrs);
+                        }
+
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
                 }
@@ -436,12 +452,49 @@ const TmdRender = struct {
         }
     };
 
+    fn writeCustomBlock(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo, attrs: tmd.CustomBlockAttibutes) !void {
+        _ = try w.write("<div");
+        try writeBlockAttributes(w, "tmd-custom", blockInfo.attributes);
+        _ = try w.write("'>");
+
+        if (attrs.app.len == 0) {
+            _ = try w.write("[...]");
+        } else if (std.ascii.eqlIgnoreCase(attrs.app, "html")) {
+            const endLine = blockInfo.getEndLine();
+            const startLine = blockInfo.getStartLine();
+            std.debug.assert(startLine.lineType == .customStart);
+
+            var lineInfoElement = startLine.ownerListElement();
+            if (startLine != endLine) {
+                lineInfoElement = lineInfoElement.next.?;
+                while (true) {
+                    const lineInfo = &lineInfoElement.value;
+                    switch (lineInfo.lineType) {
+                        .customEnd => break,
+                        .data => {
+                            const r = lineInfo.range;
+                            _ = try w.write(self.doc.data[r.start..r.end]);
+                        },
+                        else => unreachable,
+                    }
+
+                    std.debug.assert(!lineInfo.treatEndAsSpace);
+                    if (lineInfo == endLine) break;
+                    _ = try w.write("\n");
+                    if (lineInfoElement.next) |next| {
+                        lineInfoElement = next;
+                    } else unreachable;
+                }
+            }
+        } else {
+            _ = try w.print("[{s} ...]", .{attrs.app}); // ToDo
+        }
+
+        _ = try w.write("</div>\n");
+    }
+
     fn writeCodeBlockLines(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo, attrs: tmd.CodeBlockAttibutes) !void {
         std.debug.assert(blockInfo.blockType == .code_snippet);
-
-        const endLine = blockInfo.getEndLine();
-        const startLine = blockInfo.getStartLine();
-        std.debug.assert(startLine.lineType == .codeSnippetStart);
 
         //std.debug.print("\n==========\n", .{});
         //std.debug.print("commentedOut: {}\n", .{attrs.commentedOut});
@@ -457,6 +510,10 @@ const TmdRender = struct {
             try writeHtmlAttributeValue(w, attrs.language);
         }
         _ = try w.write("'>");
+
+        const endLine = blockInfo.getEndLine();
+        const startLine = blockInfo.getStartLine();
+        std.debug.assert(startLine.lineType == .codeSnippetStart);
 
         var lineInfoElement = startLine.ownerListElement();
         if (startLine != endLine) {
@@ -1007,7 +1064,7 @@ const TmdRender = struct {
 
                     // atom
 
-                    .header, .usual, .blank, .code_snippet, .directive => {
+                    .header, .usual, .directive, .blank, .code_snippet, .custom => {
                         try self.renderTmdCodeForAtomBlock(w, blockInfo, trimContainerMark);
 
                         element = element.next orelse &self.nullBlockInfoElement;

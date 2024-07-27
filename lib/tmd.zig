@@ -130,7 +130,7 @@ pub const ContentStreamAttributes = struct {
 
 pub const CustomBlockAttibutes = struct {
     commentedOut: bool = false, // ToDo: use Range
-    customApp: []const u8 = "", // ToDo: use Range
+    app: []const u8 = "", // ToDo: use Range
     arguments: []const u8 = "", // ToDo: use Range
     // The argument is the content in the following custom block.
     // It might be a file path.
@@ -376,19 +376,6 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
-    //footer: struct {
-    //    startLine: *LineInfo = undefined,
-    //    endLine: *LineInfo = undefined,
-    //
-    //    // ToDo: when false, no need to render.
-    //    //       So a block with a singal ` will outout nothing.
-    //    //       Maybe needless with .blankSpan.
-    //    // hasContent: bool = false,
-    //
-    //    // traits:
-    //    const Atom = void;
-    //},
-
     directive: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
@@ -397,36 +384,43 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
-    code_snippet: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
-        // Note: the code block end tag line might be missing.
-        //       So endLine might not be a .codeSnippetEnd line.
-        //       It can be also of .code or .codeSnippetStart.
+    code_snippet: AtomBlockWithBoundary,
 
-        // traits:
-        const Atom = void;
+    custom: AtomBlockWithBoundary,
+};
 
-        pub fn startPlayloadRange(self: @This()) Range {
-            return switch (self.startLine.lineType) {
-                .codeSnippetStart => |codeSnippetEnd| blk: {
-                    std.debug.assert(codeSnippetEnd.markEndWithSpaces <= self.startLine.rangeTrimmed.end);
-                    break :blk Range{ .start = codeSnippetEnd.markEndWithSpaces, .end = self.startLine.rangeTrimmed.end };
-                },
-                else => unreachable,
-            };
-        }
+pub const AtomBlockWithBoundary = struct {
+    startLine: *LineInfo = undefined,
+    endLine: *LineInfo = undefined,
 
-        pub fn endPlayloadRange(self: @This()) ?Range {
-            return switch (self.endLine.lineType) {
-                .codeSnippetEnd => |codeSnippetEnd| blk: {
-                    std.debug.assert(codeSnippetEnd.markEndWithSpaces <= self.endLine.rangeTrimmed.end);
-                    break :blk Range{ .start = codeSnippetEnd.markEndWithSpaces, .end = self.endLine.rangeTrimmed.end };
-                },
-                else => null,
-            };
-        }
-    },
+    // Note: the custom block end tag line might be missing.
+    //       For .code_snippet, the endLine might not be a .codeSnippetEnd line.
+    //          It can be also of .code or .codeSnippetStart.
+    //       For .custom, the endLine might not be a .customEnd line.
+    //          It can be also of .data or .customStart.
+
+    // traits:
+    const Atom = void;
+
+    pub fn startPlayloadRange(self: @This()) Range {
+        return switch (self.startLine.lineType) {
+            inline .codeSnippetStart, .customStart => |start| blk: {
+                std.debug.assert(start.markEndWithSpaces <= self.startLine.rangeTrimmed.end);
+                break :blk Range{ .start = start.markEndWithSpaces, .end = self.startLine.rangeTrimmed.end };
+            },
+            else => unreachable,
+        };
+    }
+
+    pub fn endPlayloadRange(self: @This()) ?Range {
+        return switch (self.endLine.lineType) {
+            inline .codeSnippetEnd, .customEnd => |end| blk: {
+                std.debug.assert(end.markEndWithSpaces <= self.endLine.rangeTrimmed.end);
+                break :blk Range{ .start = end.markEndWithSpaces, .end = self.endLine.rangeTrimmed.end };
+            },
+            else => null,
+        };
+    }
 };
 
 pub const LineInfo = struct {
@@ -608,6 +602,16 @@ pub const LineType = union(enum) {
         markEndWithSpaces: u32,
     },
     code: struct {},
+
+    customStart: struct {
+        markLen: u32,
+        markEndWithSpaces: u32,
+    },
+    customEnd: struct {
+        markLen: u32,
+        markEndWithSpaces: u32,
+    },
+    data: struct {},
 
     directive: struct {
         markLen: u32,
