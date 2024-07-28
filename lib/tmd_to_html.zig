@@ -800,7 +800,7 @@ const TmdRender = struct {
             },
             .fontWeight => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-pale'>");
+                    _ = try w.write("<span class='tmd-dimmed'>");
                 } else {
                     _ = try w.write("<span class='tmd-bold'>");
                 }

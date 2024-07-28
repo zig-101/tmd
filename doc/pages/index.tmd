@@ -17,7 +17,7 @@ TMD is also much more specified than traditional markdown.
 ! ### **Render result of demo 1
 ////@@ #demo-1
 {
-**bold text** and ^**pale text**.
+**bold text** and ^**dimmed text**.
 
 %%italic text%% and ^%%revert italic text%%.
 
