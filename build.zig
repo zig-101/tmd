@@ -37,9 +37,9 @@ pub fn build(b: *std.Build) !void {
     const runStep = b.step("run", "Run tmd command");
     runStep.dependOn(&runTmdCommand.step);
 
-    // website
+    // doc
 
-    const websitePagesPath = b.path("website/pages");
+    const websitePagesPath = b.path("doc/pages");
     const buildWebsiteCommand = b.addRunArtifact(tmdCommand);
     buildWebsiteCommand.setCwd(websitePagesPath);
     buildWebsiteCommand.addArg("render");
@@ -56,6 +56,6 @@ pub fn build(b: *std.Build) !void {
         buildWebsiteCommand.addArg(entry.basename);
     }
 
-    const buildWebsite = b.step("website", "Build website");
-    buildWebsite.dependOn(&buildWebsiteCommand.step);
+    const buildDoc = b.step("doc", "Build doc");
+    buildDoc.dependOn(&buildWebsiteCommand.step);
 }
