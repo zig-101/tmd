@@ -385,7 +385,7 @@ const TmdRender = struct {
 
                         _ = try w.write("\n<p");
                         if (blockInfo.attributes) |as| {
-                            try writeID(w, as.id);
+                            try writeID(w, as.common.id);
                         }
                         _ = try w.write("></p>\n");
 
@@ -401,7 +401,7 @@ const TmdRender = struct {
                         if (attrs.commentedOut) {
                             _ = try w.write("\n<div");
                             if (blockInfo.attributes) |as| {
-                                try writeID(w, as.id);
+                                try writeID(w, as.common.id);
                             }
                             _ = try w.write("></div>\n");
                         } else {
@@ -417,7 +417,7 @@ const TmdRender = struct {
                         if (attrs.commentedOut) {
                             _ = try w.write("\n<div");
                             if (blockInfo.attributes) |as| {
-                                try writeID(w, as.id);
+                                try writeID(w, as.common.id);
                             }
                             _ = try w.write("></div>\n");
                         } else {
@@ -488,6 +488,9 @@ const TmdRender = struct {
             }
         } else {
             _ = try w.print("[{s} ...]", .{attrs.app}); // ToDo
+
+            // Common MIME types:
+            //    https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
         }
 
         _ = try w.write("</div>\n");
@@ -628,10 +631,14 @@ const TmdRender = struct {
                                     if (tracker.urlConfirmedFinally) {
                                         _ = try w.write("<a href='");
                                         _ = try w.write(linkURL);
-                                        _ = try w.write("'>");
+                                        _ = try w.write("'");
                                     } else {
-                                        _ = try w.write("<span class='tmd-broken-link'>");
+                                        _ = try w.write("<span class='tmd-broken-link'");
                                     }
+                                    if (tracker.activeLinkInfo.?.attrs) |attrs| {
+                                        try writeElementAttributes(w, "", attrs);
+                                    }
+                                    _ = try w.write(">");
 
                                     try writeOpenMarks(w, markElement);
                                 } else {
@@ -684,30 +691,6 @@ const TmdRender = struct {
                                     element = mediaInfoElement.next;
                                     continue;
                                 },
-                                //else => {},
-                                //.blockAttributes => blk: {
-                                //    if (m.isBare) {
-                                //        break :blk;
-                                //    }
-                                //
-                                //    const anchorInfoElement = tokenInfoElement.next.?;
-                                //
-                                //    {
-                                //        const anchorInfoToken = anchorInfoElement.value;
-                                //        std.debug.assert(anchorInfoToken.tokenType == .commentText);
-                                //
-                                //        const anchorInfo = self.doc.data[anchorInfoToken.start()..anchorInfoToken.end()];
-                                //        const id = parser.parse_anchor_id(anchorInfo);
-                                //        if (id.len > 0) {
-                                //            _ = try w.write("<span id=\"");
-                                //            try writeHtmlAttributeValue(w, anchorInfo);
-                                //            _ = try w.write("\"/>");
-                                //        }
-                                //    }
-                                //
-                                //    element = tokenInfoElement.next;
-                                //    continue;
-                                //},
                             }
                         },
                     }
@@ -718,10 +701,9 @@ const TmdRender = struct {
 
             if (lineInfo.treatEndAsSpace) _ = try w.write(" ");
             if (lineInfo == endLine) break;
-            if (lineInfoElement.next) |next|
-                lineInfoElement = next
-            else
-                unreachable;
+            if (lineInfoElement.next) |next| {
+                lineInfoElement = next;
+            } else unreachable;
         }
 
         if (tracker.marksStack.tail()) |element| {
@@ -955,11 +937,15 @@ const TmdRender = struct {
 
     fn writeBlockAttributes(w: anytype, classesSeperatedBySpace: []const u8, attributes: ?*tmd.BlockAttibutes) !void {
         if (attributes) |as| {
-            try writeID(w, as.id);
-            try writeClasses(w, classesSeperatedBySpace, as.classes);
-            return;
+            try writeElementAttributes(w, classesSeperatedBySpace, &as.common);
+        } else {
+            try writeClasses(w, classesSeperatedBySpace, "");
         }
-        try writeClasses(w, classesSeperatedBySpace, "");
+    }
+
+    fn writeElementAttributes(w: anytype, classesSeperatedBySpace: []const u8, attributes: *tmd.ElementAttibutes) !void {
+        try writeID(w, attributes.id);
+        try writeClasses(w, classesSeperatedBySpace, attributes.classes);
     }
 
     fn writeID(w: anytype, id: []const u8) !void {

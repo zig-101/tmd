@@ -23,6 +23,8 @@ pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
     destroyListElements(tmd.BlockAttibutes, tmdDoc.blockAttributes, null, allocator);
     destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
 
+    destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
+
     tmdDoc.* = .{ .data = "" };
 }
 
@@ -39,7 +41,10 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     };
     tmdDoc.blocksByID.init(nilBlockTreeNode);
 
-    var docParser = DocParser{ .tmdDoc = &tmdDoc };
+    var docParser = DocParser{
+        .tmdDoc = &tmdDoc,
+        .lineScanner = LineScanner{ .data = tmdDoc.data },
+    };
     try docParser.parseAll(tmdData, allocator);
 
     if (false and builtin.mode == .Debug)
@@ -399,14 +404,8 @@ const BlockArranger = struct {
 };
 
 const ContentParser = struct {
+    docParser: *DocParser,
     allocator: mem.Allocator,
-    tmdData: []const u8, // ToDo: remove?
-    lineScanner: *LineScanner,
-
-    linkInfos: ?struct {
-        first: *tmd.LinkInfo,
-        last: *tmd.LinkInfo,
-    } = null,
 
     escapedSpanStatus: *SpanStatus = undefined,
     codeSpanStatus: *SpanStatus = undefined,
@@ -462,18 +461,13 @@ const ContentParser = struct {
         openTextNumber: u32 = 0,
     };
 
-    fn make(allocator: mem.Allocator, lineScanner: *LineScanner) ContentParser {
+    fn make(allocator: mem.Allocator, docParser: *DocParser) ContentParser {
         std.debug.assert(MarkCount <= 32);
 
         return .{
+            .docParser = docParser,
             .allocator = allocator,
-            .tmdData = lineScanner.data,
-            .lineScanner = lineScanner,
         };
-    }
-
-    fn tmdData(self: *ContentParser) []const u8 {
-        return self.lineScanner.data;
     }
 
     fn deinit(_: *ContentParser) void {
@@ -533,7 +527,7 @@ const ContentParser = struct {
                 return;
             }
 
-            const text = self.tmdData[token.start()..token.end()];
+            const text = self.docParser.tmdDoc.data[token.start()..token.end()];
             std.debug.assert(text.len > 0);
 
             // ToDo: use ends_with_space instead?
@@ -574,7 +568,7 @@ const ContentParser = struct {
                         line.treatEndAsSpace = false;
                     },
                     .plainText => |_| {
-                        const text = self.tmdData[token.start()..token.end()];
+                        const text = self.docParser.tmdDoc.data[token.start()..token.end()];
                         std.debug.assert(text.len > 0);
 
                         line.treatEndAsSpace = !utf8.start_with_CJK_rune(text);
@@ -589,7 +583,7 @@ const ContentParser = struct {
     }
 
     fn create_token(self: ContentParser) !*tmd.TokenInfo {
-        var tokenInfoElement = try self.allocator.create(list.Element(tmd.TokenInfo));
+        var tokenInfoElement = try createListElement(tmd.TokenInfo, self.allocator);
         self.lineSession.tokens.push(tokenInfoElement);
 
         return &tokenInfoElement.value;
@@ -681,15 +675,18 @@ const ContentParser = struct {
             };
             self.blockSession.lastLinkInfoToken = tokenInfo;
 
-            const linkInfo = &tokenInfo.tokenType.linkInfo;
-            if (self.linkInfos) |*infos| {
-                infos.last.next = linkInfo;
-                infos.last = linkInfo;
-            } else {
-                self.linkInfos = .{
-                    .first = linkInfo,
-                    .last = linkInfo,
-                };
+            var linkElement = try createListElement(tmd.Link, self.allocator);
+            self.docParser.tmdDoc.links.push(linkElement);
+            const link = &linkElement.value;
+            link.* = .{
+                .info = &tokenInfo.tokenType.linkInfo,
+            };
+
+            if (self.docParser.nextElementAttributes) |as| {
+                link.attrs = as;
+                tokenInfo.tokenType.linkInfo.attrs = &link.attrs;
+
+                self.docParser.nextElementAttributes = null;
             }
         }
 
@@ -797,7 +794,7 @@ const ContentParser = struct {
     }
 
     fn parse_directive_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32, isPureComment: bool) !u32 {
-        const lineScanner = self.lineScanner;
+        const lineScanner = &self.docParser.lineScanner;
 
         self.set_currnet_line(lineInfo, lineStart);
 
@@ -840,7 +837,7 @@ const ContentParser = struct {
 
     fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
         const lineStart = self.lineSession.contentStart;
-        const lineScanner = self.lineScanner;
+        const lineScanner = &self.docParser.lineScanner;
         std.debug.assert(lineScanner.lineEnd == null);
 
         const contentEnd = parse_tokens: {
@@ -1213,7 +1210,7 @@ const ContentParser = struct {
     // Match link definitions.
 
     fn tokenAsString(self: *const ContentParser, plainTextTokenInfo: *const tmd.TokenInfo) []const u8 {
-        return self.tmdData[plainTextTokenInfo.start()..plainTextTokenInfo.end()];
+        return self.docParser.tmdDoc.data[plainTextTokenInfo.start()..plainTextTokenInfo.end()];
     }
 
     fn copyLinkText(dst: anytype, from: u32, src: []const u8) u32 {
@@ -1583,12 +1580,13 @@ const ContentParser = struct {
                 return null;
             }
 
-            fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
+            fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.TokenInfo, confirmed: bool, attrs: ?*tmd.ElementAttibutes) void {
                 var le = node.value.linkInfos.head();
                 while (le) |linkInfoElement| {
                     if (linkInfoElement.value.info != .urlSourceText) {
                         //std.debug.print("    333 aaa exact match, found and setSourceOfURL.\n", .{});
                         linkInfoElement.value.setSourceOfURL(urlSource, confirmed);
+                        linkInfoElement.value.attrs = attrs;
                     } else {
                         //std.debug.print("    333 aaa exact match, found but sourceURL has set.\n", .{});
                     }
@@ -1600,24 +1598,25 @@ const ContentParser = struct {
                 }
             }
 
-            fn setUrlSourceForTreeNodes(theTree: *Tree, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
+            fn setUrlSourceForTreeNodes(theTree: *Tree, urlSource: ?*tmd.TokenInfo, confirmed: bool, attrs: ?*tmd.ElementAttibutes) void {
                 const NodeHandler = struct {
                     urlSource: ?*tmd.TokenInfo,
                     confirmed: bool,
+                    attrs: ?*tmd.ElementAttibutes,
 
                     pub fn onNode(h: @This(), node: *Node) void {
-                        setUrlSourceForTreeNodes(&node.value.deeperTree, h.urlSource, h.confirmed);
-                        setUrlSourceForNode(node, h.urlSource, h.confirmed);
+                        setUrlSourceForTreeNodes(&node.value.deeperTree, h.urlSource, h.confirmed, h.attrs);
+                        setUrlSourceForNode(node, h.urlSource, h.confirmed, h.attrs);
                     }
                 };
 
-                const handler = NodeHandler{ .urlSource = urlSource, .confirmed = confirmed };
+                const handler = NodeHandler{ .urlSource = urlSource, .confirmed = confirmed, .attrs = attrs };
                 theTree.traverseNodes(handler);
             }
         };
     }
 
-    const Link = struct {
+    const LinkForTree = struct {
         linkInfoElementNormal: list.Element(*tmd.LinkInfo),
         linkInfoElementInverted: list.Element(*tmd.LinkInfo),
         revisedLinkText: RevisedLinkText,
@@ -1634,7 +1633,7 @@ const ContentParser = struct {
         }
     };
 
-    fn destroyRevisedLinkText(link: *Link, a: mem.Allocator) void {
+    fn destroyRevisedLinkText(link: *LinkForTree, a: mem.Allocator) void {
         a.free(link.revisedLinkText.asString());
     }
 
@@ -1645,12 +1644,13 @@ const ContentParser = struct {
         normalPatricia: *NormalPatricia,
         invertedPatricia: *InvertedPatricia,
 
-        fn doForLinkDefinition(self: @This(), linkDef: *Link) void {
+        fn doForLinkDefinition(self: @This(), linkDef: *LinkForTree) void {
             const linkInfo = linkDef.info();
             std.debug.assert(linkInfo.inDirective());
 
             const urlSource = linkInfo.info.urlSourceText.?;
             const confirmed = linkInfo.urlConfirmed();
+            const attrs = linkInfo.attrs;
 
             const linkText = linkDef.revisedLinkText.asString();
 
@@ -1662,8 +1662,9 @@ const ContentParser = struct {
                 if (linkText.len == ddd.len) {
                     //std.debug.print("    333 all match.\n", .{});
                     // all match
-                    NormalPatricia.setUrlSourceForTreeNodes(&self.normalPatricia.topTree, urlSource, confirmed);
-                    //InvertedPatricia.setUrlSourceForTreeNodes(&self.invertedPatricia.topTree, urlSource, confirmed);
+
+                    NormalPatricia.setUrlSourceForTreeNodes(&self.normalPatricia.topTree, urlSource, confirmed, attrs);
+                    //InvertedPatricia.setUrlSourceForTreeNodes(&self.invertedPatricia.topTree, urlSource, confirmed, attrs);
 
                     self.normalPatricia.clear();
                     self.invertedPatricia.clear();
@@ -1673,8 +1674,8 @@ const ContentParser = struct {
 
                     const revisedLinkText = linkDef.revisedLinkText.prefix(linkDef.revisedLinkText.len - @as(u32, ddd.len));
                     if (self.normalPatricia.searchLinkInfo(revisedLinkText, true)) |node| {
-                        NormalPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed);
-                        NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed);
+                        NormalPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed, attrs);
+                        NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed, attrs);
                     } else {
                         //std.debug.print("    333 leading match. Not found.\n", .{});
                     }
@@ -1686,8 +1687,8 @@ const ContentParser = struct {
 
                     const revisedLinkText = linkDef.revisedLinkText.suffix(@intCast(ddd.len));
                     if (self.invertedPatricia.searchLinkInfo(revisedLinkText.invert(), true)) |node| {
-                        InvertedPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed);
-                        InvertedPatricia.setUrlSourceForNode(node, urlSource, confirmed);
+                        InvertedPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed, attrs);
+                        InvertedPatricia.setUrlSourceForNode(node, urlSource, confirmed, attrs);
                     } else {
                         //std.debug.print("    333 trailing match. Not found.\n", .{});
                     }
@@ -1697,7 +1698,7 @@ const ContentParser = struct {
 
                     if (self.normalPatricia.searchLinkInfo(linkDef.revisedLinkText, false)) |node| {
                         //std.debug.print("    333 exact match, found.\n", .{});
-                        NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed);
+                        NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed, attrs);
                     } else {
                         //std.debug.print("    333 exact match, not found.\n", .{});
                     }
@@ -1707,10 +1708,10 @@ const ContentParser = struct {
     };
 
     fn matchLinks(self: *ContentParser) !void {
-        if (self.linkInfos) |infos| {
-            var links: list.List(Link) = .{};
-            defer destroyListElements(Link, links, destroyRevisedLinkText, self.allocator);
-            // destroyRevisedLinkText should be called after destroying the following two trees.
+        const links = &self.docParser.tmdDoc.links;
+        if (!links.empty()) {
+            var linksForTree: list.List(LinkForTree) = .{};
+            defer destroyListElements(LinkForTree, linksForTree, destroyRevisedLinkText, self.allocator);
 
             var normalPatricia = NormalPatricia{ .allocator = self.allocator };
             normalPatricia.init();
@@ -1726,8 +1727,9 @@ const ContentParser = struct {
             };
 
             // The top-to-bottom pass.
-            var linkInfo: *tmd.LinkInfo = infos.first;
+            var linkElement = links.head().?;
             while (true) {
+                const linkInfo = linkElement.value.info;
                 switch (linkInfo.info) {
                     .urlSourceText => unreachable,
                     .firstPlainText => |plainTextToken| blk: {
@@ -1775,10 +1777,10 @@ const ContentParser = struct {
                             .text = textPtr,
                         };
 
-                        const linkElement = try self.allocator.create(list.Element(Link));
-                        links.push(linkElement);
-                        linkElement.value.setInfoAndText(linkInfo, revisedLinkText);
-                        const link = &linkElement.value;
+                        const theElement = try self.allocator.create(list.Element(LinkForTree));
+                        linksForTree.push(theElement);
+                        theElement.value.setInfoAndText(linkInfo, revisedLinkText);
+                        const linkForTree = &theElement.value;
 
                         const confirmed = while (true) {
                             const realLinkText = RealLinkText{
@@ -1798,6 +1800,9 @@ const ContentParser = struct {
                                 std.debug.assert(linkTextLen2 == linkTextLen);
 
                                 //std.debug.print("    222 linkText = {s}\n", .{revisedLinkText.asString()});
+
+                                //std.debug.print("==== /{s}/, {}\n", .{ str, url.isValidURL(str) });
+                                break url.isValidURL(str);
                             } else {
                                 std.debug.assert(!url.isValidURL(str));
                                 linkTextLen2 = copyLinkText(realLinkText, linkTextLen2, str);
@@ -1805,60 +1810,53 @@ const ContentParser = struct {
 
                                 //std.debug.print("    111 linkText = {s}\n", .{revisedLinkText.asString()});
 
-                                try normalPatricia.putLinkInfo(revisedLinkText, &link.linkInfoElementNormal);
-                                try invertedPatricia.putLinkInfo(revisedLinkText.invert(), &link.linkInfoElementInverted);
+                                try normalPatricia.putLinkInfo(revisedLinkText, &linkForTree.linkInfoElementNormal);
+                                try invertedPatricia.putLinkInfo(revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
                                 break :blk;
                             }
-
-                            //std.debug.print("==== /{s}/, {}\n", .{ str, url.isValidURL(str) });
-
-                            break url.isValidURL(str);
                         };
 
                         std.debug.assert(linkInfo.inDirective());
                         linkInfo.setSourceOfURL(lastToken, confirmed);
 
-                        matcher.doForLinkDefinition(link);
+                        matcher.doForLinkDefinition(linkForTree);
                     },
                 }
 
-                if (linkInfo.next) |next| {
-                    linkInfo = next;
-                } else {
-                    std.debug.assert(linkInfo == infos.last);
-                    break;
-                }
+                if (linkElement.next) |next| {
+                    linkElement = next;
+                } else break;
             }
 
             // The bottom-to-top pass.
-            if (true) {
+            {
                 normalPatricia.clear();
                 invertedPatricia.clear();
 
-                var element = links.tail();
-                while (element) |linkElement| {
-                    const link = &linkElement.value;
-                    const theLinkInfo = link.info();
+                var element = linksForTree.tail();
+                while (element) |theElement| {
+                    const linkForTree = &theElement.value;
+                    const theLinkInfo = linkForTree.info();
                     if (theLinkInfo.inDirective()) {
                         std.debug.assert(theLinkInfo.info == .urlSourceText);
-                        matcher.doForLinkDefinition(link);
+                        matcher.doForLinkDefinition(linkForTree);
                     } else if (theLinkInfo.info != .urlSourceText) {
-                        try normalPatricia.putLinkInfo(link.revisedLinkText, &link.linkInfoElementNormal);
-                        try invertedPatricia.putLinkInfo(link.revisedLinkText.invert(), &link.linkInfoElementInverted);
+                        try normalPatricia.putLinkInfo(linkForTree.revisedLinkText, &linkForTree.linkInfoElementNormal);
+                        try invertedPatricia.putLinkInfo(linkForTree.revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
                     }
-                    element = linkElement.prev;
+                    element = theElement.prev;
                 }
             }
 
             // The final pass.
             {
-                var element = links.head();
-                while (element) |linkElement| {
-                    const theLinkInfo = linkElement.value.info();
+                var element = linksForTree.head();
+                while (element) |theElement| {
+                    const theLinkInfo = theElement.value.info();
                     if (theLinkInfo.info != .urlSourceText) {
                         theLinkInfo.setSourceOfURL(theLinkInfo.info.firstPlainText, false);
                     }
-                    element = linkElement.next;
+                    element = theElement.next;
                 }
             }
         }
@@ -2119,22 +2117,26 @@ const LineScanner = struct {
 const DocParser = struct {
     tmdDoc: *tmd.Doc,
 
-    nextBlockAttributes: ?tmd.BlockAttibutes = null,
+    lineScanner: LineScanner,
+
+    nextElementAttributes: ?tmd.ElementAttibutes = null,
 
     fn createAndPushBlockInfoElement(parser: *DocParser, allocator: mem.Allocator) !*tmd.BlockInfo {
         var blockInfoElement = try createListElement(tmd.BlockInfo, allocator);
         parser.tmdDoc.blocks.push(blockInfoElement);
         const blockInfo = &blockInfoElement.value;
 
-        if (parser.nextBlockAttributes) |as| {
+        if (parser.nextElementAttributes) |as| {
             var blockAttributesElement = try createListElement(tmd.BlockAttibutes, allocator);
             parser.tmdDoc.blockAttributes.push(blockAttributesElement);
 
             const attrs = &blockAttributesElement.value;
-            attrs.* = as;
+            attrs.* = .{ .common = as };
+            std.debug.assert(attrs.extra == .none);
+
             blockInfo.attributes = attrs;
 
-            if (attrs.id.len > 0) {
+            if (attrs.common.id.len > 0) {
                 const blockTreeNodeElement = parser.tmdDoc.freeBlockTreeNodeElement orelse try createListElement(tmd.BlockInfoRedBlack.Node, allocator);
                 const blockTreeNode = &blockTreeNodeElement.value;
                 blockTreeNode.value = blockInfo;
@@ -2146,7 +2148,7 @@ const DocParser = struct {
                 }
             }
 
-            parser.nextBlockAttributes = null;
+            parser.nextElementAttributes = null;
         } else {
             blockInfo.attributes = null; // !important
         }
@@ -2168,19 +2170,19 @@ const DocParser = struct {
             break comment[i..];
         } else return;
 
-        const attrs = parse_block_attributes(playload);
+        const attrs = parse_element_attributes(playload);
         if (attrs.id.len > 0) {
-            if (parser.nextBlockAttributes) |*as| {
+            if (parser.nextElementAttributes) |*as| {
                 as.id = attrs.id;
             } else {
-                parser.nextBlockAttributes = .{ .id = attrs.id };
+                parser.nextElementAttributes = .{ .id = attrs.id };
             }
         }
         if (attrs.classes.len > 0) {
-            if (parser.nextBlockAttributes) |*as| {
+            if (parser.nextElementAttributes) |*as| {
                 as.classes = attrs.classes;
             } else {
-                parser.nextBlockAttributes = .{ .classes = attrs.classes };
+                parser.nextElementAttributes = .{ .classes = attrs.classes };
             }
         }
     }
@@ -2201,10 +2203,9 @@ const DocParser = struct {
         var blockArranger = BlockArranger.start(rootBlockInfo);
         defer blockArranger.end();
 
-        var lineScanner = LineScanner{ .data = tmdData };
-        // ToDo: lineScanner should be a property of ContentParser.
+        const lineScanner = &parser.lineScanner;
 
-        var contentParser = ContentParser.make(allocator, &lineScanner);
+        var contentParser = ContentParser.make(allocator, parser);
         contentParser.init();
         defer contentParser.deinit(); // ToDo: needed?
 
@@ -2988,11 +2989,11 @@ const charIdLevels = blk: {
     break :blk table;
 };
 
-pub fn parse_block_attributes(playload: []const u8) tmd.BlockAttibutes {
-    var attrs = tmd.BlockAttibutes{};
+pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
+    var attrs = tmd.ElementAttibutes{};
 
-    const id = std.meta.fieldIndex(tmd.BlockAttibutes, "id").?;
-    const classes = std.meta.fieldIndex(tmd.BlockAttibutes, "classes").?;
+    const id = std.meta.fieldIndex(tmd.ElementAttibutes, "id").?;
+    const classes = std.meta.fieldIndex(tmd.ElementAttibutes, "classes").?;
 
     var lastOrder: isize = -1;
 

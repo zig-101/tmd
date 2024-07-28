@@ -25,11 +25,11 @@ pub const Doc = struct {
     blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{},
     freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null,
 
-    pendingLinks: list.List(*LinkInfo) = .{}, // ToDo
+    links: list.List(Link) = .{},
 
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
         var a = BlockAttibutes{
-            .id = id,
+            .common = .{ .id = id },
         };
         var b = BlockInfo{
             .blockType = undefined,
@@ -91,15 +91,23 @@ pub fn listBulletIndex(bulletMark: []const u8) ListMarkTypeIndex {
     }
 }
 
-// A BlockAttibutes directive line
-pub const BlockAttibutes = struct {
+pub const ElementAttibutes = struct {
     // For any block:
     id: []const u8 = "", // ToDo: should be a Range?
     classes: []const u8 = "", // ToDo: should be Range list?
+};
+
+pub const Link = struct {
+    attrs: ElementAttibutes = .{}, // ToDo: use pointer? Memory will be more fragmental.
+    info: *LinkInfo,
+};
+
+pub const BlockAttibutes = struct {
+    common: ElementAttibutes = .{}, // ToDo: use pointer? Memory will be more fragmental.
 
     extra: union(enum) {
         base: BaseBlockAttibutes,
-        code: CodeBlockAttibutes, // ToDo: when become large, use a pointer type.
+        code: CodeBlockAttibutes, // ToDo: use pointer? Memory will be more fragmental.
         none: void,
     } = .none,
 };
@@ -220,8 +228,8 @@ pub const BlockInfo = struct {
     pub fn compare(x: *const @This(), y: *const @This()) isize {
         const xAttributes = x.attributes orelse unreachable;
         const yAttributes = y.attributes orelse unreachable;
-        const xID = if (xAttributes.id.len > 0) xAttributes.id else unreachable;
-        const yID = if (yAttributes.id.len > 0) yAttributes.id else unreachable;
+        const xID = if (xAttributes.common.id.len > 0) xAttributes.common.id else unreachable;
+        const yID = if (yAttributes.common.id.len > 0) yAttributes.common.id else unreachable;
         const i = std.mem.indexOfDiff(u8, xID, yID) orelse return 0;
         if (xID.len == i) {
             std.debug.assert(yID.len > i);
@@ -254,7 +262,7 @@ pub const BlockType = union(enum) {
         //       Can be unioned with .firstItem.
         //       Note: in parsing phase, the union is always .firstItem.
         //       The parse should maintain tmmp list to record listAttributes.
-        // listAttributes: ?*BlockAttibutes = null,
+        // listAttributes: ?*ElementAttibutes = null,
 
         _markTypeIndex: ListMarkTypeIndex,
 
@@ -758,9 +766,11 @@ pub const TokenType = union(enum) {
     },
     // A linkInfo token is always before an open .link SpanMarkType token.
     linkInfo: struct {
-        next: ?*@This() = null,
+        attrs: ?*ElementAttibutes = null,
         info: union(enum) {
+            // This is only used for link matching.
             firstPlainText: ?*TokenInfo, // null for a blank link span
+
             // This is a list, it is the head.
             // Surely, if urlConfirmed, it is the only one in the list.
             urlSourceText: ?*TokenInfo, // null for a blank link span
