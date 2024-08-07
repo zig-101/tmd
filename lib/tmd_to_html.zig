@@ -49,7 +49,7 @@ const TmdRender = struct {
 
         if (element) |blockInfoElement| {
             std.debug.assert(blockInfoElement.value.blockType == .root);
-            if (renderRoot) _ = try w.write("\n<div class='tmd-doc'>\n");
+            if (renderRoot) _ = try w.write("\n<div class=\"tmd-doc\">\n");
             std.debug.assert((try self.renderBlockChildren(w, blockInfoElement, 0)) == &self.nullBlockInfoElement);
             if (renderRoot) _ = try w.write("\n</div>\n");
         } else unreachable;
@@ -87,7 +87,7 @@ const TmdRender = struct {
             break :blk headerElement;
         } else parentElement;
 
-        _ = try w.write("\n<div class='tmd-indented-content'>\n");
+        _ = try w.write("\n<div class=\"tmd-indented-content\">\n");
 
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
         _ = try w.write("\n</div>\n");
@@ -124,7 +124,7 @@ const TmdRender = struct {
             break :blk headerElement;
         } else parentElement;
 
-        _ = try w.write("\n<div class='tmd-note_box-content'>\n");
+        _ = try w.write("\n<div class=\"tmd-note_box-content\">\n");
 
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
         _ = try w.write("\n</div>\n");
@@ -150,7 +150,7 @@ const TmdRender = struct {
             break :blk parentElement;
         };
 
-        _ = try w.write("<div class='tmd-disclosure_box-content'>");
+        _ = try w.write("<div class=\"tmd-disclosure_box-content\">");
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
         _ = try w.write("\n</div></details>\n");
         return element;
@@ -194,10 +194,10 @@ const TmdRender = struct {
 
                         switch (attrs.horizontalAlign) {
                             .none => {},
-                            .left => _ = try w.write(" style='text-align: left;'"),
-                            .center => _ = try w.write(" style='text-align: center;'"),
-                            .justify => _ = try w.write(" style='text-align: justify;'"),
-                            .right => _ = try w.write(" style='text-align: right;'"),
+                            .left => _ = try w.write(" style=\"text-align: left;\""),
+                            .center => _ = try w.write(" style=\"text-align: center;\""),
+                            .justify => _ = try w.write(" style=\"text-align: justify;\""),
+                            .right => _ = try w.write(" style=\"text-align: right;\""),
                         }
                         _ = try w.write(">");
                         element = try self.renderBlockChildren(w, element, 0);
@@ -210,7 +210,7 @@ const TmdRender = struct {
                         if (listItem.isTabItem()) {
                             const tabInfo = if (listItem.isFirst) blk: {
                                 _ = try w.write("\n<div");
-                                _ = try w.write(" class='tmd-tab'>\n");
+                                _ = try w.write(" class=\"tmd-tab\">\n");
 
                                 const orderId = self.nextTabListOrderId;
                                 self.nextTabListOrderId += 1;
@@ -228,14 +228,14 @@ const TmdRender = struct {
                                 break :blk self.tabListInfos[@intCast(self.currentTabListDepth)];
                             };
 
-                            _ = try w.print("<input type='radio' class='tmd-tab-radio' name='tmd-tab-{d}' id='tmd-tab-{d}-input-{d}'", .{
+                            _ = try w.print("<input type=\"radio\" class=\"tmd-tab-radio\" name=\"tmd-tab-{d}\" id=\"tmd-tab-{d}-input-{d}\"", .{
                                 tabInfo.orderId, tabInfo.orderId, tabInfo.nextItemOrderId,
                             });
                             if (listItem.isFirst) {
                                 _ = try w.write(" checked");
                             }
                             _ = try w.write(">\n");
-                            _ = try w.print("<label for='tmd-tab-{d}-input-{d}' class='tmd-tab-label'", .{
+                            _ = try w.print("<label for=\"tmd-tab-{d}-input-{d}\" class=\"tmd-tab-label\"", .{
                                 tabInfo.orderId, tabInfo.nextItemOrderId,
                             });
 
@@ -273,7 +273,7 @@ const TmdRender = struct {
                                     .unordered => _ = try w.write("\n<ul"),
                                     .ordered => _ = try w.write("\n<ol"),
                                 }
-                                _ = try w.write(" class='tmd-list'>\n");
+                                _ = try w.write(" class=\"tmd-list\">\n");
                             }
                             _ = try w.write("\n<li");
                             try writeBlockAttributes(w, "tmd-list-item", blockInfo.attributes);
@@ -456,7 +456,7 @@ const TmdRender = struct {
         // Not a good idea to wrapping the content.
         //_ = try w.write("<div");
         //try writeBlockAttributes(w, "tmd-custom", blockInfo.attributes);
-        //_ = try w.write(">");
+        //_ = try w.write("\">");
 
         if (attrs.app.len == 0) {
             _ = try w.write("[...]");
@@ -511,10 +511,10 @@ const TmdRender = struct {
         _ = try w.write("<pre");
         try writeBlockAttributes(w, "tmd-code_snippet", blockInfo.attributes);
         if (attrs.language.len > 0) {
-            _ = try w.write("'><code class='language-");
+            _ = try w.write("\"><code class=\"language-");
             try writeHtmlAttributeValue(w, attrs.language);
         }
-        _ = try w.write("'>");
+        _ = try w.write("\">");
 
         const endLine = blockInfo.getEndLine();
         const startLine = blockInfo.getStartLine();
@@ -631,11 +631,11 @@ const TmdRender = struct {
                                         // ToDo: call custom callback to try to generate a url.
                                     }
                                     if (tracker.urlConfirmedFinally) {
-                                        _ = try w.write("<a href='");
+                                        _ = try w.write("<a href=\"");
                                         _ = try w.write(linkURL);
-                                        _ = try w.write("'");
+                                        _ = try w.write("\"");
                                     } else {
-                                        _ = try w.write("<span class='tmd-broken-link'");
+                                        _ = try w.write("<span class=\"tmd-broken-link\"");
                                     }
                                     if (tracker.activeLinkInfo.?.attrs) |attrs| {
                                         try writeElementAttributes(w, "", attrs);
@@ -684,7 +684,7 @@ const TmdRender = struct {
                                         _ = try w.write("<img src=\"");
                                         try writeHtmlAttributeValue(w, src);
                                         if (isInline) {
-                                            _ = try w.write("\" class='tmd-inline-media'/>");
+                                            _ = try w.write("\" class=\"tmd-inline-media\"/>");
                                         } else {
                                             _ = try w.write("\"/>");
                                         }
@@ -798,48 +798,48 @@ const TmdRender = struct {
         switch (spanMark.markType) {
             .link => {
                 std.debug.assert(spanMark.secondary);
-                _ = try w.write("<span class='tmd-underlined'>");
+                _ = try w.write("<span class=\"tmd-underlined\">");
             },
             .fontWeight => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-dimmed'>");
+                    _ = try w.write("<span class=\"tmd-dimmed\">");
                 } else {
-                    _ = try w.write("<span class='tmd-bold'>");
+                    _ = try w.write("<span class=\"tmd-bold\">");
                 }
             },
             .fontStyle => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-revert-italic'>");
+                    _ = try w.write("<span class=\"tmd-revert-italic\">");
                 } else {
-                    _ = try w.write("<span class='tmd-italic'>");
+                    _ = try w.write("<span class=\"tmd-italic\">");
                 }
             },
             .fontSize => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-larger-size'>");
+                    _ = try w.write("<span class=\"tmd-larger-size\">");
                 } else {
-                    _ = try w.write("<span class='tmd-smaller-size'>");
+                    _ = try w.write("<span class=\"tmd-smaller-size\">");
                 }
             },
             .spoiler => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-secure-spoiler'>");
+                    _ = try w.write("<span class=\"tmd-secure-spoiler\">");
                 } else {
-                    _ = try w.write("<span class='tmd-spoiler'>");
+                    _ = try w.write("<span class=\"tmd-spoiler\">");
                 }
             },
             .deleted => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-invisible'>");
+                    _ = try w.write("<span class=\"tmd-invisible\">");
                 } else {
-                    _ = try w.write("<span class='tmd-deleted'>");
+                    _ = try w.write("<span class=\"tmd-deleted\">");
                 }
             },
             .marked => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<mark class='tmd-marked-2'>");
+                    _ = try w.write("<mark class=\"tmd-marked-2\">");
                 } else {
-                    _ = try w.write("<mark class='tmd-marked'>");
+                    _ = try w.write("<mark class=\"tmd-marked\">");
                 }
             },
             .supsub => {
@@ -851,14 +851,14 @@ const TmdRender = struct {
             },
             .code => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<code class='tmd-mono-font'>");
+                    _ = try w.write("<code class=\"tmd-mono-font\">");
                 } else {
-                    _ = try w.write("<code class='tmd-code-span'>");
+                    _ = try w.write("<code class=\"tmd-code-span\">");
                 }
             },
             .escaped => {
                 if (spanMark.secondary) {
-                    _ = try w.write("<span class='tmd-keep-whitespaces'>");
+                    _ = try w.write("<span class=\"tmd-keep-whitespaces\">");
                 }
             },
         }
@@ -953,13 +953,13 @@ const TmdRender = struct {
     fn writeID(w: anytype, id: []const u8) !void {
         if (id.len == 0) return;
 
-        _ = try w.write(" id='");
+        _ = try w.write(" id=\"");
         _ = try w.write(id);
-        _ = try w.write("'");
+        _ = try w.write("\"");
     }
 
     fn writeClasses(w: anytype, classesSeperatedBySpace: []const u8, classesSeperatedBySemicolon: []const u8) !void {
-        _ = try w.write(" class='");
+        _ = try w.write(" class=\"");
         var needSpace = classesSeperatedBySpace.len > 0;
         if (needSpace) _ = try w.write(classesSeperatedBySpace);
         if (classesSeperatedBySemicolon.len > 0) {
@@ -976,7 +976,7 @@ const TmdRender = struct {
                 } else break;
             }
         }
-        _ = try w.write("'");
+        _ = try w.write("\"");
     }
 
     fn writeHtmlAttributeValue(w: anytype, text: []const u8) !void {
