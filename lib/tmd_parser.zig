@@ -1331,7 +1331,6 @@ const ContentParser = struct {
             },
 
             freeNodeList: ?*Node = null,
-            //freeLinkInfoElement: list.List(*tmd.LinkInfo) = .{},
 
             const rbtree = tree.RedBlack(NodeValue, NodeValue);
             const Tree = rbtree.Tree;
@@ -1408,17 +1407,6 @@ const ContentParser = struct {
                 }
                 self.freeNodeList = node;
             }
-
-            //fn getFreeLinkInfoElement(self: *@This()) !*list.Element(*tmd.LinkInfo) {
-            //    if (self.freeLinkInfoElement.pop()) |element| {
-            //        return element;
-            //    }
-            //    return try self.allocator.create(list.Element(*tmd.LinkInfo));
-            //}
-            //
-            //fn freeLinkInfoElement(self: *@This(), element: *list.Element(*tmd.LinkInfo)) void {
-            //    self.freeLinkInfoElement.push(element);
-            //}
 
             const NodeValue = struct {
                 textSegment: TextType = undefined,
@@ -2994,8 +2982,13 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
 
     const id = std.meta.fieldIndex(tmd.ElementAttibutes, "id").?;
     const classes = std.meta.fieldIndex(tmd.ElementAttibutes, "classes").?;
+    //const kvs = std.meta.fieldIndex(tmd.ElementAttibutes, "kvs").?;
 
     var lastOrder: isize = -1;
+    var kvs: ?struct {
+        first: []const u8,
+        last: []const u8,
+    } = null;
 
     var it = mem.splitAny(u8, playload, " \t");
     var item = it.first();
@@ -3015,21 +3008,22 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
                 '.' => {
                     if (lastOrder >= classes) break;
                     if (item.len == 1) break;
-                    if (item[1] >= 128 or charIdLevels[item[1]] != 2) break;
-                    var canSep = false;
-                    for (item[2..]) |c| {
-                        if (canSep and c == ';') {
-                            canSep = false;
-                            continue;
-                        }
-                        if (c >= 128 or charIdLevels[c] == 0) break;
-                        canSep = true;
-                    }
+                    // ToDo: write a more precise implementation.
+                    //       and support .class1 .class2.
+                    //       classes can't contain periods.
                     attrs.classes = item[1..];
                     lastOrder = classes;
                 },
                 else => {
-                    break; // break the loop
+                    if (item.len < 2) break;
+
+                    // ToDo: write a more pricise implementation.
+
+                    if (std.mem.indexOfScalar(u8, item, '=')) |i| {
+                        if (0 < i and i < item.len - 1) {
+                            if (kvs == null) kvs = .{ .first = item, .last = item } else kvs.?.last = item;
+                        } else break;
+                    } else break;
                 },
             }
         }
@@ -3038,6 +3032,13 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
             item = next;
         } else break;
     }
+
+    if (kvs) |v| {
+        const start = @intFromPtr(v.first.ptr);
+        const end = @intFromPtr(v.last.ptr + v.last.len);
+        attrs.kvs = v.first.ptr[0 .. end - start];
+    }
+
     return attrs;
 }
 

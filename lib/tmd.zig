@@ -16,16 +16,16 @@ pub const BlockInfoRedBlack = tree.RedBlack(*BlockInfo, BlockInfo);
 
 pub const Doc = struct {
     data: []const u8,
-    blocks: list.List(BlockInfo) = .{},
-    lines: list.List(LineInfo) = .{},
+    blocks: list.List(BlockInfo) = .{}, // ToDo: use SinglyLinkedList
+    lines: list.List(LineInfo) = .{}, // ToDo: use SinglyLinkedList
 
     blocksByID: BlockInfoRedBlack.Tree = .{},
 
-    blockAttributes: list.List(BlockAttibutes) = .{},
-    blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{},
-    freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null,
+    blockAttributes: list.List(BlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{}, // ToDo: use SinglyLinkedList
+    freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null, // ToDo: use SinglyLinkedList
 
-    links: list.List(Link) = .{},
+    links: list.List(Link) = .{}, // ToDo: use SinglyLinkedList
 
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
         var a = BlockAttibutes{
@@ -95,6 +95,7 @@ pub const ElementAttibutes = struct {
     // For any block:
     id: []const u8 = "", // ToDo: should be a Range?
     classes: []const u8 = "", // ToDo: should be Range list?
+    kvs: []const u8 = "", // ToDo: should be Range list?
 };
 
 pub const Link = struct {

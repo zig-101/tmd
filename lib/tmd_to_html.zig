@@ -453,9 +453,10 @@ const TmdRender = struct {
     };
 
     fn writeCustomBlock(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo, attrs: tmd.CustomBlockAttibutes) !void {
-        _ = try w.write("<div");
-        try writeBlockAttributes(w, "tmd-custom", blockInfo.attributes);
-        _ = try w.write("'>");
+        // Not a good idea to wrapping the content.
+        //_ = try w.write("<div");
+        //try writeBlockAttributes(w, "tmd-custom", blockInfo.attributes);
+        //_ = try w.write(">");
 
         if (attrs.app.len == 0) {
             _ = try w.write("[...]");
@@ -493,7 +494,8 @@ const TmdRender = struct {
             //    https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
         }
 
-        _ = try w.write("</div>\n");
+        // Not a good idea to wrapping the content.
+        //_ = try w.write("</div>\n");
     }
 
     fn writeCodeBlockLines(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo, attrs: tmd.CodeBlockAttibutes) !void {
