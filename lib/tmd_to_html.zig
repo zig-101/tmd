@@ -332,6 +332,11 @@ const TmdRender = struct {
 
                     // atom
 
+                    .line => |_| {
+                        _ = try w.print("<hr class=\"tmd-line\"/>\n", .{});
+
+                        element = element.next orelse &self.nullBlockInfoElement;
+                    },
                     .header => |header| {
                         element = element.next orelse &self.nullBlockInfoElement;
 
@@ -574,6 +579,11 @@ const TmdRender = struct {
         var lineInfoElement = blockInfo.getStartLine().ownerListElement();
         while (true) {
             const lineInfo = &lineInfoElement.value;
+
+            // Just to check all possible types. Don't remove.
+            switch (lineInfo.lineType) {
+                .blank, .usual, .header, .line, .directive, .baseBlockOpen, .baseBlockClose, .codeSnippetStart, .codeSnippetEnd, .code, .customStart, .customEnd, .data => {},
+            }
 
             {
                 var element = lineInfo.tokens().?.head();
@@ -1052,7 +1062,7 @@ const TmdRender = struct {
 
                     // atom
 
-                    .header, .usual, .directive, .blank, .code_snippet, .custom => {
+                    .line, .header, .usual, .directive, .blank, .code_snippet, .custom => {
                         try self.renderTmdCodeForAtomBlock(w, blockInfo, trimContainerMark);
 
                         element = element.next orelse &self.nullBlockInfoElement;

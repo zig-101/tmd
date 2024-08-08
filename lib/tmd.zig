@@ -354,6 +354,14 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
+    line: struct {
+        startLine: *LineInfo = undefined,
+        endLine: *LineInfo = undefined,
+
+        // traits:
+        const Atom = void;
+    },
+
     header: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
@@ -580,10 +588,8 @@ pub const LineType = union(enum) {
         markEndWithSpaces: u32,
         tokens: list.List(TokenInfo) = .{},
     },
-    footer: struct {
+    line: struct {
         markLen: u32,
-        markEndWithSpaces: u32,
-        tokens: list.List(TokenInfo) = .{},
     },
 
     baseBlockOpen: struct {

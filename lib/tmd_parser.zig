@@ -2334,11 +2334,13 @@ const DocParser = struct {
                 // try to parse leading container mark.
                 switch (lineScanner.peekCursor()) {
                     '*', '+', '-', '~' => |mark| handle: {
-                        var lastMark = mark;
-                        if (lineScanner.peekNext() == '.') {
+                        const lastMark = if (lineScanner.peekNext() == '.') blk: {
                             lineScanner.advance(1);
-                            lastMark = '.';
-                        }
+                            break :blk '.';
+                        } else if (mark == '-' and lineScanner.peekNext() == '-') {
+                            break :handle;
+                        } else mark;
+
                         lineScanner.advance(1);
                         const markEnd = lineScanner.cursor;
                         const numSpaces = lineScanner.readUntilNotBlank();
@@ -2459,6 +2461,38 @@ const DocParser = struct {
                 if (noAtomBlockMarkForSure or lineScanner.lineEnd != null) {
                     // contentStart keeps unchanged.
                 } else switch (lineScanner.peekCursor()) { // try to parse atom block mark
+                    '-' => handle: {
+                        lineScanner.advance(1);
+                        const markLen = 1 + lineScanner.readUntilNotChar('-');
+                        if (markLen < 3) {
+                            lineScanner.setCursor(contentStart); // not perfect but avoid bugs
+                            break :handle;
+                        }
+
+                        const contentEnd = lineScanner.cursor;
+                        if (lineScanner.lineEnd == null) {
+                            _ = lineScanner.readUntilNotBlank();
+                            if (lineScanner.lineEnd == null) break :handle;
+                        }
+
+                        lineInfo.lineType = .{ .line = .{
+                            .markLen = markLen,
+                        } };
+
+                        const lineBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        lineBlockInfo.blockType = .{
+                            .line = .{
+                                .startLine = lineInfo,
+                            },
+                        };
+                        try blockArranger.stackAtomBlock(lineBlockInfo, isContainerFirstLine);
+
+                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        currentAtomBlockInfo = lineBlockInfo;
+                        atomBlockCount += 1;
+
+                        lineInfo.rangeTrimmed.end = contentEnd;
+                    },
                     '{', '}' => |mark| handle: {
                         const isOpenMark = mark == '{';
                         if (isOpenMark) {
@@ -2627,7 +2661,11 @@ const DocParser = struct {
                                 .startLine = lineInfo,
                             },
                         };
-                        if (isFirstLevel) try blockArranger.stackFirstLevelHeaderBlock(headerBlockInfo, isContainerFirstLine) else try blockArranger.stackAtomBlock(headerBlockInfo, isContainerFirstLine);
+                        if (isFirstLevel) {
+                            try blockArranger.stackFirstLevelHeaderBlock(headerBlockInfo, isContainerFirstLine);
+                        } else {
+                            try blockArranger.stackAtomBlock(headerBlockInfo, isContainerFirstLine);
+                        }
 
                         parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = headerBlockInfo;
