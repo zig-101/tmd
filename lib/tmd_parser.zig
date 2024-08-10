@@ -203,7 +203,7 @@ const BlockArranger = struct {
 
     fn stackContainerBlock(self: *BlockArranger, blockInfo: *tmd.BlockInfo) !void {
         std.debug.assert(blockInfo.isContainer());
-        std.debug.assert(blockInfo.blockType != .list_item);
+        std.debug.assert(blockInfo.blockType != .bullet);
 
         try self.stackAsChildOfBase(blockInfo);
     }
@@ -224,14 +224,14 @@ const BlockArranger = struct {
     }
 
     fn stackListItemBlock(self: *BlockArranger, listItemBlock: *tmd.BlockInfo) !void {
-        std.debug.assert(listItemBlock.blockType == .list_item);
+        std.debug.assert(listItemBlock.blockType == .bullet);
 
         var baseContext = &self.openingBaseBlocks[self.baseCount_1];
         std.debug.assert(self.count_1 > baseContext.nestingDepth);
 
         self.assertBaseOpeningListCount();
 
-        const newListItem = &listItemBlock.blockType.list_item;
+        const newListItem = &listItemBlock.blockType.bullet;
 
         const isFirstInList = if (baseContext.openingListCount == 0) blk: {
             if (baseContext.nestingDepth >= tmd.MaxBlockNestingDepth - 1) {
@@ -259,14 +259,14 @@ const BlockArranger = struct {
         } else {
             const last = self.stackedBlocks[self.count_1];
             std.debug.assert(last.blockType == .root or last.nestingDepth == self.count_1);
-            std.debug.assert(last.blockType != .list_item);
+            std.debug.assert(last.blockType != .bullet);
 
             var deltaCount: @TypeOf(baseContext.openingListCount) = 0;
             var depth = self.count_1 - 1;
             while (depth > baseContext.nestingDepth) : (depth -= 1) {
                 std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
-                std.debug.assert(self.stackedBlocks[depth].blockType == .list_item);
-                var item = &self.stackedBlocks[depth].blockType.list_item;
+                std.debug.assert(self.stackedBlocks[depth].blockType == .bullet);
+                var item = &self.stackedBlocks[depth].blockType.bullet;
                 if (item._markTypeIndex == newListItem._markTypeIndex) {
                     newListItem.firstItem = item.firstItem;
                     break;
@@ -304,7 +304,7 @@ const BlockArranger = struct {
 
         const last = self.stackedBlocks[self.count_1];
         std.debug.assert(last.blockType == .root or last.nestingDepth == self.count_1);
-        std.debug.assert(last.blockType != .list_item);
+        std.debug.assert(last.blockType != .bullet);
         defer { // ToDo: forget why defer it here?
             self.count_1 = baseContext.nestingDepth + 1;
             if (last.blockType == .blank) {
@@ -326,8 +326,8 @@ const BlockArranger = struct {
             var depth = self.count_1 - 1;
             while (depth > baseContext.nestingDepth) : (depth -= 1) {
                 std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
-                std.debug.assert(self.stackedBlocks[depth].blockType == .list_item);
-                var item = &self.stackedBlocks[depth].blockType.list_item;
+                std.debug.assert(self.stackedBlocks[depth].blockType == .bullet);
+                var item = &self.stackedBlocks[depth].blockType.bullet;
                 item.isLast = true;
                 baseContext.openingListNestingDepths[item._markTypeIndex] = 0;
                 deltaCount += 1;
@@ -383,7 +383,7 @@ const BlockArranger = struct {
             std.debug.assert(last.isContainer());
             std.debug.assert(last.nestingDepth == self.count_1);
             switch (last.blockType) {
-                .list_item => |*listItem| listItem.confirmTabItem(),
+                .bullet => |*listItem| listItem.confirmTabItem(),
                 else => {},
             }
         } else {
@@ -393,7 +393,7 @@ const BlockArranger = struct {
             if (last.blockType == .directive) {
                 const container = self.stackedBlocks[self.count_1 - 1];
                 switch (container.blockType) {
-                    .list_item => |*listItem| listItem.confirmTabItem(),
+                    .bullet => |*listItem| listItem.confirmTabItem(),
                     else => {},
                 }
             }
@@ -2363,14 +2363,14 @@ const DocParser = struct {
                             break :blk markEnd;
                         } else lineScanner.cursor;
 
-                        lineInfo.containerMark = .{ .list_item = .{
+                        lineInfo.containerMark = .{ .bullet = .{
                             .markEnd = markEnd,
                             .markEndWithSpaces = markEndWithSpaces,
                         } };
 
                         const listItemBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                         listItemBlockInfo.blockType = .{
-                            .list_item = .{
+                            .bullet = .{
                                 .isFirst = false, // will be modified eventually
                                 .isLast = false, // will be modified eventually
                                 ._markTypeIndex = tmd.listBulletIndex(tmdData[leadingBlankEnd..markEnd]),
@@ -2413,39 +2413,39 @@ const DocParser = struct {
                                 };
                             },
                             '>' => {
-                                lineInfo.containerMark = .{ .block_quote = .{
+                                lineInfo.containerMark = .{ .quotation = .{
                                     .markEnd = markEnd,
                                     .markEndWithSpaces = markEndWithSpaces,
                                 } };
                                 containerBlockInfo.blockType = .{
-                                    .block_quote = .{},
+                                    .quotation = .{},
                                 };
                             },
                             '!' => {
-                                lineInfo.containerMark = .{ .note_box = .{
+                                lineInfo.containerMark = .{ .note = .{
                                     .markEnd = markEnd,
                                     .markEndWithSpaces = markEndWithSpaces,
                                 } };
                                 containerBlockInfo.blockType = .{
-                                    .note_box = .{},
+                                    .note = .{},
                                 };
                             },
                             '?' => {
-                                lineInfo.containerMark = .{ .disclosure_box = .{
+                                lineInfo.containerMark = .{ .reveal = .{
                                     .markEnd = markEnd,
                                     .markEndWithSpaces = markEndWithSpaces,
                                 } };
                                 containerBlockInfo.blockType = .{
-                                    .disclosure_box = .{},
+                                    .reveal = .{},
                                 };
                             },
                             '.' => {
-                                lineInfo.containerMark = .{ .unstyled_box = .{
+                                lineInfo.containerMark = .{ .unstyled = .{
                                     .markEnd = markEnd,
                                     .markEndWithSpaces = markEndWithSpaces,
                                 } };
                                 containerBlockInfo.blockType = .{
-                                    .unstyled_box = .{},
+                                    .unstyled = .{},
                                 };
                             },
                             else => unreachable,
@@ -2583,7 +2583,7 @@ const DocParser = struct {
 
                             const codeSnippetBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
                             codeSnippetBlockInfo.* = .{ .blockType = .{
-                                .code_snippet = .{
+                                .code = .{
                                     .startLine = lineInfo,
                                 },
                             } };
@@ -2867,7 +2867,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
         }
         std.debug.print("+{}: {s}", .{ blockInfo.nestingDepth, blockInfo.typeName() });
         switch (blockInfo.blockType) {
-            .list_item => |item| {
+            .bullet => |item| {
                 if (item.isFirst and item.isLast) {
                     std.debug.print(" (first, last)", .{});
                 } else if (item.isFirst) {

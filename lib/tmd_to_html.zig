@@ -116,7 +116,7 @@ const TmdRender = struct {
             const blockInfo = &headerElement.value;
 
             _ = try w.write("<div");
-            try writeBlockAttributes(w, "tmd-note_box-header", blockInfo.attributes);
+            try writeBlockAttributes(w, "tmd-note-header", blockInfo.attributes);
             _ = try w.write(">\n");
             try self.writeUsualContentBlockLines(w, blockInfo, false);
             _ = try w.write("</div>");
@@ -124,7 +124,7 @@ const TmdRender = struct {
             break :blk headerElement;
         } else parentElement;
 
-        _ = try w.write("\n<div class=\"tmd-note_box-content\">\n");
+        _ = try w.write("\n<div class=\"tmd-note-content\">\n");
 
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
         _ = try w.write("\n</div>\n");
@@ -150,7 +150,7 @@ const TmdRender = struct {
             break :blk parentElement;
         };
 
-        _ = try w.write("<div class=\"tmd-disclosure_box-content\">");
+        _ = try w.write("<div class=\"tmd-reveal-content\">");
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
         _ = try w.write("\n</div></details>\n");
         return element;
@@ -206,7 +206,7 @@ const TmdRender = struct {
 
                     // containers
 
-                    .list_item => |listItem| {
+                    .bullet => |listItem| {
                         if (listItem.isTabItem()) {
                             const tabInfo = if (listItem.isFirst) blk: {
                                 _ = try w.write("\n<div");
@@ -295,36 +295,36 @@ const TmdRender = struct {
                         element = try self.renderBlockChildrenForIndented(w, element, 0);
                         _ = try w.write("\n</div>\n");
                     },
-                    .block_quote => {
+                    .quotation => {
                         _ = try w.write("\n<div");
                         if (self.getFollowingLevel1HeaderBlockElement(element)) |_| {
-                            try writeBlockAttributes(w, "tmd-block_quote-large", blockInfo.attributes);
+                            try writeBlockAttributes(w, "tmd-quotation-large", blockInfo.attributes);
                             _ = try w.write(">\n");
                             element = try self.renderBlockChildrenForLargeBlockQuote(w, element, 0);
                         } else {
-                            try writeBlockAttributes(w, "tmd-block_quote", blockInfo.attributes);
+                            try writeBlockAttributes(w, "tmd-quotation", blockInfo.attributes);
                             _ = try w.write(">\n");
                             element = try self.renderBlockChildren(w, element, 0);
                         }
                         _ = try w.write("\n</div>\n");
                     },
-                    .note_box => {
+                    .note => {
                         _ = try w.write("\n<div");
-                        try writeBlockAttributes(w, "tmd-note_box", blockInfo.attributes);
+                        try writeBlockAttributes(w, "tmd-note", blockInfo.attributes);
                         _ = try w.write(">\n");
                         element = try self.renderBlockChildrenForNoteBox(w, element, 0);
                         _ = try w.write("\n</div>\n");
                     },
-                    .disclosure_box => {
+                    .reveal => {
                         _ = try w.write("\n<div");
-                        try writeBlockAttributes(w, "tmd-disclosure_box", blockInfo.attributes);
+                        try writeBlockAttributes(w, "tmd-reveal", blockInfo.attributes);
                         _ = try w.write(">\n");
                         element = try self.renderBlockChildrenForDisclosure(w, element, 0);
                         _ = try w.write("\n</div>\n");
                     },
-                    .unstyled_box => {
+                    .unstyled => {
                         _ = try w.write("\n<div");
-                        try writeBlockAttributes(w, "tmd-unstyled_box", blockInfo.attributes);
+                        try writeBlockAttributes(w, "tmd-unstyled", blockInfo.attributes);
                         _ = try w.write(">\n");
                         element = try self.renderBlockChildren(w, element, 0);
                         _ = try w.write("\n</div>\n");
@@ -342,9 +342,9 @@ const TmdRender = struct {
 
                         const level = header.level(self.doc.data);
 
-                        if (level == 1 and element.value.blockType == .code_snippet) {
+                        if (level == 1 and element.value.blockType == .code) {
                             _ = try w.print("\n<div", .{});
-                            try writeBlockAttributes(w, "tmd-code_snippet-header", blockInfo.attributes);
+                            try writeBlockAttributes(w, "tmd-code-header", blockInfo.attributes);
                             _ = try w.write(">\n");
 
                             try self.writeUsualContentBlockLines(w, blockInfo, false);
@@ -399,8 +399,8 @@ const TmdRender = struct {
 
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
-                    .code_snippet => |code_snippet| {
-                        const r = code_snippet.startPlayloadRange();
+                    .code => |code| {
+                        const r = code.startPlayloadRange();
                         const playload = self.doc.data[r.start..r.end];
                         const attrs = parser.parse_code_block_open_playload(playload);
                         if (attrs.commentedOut) {
@@ -504,7 +504,7 @@ const TmdRender = struct {
     }
 
     fn writeCodeBlockLines(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo, attrs: tmd.CodeBlockAttibutes) !void {
-        std.debug.assert(blockInfo.blockType == .code_snippet);
+        std.debug.assert(blockInfo.blockType == .code);
 
         //std.debug.print("\n==========\n", .{});
         //std.debug.print("commentedOut: {}\n", .{attrs.commentedOut});
@@ -514,7 +514,7 @@ const TmdRender = struct {
         // ToDo: support customApp on codeSnippetBlock or customAppBlock?
 
         _ = try w.write("<pre");
-        try writeBlockAttributes(w, "tmd-code_snippet", blockInfo.attributes);
+        try writeBlockAttributes(w, "tmd-code", blockInfo.attributes);
         if (attrs.language.len > 0) {
             _ = try w.write("\"><code class=\"language-");
             try writeHtmlAttributeValue(w, attrs.language);
@@ -549,7 +549,7 @@ const TmdRender = struct {
         }
 
         blk: {
-            const r = blockInfo.blockType.code_snippet.endPlayloadRange() orelse break :blk;
+            const r = blockInfo.blockType.code.endPlayloadRange() orelse break :blk;
             const closePlayload = self.doc.data[r.start..r.end];
             const streamAttrs = parser.parse_block_close_playload(closePlayload);
             const content = streamAttrs.content;
@@ -1056,13 +1056,13 @@ const TmdRender = struct {
 
                     // containers
 
-                    .list_item, .indented, .block_quote, .note_box, .disclosure_box, .unstyled_box => {
+                    .bullet, .indented, .quotation, .note, .reveal, .unstyled => {
                         element = try self.renderTmdCodeForBlockChildren(w, element, true);
                     },
 
                     // atom
 
-                    .line, .header, .usual, .directive, .blank, .code_snippet, .custom => {
+                    .line, .header, .usual, .directive, .blank, .code, .custom => {
                         try self.renderTmdCodeForAtomBlock(w, blockInfo, trimContainerMark);
 
                         element = element.next orelse &self.nullBlockInfoElement;

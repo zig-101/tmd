@@ -252,7 +252,7 @@ pub const BlockType = union(enum) {
 
     // ToDo: add .firstBlock and .lastBlock fileds for container blocks?
 
-    list_item: struct {
+    bullet: struct {
         isFirst: bool,
         isLast: bool,
 
@@ -280,27 +280,27 @@ pub const BlockType = union(enum) {
         }
 
         pub fn isTabItem(self: @This()) bool {
-            return if (self.isFirst) self.isTab else self.firstItem.blockType.list_item.isTab;
+            return if (self.isFirst) self.isTab else self.firstItem.blockType.bullet.isTab;
         }
 
         pub fn confirmTabItem(self: *@This()) void {
-            if (self.isFirst) self.isTab = true else self.firstItem.blockType.list_item.isTab = true;
+            if (self.isFirst) self.isTab = true else self.firstItem.blockType.bullet.isTab = true;
         }
     },
 
     indented: struct {
         const Container = void;
     },
-    block_quote: struct {
+    quotation: struct {
         const Container = void;
     },
-    note_box: struct {
+    note: struct {
         const Container = void;
     },
-    disclosure_box: struct {
+    reveal: struct {
         const Container = void;
     },
-    unstyled_box: struct {
+    unstyled: struct {
         const Container = void;
     },
 
@@ -401,7 +401,7 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
-    code_snippet: AtomBlockWithBoundary,
+    code: AtomBlockWithBoundary,
 
     custom: AtomBlockWithBoundary,
 };
@@ -411,7 +411,7 @@ pub const AtomBlockWithBoundary = struct {
     endLine: *LineInfo = undefined,
 
     // Note: the custom block end tag line might be missing.
-    //       For .code_snippet, the endLine might not be a .codeSnippetEnd line.
+    //       For .code, the endLine might not be a .codeSnippetEnd line.
     //          It can be also of .code or .codeSnippetStart.
     //       For .custom, the endLine might not be a .customEnd line.
     //          It can be also of .data or .customStart.
@@ -544,7 +544,7 @@ pub const LineEndType = enum {
 // ToDo: use an enum filed + common fileds.
 //       And use u30 for cursor values.
 pub const ContainerLeadingMark = union(enum) {
-    list_item: struct {
+    bullet: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
@@ -552,19 +552,19 @@ pub const ContainerLeadingMark = union(enum) {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
-    block_quote: struct {
+    quotation: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
-    note_box: struct {
+    note: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
-    disclosure_box: struct {
+    reveal: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
-    unstyled_box: struct {
+    unstyled: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },

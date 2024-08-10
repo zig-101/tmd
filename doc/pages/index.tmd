@@ -130,8 +130,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
   a footer
   }
 
-> ### This is a quotation text looking larger.
-  ;;; Yes, it is larger.
+> ### This is a quotation block which font looks larger.
   {&&
   a footer
   }
