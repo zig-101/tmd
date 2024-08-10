@@ -1031,13 +1031,12 @@ const TmdRender = struct {
         if (element.value.isAtom()) {
             try self.renderTmdCodeForAtomBlock(w, &element.value, true);
         } else {
-            _ = try self.renderTmdCodeForBlockChildren(w, element, true);
+            _ = try self.renderTmdCodeForBlockChildren(w, element);
         }
     }
 
-    fn renderTmdCodeForBlockChildren(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, trimContainerMark0: bool) !*BlockInfoElement {
+    fn renderTmdCodeForBlockChildren(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement) !*BlockInfoElement {
         const parentNestingDepth = parentElement.value.nestingDepth;
-        var trimContainerMark = trimContainerMark0;
 
         if (parentElement.next) |nextElement| {
             var element = nextElement;
@@ -1049,26 +1048,25 @@ const TmdRender = struct {
                 switch (blockInfo.blockType) {
                     .root => unreachable,
                     .base => |base| {
-                        try self.renderTmdCodeOfLine(w, base.openLine, trimContainerMark);
-                        element = try self.renderTmdCodeForBlockChildren(w, element, true);
+                        try self.renderTmdCodeOfLine(w, base.openLine, false);
+                        element = try self.renderTmdCodeForBlockChildren(w, element);
                         if (base.closeLine) |closeLine| try self.renderTmdCodeOfLine(w, closeLine, false); // or trimContainerMark, no matter
                     },
 
                     // containers
 
                     .bullet, .indented, .quotation, .note, .reveal, .unstyled => {
-                        element = try self.renderTmdCodeForBlockChildren(w, element, true);
+                        element = try self.renderTmdCodeForBlockChildren(w, element);
                     },
 
                     // atom
 
                     .line, .header, .usual, .directive, .blank, .code, .custom => {
-                        try self.renderTmdCodeForAtomBlock(w, blockInfo, trimContainerMark);
+                        try self.renderTmdCodeForAtomBlock(w, blockInfo, false);
 
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
                 }
-                trimContainerMark = false;
             }
         }
 
