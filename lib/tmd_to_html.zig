@@ -4,10 +4,12 @@ const mem = std.mem;
 const tmd = @import("tmd.zig");
 const parser = @import("tmd_parser.zig");
 const list = @import("list.zig");
+const tree = @import("tree.zig");
 
-pub fn tmd_to_html(tmdDoc: tmd.Doc, writer: anytype, completeHTML: bool) !void {
+pub fn tmd_to_html(tmdDoc: tmd.Doc, writer: anytype, completeHTML: bool, allocator: mem.Allocator) !void {
     var r = TmdRender{
         .doc = tmdDoc,
+        .allocator = allocator,
     };
     if (completeHTML) {
         try writeHead(writer);
@@ -17,6 +19,22 @@ pub fn tmd_to_html(tmdDoc: tmd.Doc, writer: anytype, completeHTML: bool) !void {
         try r.render(writer, false);
     }
 }
+
+const FootnoteRedBlack = tree.RedBlack(*Footnote, Footnote);
+const Footnote = struct {
+    id: []const u8,
+    orderIndex: u32 = undefined,
+    refCount: u32 = undefined,
+    block: ?*tmd.BlockInfo = undefined,
+
+    pub fn compare(x: *const @This(), y: *const @This()) isize {
+        return switch (mem.order(u8, x.id, y.id)) {
+            .lt => -1,
+            .gt => 1,
+            .eq => 0,
+        };
+    }
+};
 
 const BlockInfoElement = list.Element(tmd.BlockInfo);
 const LineInfoElement = list.Element(tmd.LineInfo);
@@ -44,19 +62,108 @@ const TmdRender = struct {
     currentTabListDepth: i32 = -1,
     nextTabListOrderId: u32 = 0,
 
+    footnotesByID: FootnoteRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
+    footnoteNodes: list.List(FootnoteRedBlack.Node) = .{}, // for destroying
+
+    allocator: mem.Allocator,
+
+    fn cleanup(self: *TmdRender) void {
+        const T = struct {
+            fn destroyFootnoteNode(node: *FootnoteRedBlack.Node, a: mem.Allocator) void {
+                a.destroy(node.value);
+            }
+        };
+        list.destroyListElements(FootnoteRedBlack.Node, self.footnoteNodes, T.destroyFootnoteNode, self.allocator);
+    }
+
+    fn onFootnoteReference(self: *TmdRender, id: []const u8) !*Footnote {
+        var footnote = @constCast(&Footnote{
+            .id = id,
+        });
+        if (self.footnotesByID.search(footnote)) |node| {
+            footnote = node.value;
+            footnote.refCount += 1;
+            return footnote;
+        }
+
+        footnote = try self.allocator.create(Footnote);
+        footnote.* = .{
+            .id = id,
+            .orderIndex = @intCast(self.footnotesByID.count + 1),
+            .refCount = 1,
+            .block = self.doc.getBlockByID(id),
+        };
+
+        const nodeElement = try list.createListElement(FootnoteRedBlack.Node, self.allocator);
+        self.footnoteNodes.push(nodeElement);
+
+        const node = &nodeElement.value;
+        node.value = footnote;
+        std.debug.assert(node == self.footnotesByID.insert(node));
+
+        return footnote;
+    }
+
     fn render(self: *TmdRender, w: anytype, renderRoot: bool) !void {
+        defer self.cleanup();
+
+        var nilFootnoteTreeNode = FootnoteRedBlack.Node{
+            .color = .black,
+            .value = undefined,
+        };
+        self.footnotesByID.init(&nilFootnoteTreeNode);
+
         const element = self.doc.blocks.head();
 
         if (element) |blockInfoElement| {
             std.debug.assert(blockInfoElement.value.blockType == .root);
             if (renderRoot) _ = try w.write("\n<div class=\"tmd-doc\">\n");
             std.debug.assert((try self.renderBlockChildren(w, blockInfoElement, 0)) == &self.nullBlockInfoElement);
+            try self.writeFootnotes(w);
             if (renderRoot) _ = try w.write("\n</div>\n");
         } else unreachable;
     }
 
+    fn writeFootnotes(self: *TmdRender, w: anytype) !void {
+        if (self.footnoteNodes.empty()) return;
+
+        _ = try w.write("\n<ol class=\"tmd-footnotes\">\n");
+
+        var listElement = self.footnoteNodes.head();
+        while (listElement) |element| {
+            defer listElement = element.next;
+            const footnote = element.value.value;
+
+            _ = try w.print("<li id=\"fn:{s}\">\n", .{footnote.id});
+            const missing_flag = if (footnote.block) |block| blk: {
+                if (block.isContainer() and block.blockType != .unstyled) {
+                    break :blk "!";
+                }
+                _ = try self.renderBlock(w, block);
+                break :blk "";
+            } else "?";
+
+            for (1..footnote.refCount + 1) |n| {
+                _ = try w.print(" <a href=\"#fn:{s}:ref-{}\">↩︎{s}</a>", .{ footnote.id, n, missing_flag });
+            }
+            _ = try w.write("</li>\n");
+        }
+
+        _ = try w.write("</ol>\n");
+    }
+
     fn renderBlockChildren(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
         return self.renderNextBlocks(w, parentElement.value.nestingDepth, parentElement, atMostCount);
+    }
+
+    fn renderBlock(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo) !*BlockInfoElement {
+        const blockElement = blockInfo.ownerListElement();
+        if (blockElement.prev) |prevElement| {
+            return self.renderNextBlocks(w, blockInfo.nestingDepth - 1, prevElement, 1);
+        } else {
+            std.debug.assert(blockElement == self.doc.blocks.head());
+            return &self.nullBlockInfoElement;
+        }
     }
 
     fn getFollowingLevel1HeaderBlockElement(self: *TmdRender, parentElement: *BlockInfoElement) ?*BlockInfoElement {
@@ -201,7 +308,11 @@ const TmdRender = struct {
                         }
                         _ = try w.write(">");
                         element = try self.renderBlockChildren(w, element, 0);
-                        if (attrs.isFooter) _ = try w.write("\n</footer>\n") else _ = try w.write("\n</div>\n");
+                        if (attrs.isFooter) {
+                            _ = try w.write("\n</footer>\n");
+                        } else {
+                            _ = try w.write("\n</div>\n");
+                        }
                     },
 
                     // containers
@@ -447,13 +558,13 @@ const TmdRender = struct {
         marksStack: list.List(MarkStatus) = .{},
 
         activeLinkInfo: ?*tmd.LinkInfo = null,
-        firstPlainTextInLink: bool = true,
-        urlConfirmedFinally: bool = false,
+        // These are only valid when activeLinkInfo != null.
+        firstPlainTextInLink: bool = undefined,
+        linkFootnote: *Footnote = undefined,
 
         fn onLinkInfo(self: *@This(), linkInfo: *tmd.LinkInfo) void {
             self.activeLinkInfo = linkInfo;
             self.firstPlainTextInLink = true;
-            self.urlConfirmedFinally = linkInfo.urlConfirmed();
         }
     };
 
@@ -594,14 +705,26 @@ const TmdRender = struct {
                         .plainText => blk: {
                             if (tracker.activeLinkInfo) |linkInfo| {
                                 if (!tracker.firstPlainTextInLink) {
+                                    std.debug.assert(!linkInfo.isFootnote());
+
                                     switch (linkInfo.info) {
                                         .urlSourceText => |sourceText| {
                                             if (sourceText == token) break :blk;
                                         },
                                         else => {},
                                     }
+                                } else {
+                                    tracker.firstPlainTextInLink = false;
+
+                                    if (linkInfo.isFootnote()) {
+                                        if (tracker.linkFootnote.block) |_| {
+                                            _ = try w.print("[{}]", .{tracker.linkFootnote.orderIndex});
+                                        } else {
+                                            _ = try w.print("[{}]?", .{tracker.linkFootnote.orderIndex});
+                                        }
+                                        break :blk;
+                                    }
                                 }
-                                tracker.firstPlainTextInLink = false;
                             }
                             const text = self.doc.data[token.start()..token.end()];
                             _ = try writeHtmlContentText(w, text);
@@ -633,21 +756,43 @@ const TmdRender = struct {
                                     try writeCloseMarks(w, markElement);
 
                                     var linkURL: []const u8 = undefined;
-                                    if (tracker.urlConfirmedFinally) {
-                                        std.debug.assert(tracker.activeLinkInfo.?.info.urlSourceText != null);
-                                        const t = tracker.activeLinkInfo.?.info.urlSourceText.?;
-                                        linkURL = parser.trim_blanks(self.doc.data[t.start()..t.end()]);
-                                    } else {
-                                        // ToDo: call custom callback to try to generate a url.
-                                    }
-                                    if (tracker.urlConfirmedFinally) {
-                                        _ = try w.write("<a href=\"");
+
+                                    const linkInfo = tracker.activeLinkInfo orelse unreachable;
+                                    blk: {
+                                        if (linkInfo.urlConfirmed()) {
+                                            std.debug.assert(linkInfo.urlConfirmed());
+                                            std.debug.assert(linkInfo.info.urlSourceText != null);
+
+                                            const t = linkInfo.info.urlSourceText.?;
+                                            linkURL = parser.trim_blanks(self.doc.data[t.start()..t.end()]);
+
+                                            if (linkInfo.isFootnote()) {
+                                                const footnote_id = linkURL[1..];
+                                                const footnote = try self.onFootnoteReference(footnote_id);
+                                                tracker.linkFootnote = footnote;
+
+                                                _ = try w.print("<sup><a id=\"fn:{s}:ref-{}\" href=\"#fn:{s}\"", .{ footnote_id, footnote.refCount, footnote_id });
+                                                break :blk;
+                                            }
+                                        } else {
+                                            std.debug.assert(!linkInfo.urlConfirmed());
+                                            std.debug.assert(!linkInfo.isFootnote());
+
+                                            // ToDo: call custom callback to try to generate a url.
+
+                                            _ = try w.write("<span class=\"tmd-broken-link\"");
+
+                                            break :blk;
+                                        }
+
+                                        _ = try w.write("<a");
+                                        _ = try w.write(" href=\"");
                                         _ = try w.write(linkURL);
                                         _ = try w.write("\"");
-                                    } else {
-                                        _ = try w.write("<span class=\"tmd-broken-link\"");
                                     }
+
                                     if (tracker.activeLinkInfo.?.attrs) |attrs| {
+                                        std.debug.assert(!linkInfo.isFootnote());
                                         try writeElementAttributes(w, "", attrs);
                                     }
                                     _ = try w.write(">");
@@ -742,17 +887,15 @@ const TmdRender = struct {
             switch (m.markType) {
                 .link => blk: {
                     //if (m.secondary) break :blk;
-                    if (tracker.activeLinkInfo == null) break :blk;
+                    const linkInfo = tracker.activeLinkInfo orelse break :blk;
+                    tracker.activeLinkInfo = null;
 
                     try writeCloseMarks(w, markElement);
 
-                    {
-                        tracker.activeLinkInfo = null;
-                        if (tracker.urlConfirmedFinally) {
-                            _ = try w.write("</a>");
-                        } else {
-                            _ = try w.write("</span>");
-                        }
+                    if (linkInfo.urlConfirmed()) {
+                        _ = try w.write("</a></sup>");
+                    } else {
+                        _ = try w.write("</span></sup>");
                     }
 
                     try writeOpenMarks(w, markElement);

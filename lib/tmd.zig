@@ -19,10 +19,11 @@ pub const Doc = struct {
     blocks: list.List(BlockInfo) = .{}, // ToDo: use SinglyLinkedList
     lines: list.List(LineInfo) = .{}, // ToDo: use SinglyLinkedList
 
-    blocksByID: BlockInfoRedBlack.Tree = .{},
-
     blockAttributes: list.List(BlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+
+    blocksByID: BlockInfoRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
     blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{}, // ToDo: use SinglyLinkedList
+    // It is in blockTreeNodes when exists.
     freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null, // ToDo: use SinglyLinkedList
 
     links: list.List(Link) = .{}, // ToDo: use SinglyLinkedList
@@ -96,6 +97,10 @@ pub const ElementAttibutes = struct {
     id: []const u8 = "", // ToDo: should be a Range?
     classes: []const u8 = "", // ToDo: should be Range list?
     kvs: []const u8 = "", // ToDo: should be Range list?
+
+    pub fn isForFootnote(self: *const @This()) bool {
+        return self.id.len > 0 and self.id[0] == '^';
+    }
 };
 
 pub const Link = struct {
@@ -231,19 +236,15 @@ pub const BlockInfo = struct {
         const yAttributes = y.attributes orelse unreachable;
         const xID = if (xAttributes.common.id.len > 0) xAttributes.common.id else unreachable;
         const yID = if (yAttributes.common.id.len > 0) yAttributes.common.id else unreachable;
-        const i = std.mem.indexOfDiff(u8, xID, yID) orelse return 0;
-        if (xID.len == i) {
-            std.debug.assert(yID.len > i);
-            return -1;
-        }
-        std.debug.assert(xID.len > i);
-        if (yID.len == i) {
-            return 1;
-        }
-        std.debug.assert(yID.len > i);
-        std.debug.assert(xID[i] != yID[i]);
-        if (xID[i] < yID[i]) return -1;
-        return 1;
+        return switch (std.mem.order(u8, xID, yID)) {
+            .lt => -1,
+            .gt => 1,
+            .eq => 0,
+        };
+    }
+
+    pub fn ownerListElement(self: *@This()) *list.Element(@This()) {
+        return @alignCast(@fieldParentPtr("value", self));
     }
 };
 
@@ -751,12 +752,15 @@ pub const TokenType = union(enum) {
 
         // `` means a void char.
         // ^`` means a ` char.
+        // ToDo: ```` means non-collapsable space?
     },
     spanMark: struct {
         // For a close mark, this might be the start of the attached blanks.
         // For a open mark, this might be the position of the secondary sign.
         start: u32,
         blankLen: u32, // blank char count after open-mark or before close-mark in a line.
+
+        // ToDo: replace the bools as bits.
 
         open: bool,
         secondary: bool = false,
@@ -766,6 +770,7 @@ pub const TokenType = union(enum) {
 
         inDirective: bool, // for .linkInfo
         urlConfirmed: bool = false, // for .linkInfo
+        isFootnote: bool = false, // for .linkInfo
 
         pub fn typeName(self: @This()) []const u8 {
             return @tagName(self.markType);
@@ -789,6 +794,14 @@ pub const TokenType = union(enum) {
             const m = tokenInfo.followingSpanMark();
             std.debug.assert(m.markType == .link and m.open == true);
             return m;
+        }
+
+        pub fn isFootnote(self: *const @This()) bool {
+            return self.followingOpenLinkSpanMark().isFootnote;
+        }
+
+        pub fn setFootnote(self: *const @This(), is: bool) void {
+            self.followingOpenLinkSpanMark().isFootnote = is;
         }
 
         pub fn inDirective(self: *const @This()) bool {

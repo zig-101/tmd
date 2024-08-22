@@ -266,5 +266,17 @@ img {
   vertical-align:middle;
 }
 
+.tmd-footnotes {
+}
+
+ol.tmd-footnotes {
+  font-size: smaller;
+  opacity: 0.75;
+}
+
+ol.tmd-footnotes > li::marker {
+  content: "[" counter(list-item) "]: ";
+}
+
 </style>
 

@@ -100,7 +100,7 @@ pub fn main() !void {
         const renderBuffer = try fbaAllocator.alloc(u8, MaxOutFileSize);
         defer fbaAllocator.free(renderBuffer);
         var fbs = std.io.fixedBufferStream(renderBuffer);
-        try tmd.render.tmd_to_html(tmdDoc, fbs.writer(), option_full_html);
+        try tmd.render.tmd_to_html(tmdDoc, fbs.writer(), option_full_html, gpaAllocator);
 
         // write file
 

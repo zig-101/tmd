@@ -119,3 +119,23 @@ pub fn Element(comptime Value: type) type {
         next: ?*Element(Value) = null,
     };
 }
+
+pub fn createListElement(comptime Node: type, allocator: std.mem.Allocator) !*Element(Node) {
+    return try allocator.create(Element(Node));
+}
+
+pub fn destroyListElements(comptime NodeValue: type, l: List(NodeValue), comptime onNodeValue: ?fn (*NodeValue, std.mem.Allocator) void, allocator: std.mem.Allocator) void {
+    var element = l.head();
+    if (onNodeValue) |f| {
+        while (element) |e| {
+            const next = e.next;
+            f(&e.value, allocator);
+            allocator.destroy(e);
+            element = next;
+        }
+    } else while (element) |e| {
+        const next = e.next;
+        allocator.destroy(e);
+        element = next;
+    }
+}

@@ -6,24 +6,23 @@ const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 const utf8 = @import("utf8.zig");
-const url = @import("url.zig");
 
 pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
-    destroyListElements(tmd.BlockInfo, tmdDoc.blocks, null, allocator);
+    list.destroyListElements(tmd.BlockInfo, tmdDoc.blocks, null, allocator);
 
     const T = struct {
         fn destroyLineTokens(lineInfo: *tmd.LineInfo, a: mem.Allocator) void {
             if (lineInfo.tokens()) |tokens| {
-                destroyListElements(tmd.TokenInfo, tokens.*, null, a);
+                list.destroyListElements(tmd.TokenInfo, tokens.*, null, a);
             }
         }
     };
 
-    destroyListElements(tmd.LineInfo, tmdDoc.lines, T.destroyLineTokens, allocator);
-    destroyListElements(tmd.BlockAttibutes, tmdDoc.blockAttributes, null, allocator);
-    destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
+    list.destroyListElements(tmd.LineInfo, tmdDoc.lines, T.destroyLineTokens, allocator);
+    list.destroyListElements(tmd.BlockAttibutes, tmdDoc.blockAttributes, null, allocator);
+    list.destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
 
-    destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
+    list.destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
 
     tmdDoc.* = .{ .data = "" };
 }
@@ -32,7 +31,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     var tmdDoc = tmd.Doc{ .data = tmdData };
     errdefer destroy_tmd_doc(&tmdDoc, allocator);
 
-    const nilBlockTreeNodeElement = try createListElement(tmd.BlockInfoRedBlack.Node, allocator);
+    const nilBlockTreeNodeElement = try list.createListElement(tmd.BlockInfoRedBlack.Node, allocator);
     tmdDoc.blockTreeNodes.push(nilBlockTreeNodeElement);
     const nilBlockTreeNode = &nilBlockTreeNodeElement.value;
     nilBlockTreeNode.* = .{
@@ -54,26 +53,6 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
 }
 
 //===========================================
-
-fn createListElement(comptime Node: type, allocator: mem.Allocator) !*list.Element(Node) {
-    return try allocator.create(list.Element(Node));
-}
-
-fn destroyListElements(comptime NodeValue: type, l: list.List(NodeValue), comptime onNodeValue: ?fn (*NodeValue, mem.Allocator) void, allocator: mem.Allocator) void {
-    var element = l.head();
-    if (onNodeValue) |f| {
-        while (element) |e| {
-            const next = e.next;
-            f(&e.value, allocator);
-            allocator.destroy(e);
-            element = next;
-        }
-    } else while (element) |e| {
-        const next = e.next;
-        allocator.destroy(e);
-        element = next;
-    }
-}
 
 // BlockArranger determines block nesting depths.
 const BlockArranger = struct {
@@ -583,7 +562,7 @@ const ContentParser = struct {
     }
 
     fn create_token(self: ContentParser) !*tmd.TokenInfo {
-        var tokenInfoElement = try createListElement(tmd.TokenInfo, self.allocator);
+        var tokenInfoElement = try list.createListElement(tmd.TokenInfo, self.allocator);
         self.lineSession.tokens.push(tokenInfoElement);
 
         return &tokenInfoElement.value;
@@ -675,7 +654,7 @@ const ContentParser = struct {
             };
             self.blockSession.lastLinkInfoToken = tokenInfo;
 
-            var linkElement = try createListElement(tmd.Link, self.allocator);
+            var linkElement = try list.createListElement(tmd.Link, self.allocator);
             self.docParser.tmdDoc.links.push(linkElement);
             const link = &linkElement.value;
             link.* = .{
@@ -1697,155 +1676,178 @@ const ContentParser = struct {
 
     fn matchLinks(self: *ContentParser) !void {
         const links = &self.docParser.tmdDoc.links;
-        if (!links.empty()) {
-            var linksForTree: list.List(LinkForTree) = .{};
-            defer destroyListElements(LinkForTree, linksForTree, destroyRevisedLinkText, self.allocator);
+        if (links.empty()) return;
 
-            var normalPatricia = NormalPatricia{ .allocator = self.allocator };
-            normalPatricia.init();
-            defer normalPatricia.deinit();
+        var linksForTree: list.List(LinkForTree) = .{};
+        defer list.destroyListElements(LinkForTree, linksForTree, destroyRevisedLinkText, self.allocator);
 
-            var invertedPatricia = InvertedPatricia{ .allocator = self.allocator };
-            invertedPatricia.init();
-            defer invertedPatricia.deinit();
+        var normalPatricia = NormalPatricia{ .allocator = self.allocator };
+        normalPatricia.init();
+        defer normalPatricia.deinit();
 
-            const matcher = Matcher{
-                .normalPatricia = &normalPatricia,
-                .invertedPatricia = &invertedPatricia,
-            };
+        var invertedPatricia = InvertedPatricia{ .allocator = self.allocator };
+        invertedPatricia.init();
+        defer invertedPatricia.deinit();
 
-            // The top-to-bottom pass.
-            var linkElement = links.head().?;
-            while (true) {
-                const linkInfo = linkElement.value.info;
-                switch (linkInfo.info) {
-                    .urlSourceText => unreachable,
-                    .firstPlainText => |plainTextToken| blk: {
-                        if (plainTextToken == null) {
-                            //std.debug.print("ignored for no plainText tokens\n", .{});
-                            linkInfo.setSourceOfURL(null, false);
-                            break :blk;
-                        }
+        const matcher = Matcher{
+            .normalPatricia = &normalPatricia,
+            .invertedPatricia = &invertedPatricia,
+        };
 
-                        var linkTextLen: u32 = 0;
-                        var lastToken = plainTextToken.?;
-                        while (lastToken.tokenType.plainText.nextInLink) |nextToken| {
-                            defer lastToken = nextToken;
-                            const str = self.tokenAsString(lastToken);
-                            linkTextLen = copyLinkText(DummyLinkText{}, linkTextLen, str);
-                        }
+        // The top-to-bottom pass.
+        var linkElement = links.head().?;
+        while (true) {
+            const linkInfo = linkElement.value.info;
+            switch (linkInfo.info) {
+                .urlSourceText => unreachable,
+                .firstPlainText => |plainTextToken| blk: {
+                    const firstTextToken = if (plainTextToken) |first| first else {
+                        // The link should be ignored in rendering.
 
-                        {
-                            const str = self.tokenAsString(lastToken);
-                            if (linkInfo.inDirective()) {
-                                if (copyLinkText(DummyLinkText{}, 0, str) == 0) {
-                                    //std.debug.print("ignored for blank link definition\n", .{});
-                                    linkInfo.setSourceOfURL(null, false);
-                                    break :blk;
-                                }
-                            } else if (url.isValidURL(trim_blanks(str))) {
-                                // self-defined
-                                //std.debug.print("self defined url: {s}\n", .{str});
-                                linkInfo.setSourceOfURL(lastToken, true);
-                                break :blk;
-                            } else {
-                                linkTextLen = copyLinkText(DummyLinkText{}, linkTextLen, str);
-                            }
+                        //std.debug.print("ignored for no plainText tokens\n", .{});
+                        linkInfo.setSourceOfURL(null, false);
+                        break :blk;
+                    };
 
-                            if (linkTextLen == 0) {
-                                //std.debug.print("ignored for blank link text\n", .{});
+                    var linkTextLen: u32 = 0;
+                    var lastToken = firstTextToken;
+                    // count sum length without the last text token
+                    while (lastToken.tokenType.plainText.nextInLink) |nextToken| {
+                        defer lastToken = nextToken;
+                        const str = self.tokenAsString(lastToken);
+                        linkTextLen = copyLinkText(DummyLinkText{}, linkTextLen, str);
+                    }
+
+                    // handle the last text token
+                    {
+                        const str = trim_blanks(self.tokenAsString(lastToken));
+                        if (linkInfo.inDirective()) {
+                            if (copyLinkText(DummyLinkText{}, 0, str) == 0) {
+                                // This link definition will be ignored.
+
+                                //std.debug.print("ignored for blank link definition\n", .{});
                                 linkInfo.setSourceOfURL(null, false);
                                 break :blk;
                             }
+                        } else if (isValidURL(str)) {
+                            // For built-in cases, no need to call callback to determine the url.
+
+                            //std.debug.print("self defined url: {s}\n", .{str});
+                            linkInfo.setSourceOfURL(lastToken, true);
+
+                            if (lastToken == firstTextToken and mem.startsWith(u8, str, "#")) {
+                                linkInfo.setFootnote(true);
+                            }
+
+                            break :blk;
+                        } else {
+                            linkTextLen = copyLinkText(DummyLinkText{}, linkTextLen, str);
                         }
 
-                        const textPtr: [*]u8 = (try self.allocator.alloc(u8, linkTextLen)).ptr;
-                        const revisedLinkText = RevisedLinkText{
-                            .len = linkTextLen,
-                            .text = textPtr,
-                        };
+                        if (linkTextLen == 0) {
+                            // The link should be ignored in rendering.
 
-                        const theElement = try self.allocator.create(list.Element(LinkForTree));
-                        linksForTree.push(theElement);
-                        theElement.value.setInfoAndText(linkInfo, revisedLinkText);
-                        const linkForTree = &theElement.value;
+                            //std.debug.print("ignored for blank link text\n", .{});
+                            linkInfo.setSourceOfURL(null, false);
+                            break :blk;
+                        }
+                    }
 
-                        const confirmed = while (true) {
-                            const realLinkText = RealLinkText{
-                                .text = textPtr,
-                            };
+                    // build RevisedLinkText
 
-                            var linkTextLen2: u32 = 0;
-                            lastToken = plainTextToken.?;
-                            while (lastToken.tokenType.plainText.nextInLink) |nextToken| {
-                                defer lastToken = nextToken;
-                                const str = self.tokenAsString(lastToken);
-                                linkTextLen2 = copyLinkText(realLinkText, linkTextLen2, str);
-                            }
+                    const textPtr: [*]u8 = (try self.allocator.alloc(u8, linkTextLen)).ptr;
+                    const revisedLinkText = RevisedLinkText{
+                        .len = linkTextLen,
+                        .text = textPtr,
+                    };
 
-                            const str = trim_blanks(self.tokenAsString(lastToken));
-                            if (linkInfo.inDirective()) {
-                                std.debug.assert(linkTextLen2 == linkTextLen);
-
-                                //std.debug.print("    222 linkText = {s}\n", .{revisedLinkText.asString()});
-
-                                //std.debug.print("==== /{s}/, {}\n", .{ str, url.isValidURL(str) });
-                                break url.isValidURL(str);
-                            } else {
-                                std.debug.assert(!url.isValidURL(str));
-                                linkTextLen2 = copyLinkText(realLinkText, linkTextLen2, str);
-                                std.debug.assert(linkTextLen2 == linkTextLen);
-
-                                //std.debug.print("    111 linkText = {s}\n", .{revisedLinkText.asString()});
-
-                                try normalPatricia.putLinkInfo(revisedLinkText, &linkForTree.linkInfoElementNormal);
-                                try invertedPatricia.putLinkInfo(revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
-                                break :blk;
-                            }
-                        };
-
-                        std.debug.assert(linkInfo.inDirective());
-                        linkInfo.setSourceOfURL(lastToken, confirmed);
-
-                        matcher.doForLinkDefinition(linkForTree);
-                    },
-                }
-
-                if (linkElement.next) |next| {
-                    linkElement = next;
-                } else break;
-            }
-
-            // The bottom-to-top pass.
-            {
-                normalPatricia.clear();
-                invertedPatricia.clear();
-
-                var element = linksForTree.tail();
-                while (element) |theElement| {
+                    const theElement = try self.allocator.create(list.Element(LinkForTree));
+                    linksForTree.push(theElement);
+                    theElement.value.setInfoAndText(linkInfo, revisedLinkText);
                     const linkForTree = &theElement.value;
-                    const theLinkInfo = linkForTree.info();
-                    if (theLinkInfo.inDirective()) {
-                        std.debug.assert(theLinkInfo.info == .urlSourceText);
-                        matcher.doForLinkDefinition(linkForTree);
-                    } else if (theLinkInfo.info != .urlSourceText) {
-                        try normalPatricia.putLinkInfo(linkForTree.revisedLinkText, &linkForTree.linkInfoElementNormal);
-                        try invertedPatricia.putLinkInfo(linkForTree.revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
-                    }
-                    element = theElement.prev;
-                }
+
+                    const confirmed = while (true) { // ToDo: use a labled non-loop block
+                        const realLinkText = RealLinkText{
+                            .text = textPtr, // == revisedLinkText.text,
+                        };
+
+                        var linkTextLen2: u32 = 0;
+                        lastToken = firstTextToken;
+                        // build text data without the last text token
+                        while (lastToken.tokenType.plainText.nextInLink) |nextToken| {
+                            defer lastToken = nextToken;
+                            const str = self.tokenAsString(lastToken);
+                            linkTextLen2 = copyLinkText(realLinkText, linkTextLen2, str);
+                        }
+
+                        // handle the last text token
+                        const str = trim_blanks(self.tokenAsString(lastToken));
+                        if (linkInfo.inDirective()) {
+                            std.debug.assert(linkTextLen2 == linkTextLen);
+
+                            //std.debug.print("    222 linkText = {s}\n", .{revisedLinkText.asString()});
+
+                            //std.debug.print("==== /{s}/, {}\n", .{ str, isValidURL(str) });
+
+                            break isValidURL(str);
+                        } else {
+                            std.debug.assert(!isValidURL(str));
+
+                            // For a link whose url is not built-in determined,
+                            // all of its text tokens are used as link texts.
+
+                            linkTextLen2 = copyLinkText(realLinkText, linkTextLen2, str);
+                            std.debug.assert(linkTextLen2 == linkTextLen);
+
+                            //std.debug.print("    111 linkText = {s}\n", .{revisedLinkText.asString()});
+
+                            try normalPatricia.putLinkInfo(revisedLinkText, &linkForTree.linkInfoElementNormal);
+                            try invertedPatricia.putLinkInfo(revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
+                            break :blk;
+                        }
+                    };
+
+                    std.debug.assert(linkInfo.inDirective());
+
+                    linkInfo.setSourceOfURL(lastToken, confirmed);
+                    matcher.doForLinkDefinition(linkForTree);
+                },
             }
 
-            // The final pass.
-            {
-                var element = linksForTree.head();
-                while (element) |theElement| {
-                    const theLinkInfo = theElement.value.info();
-                    if (theLinkInfo.info != .urlSourceText) {
-                        theLinkInfo.setSourceOfURL(theLinkInfo.info.firstPlainText, false);
-                    }
-                    element = theElement.next;
+            if (linkElement.next) |next| {
+                linkElement = next;
+            } else break;
+        }
+
+        // The bottom-to-top pass.
+        {
+            normalPatricia.clear();
+            invertedPatricia.clear();
+
+            var element = linksForTree.tail();
+            while (element) |theElement| {
+                const linkForTree = &theElement.value;
+                const theLinkInfo = linkForTree.info();
+                if (theLinkInfo.inDirective()) {
+                    std.debug.assert(theLinkInfo.info == .urlSourceText);
+                    matcher.doForLinkDefinition(linkForTree);
+                } else if (theLinkInfo.info != .urlSourceText) {
+                    try normalPatricia.putLinkInfo(linkForTree.revisedLinkText, &linkForTree.linkInfoElementNormal);
+                    try invertedPatricia.putLinkInfo(linkForTree.revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
                 }
+                element = theElement.prev;
+            }
+        }
+
+        // The final pass (for still unmatched links).
+        {
+            var element = linksForTree.head();
+            while (element) |theElement| {
+                const theLinkInfo = theElement.value.info();
+                if (theLinkInfo.info != .urlSourceText) {
+                    theLinkInfo.setSourceOfURL(theLinkInfo.info.firstPlainText, false);
+                }
+                element = theElement.next;
             }
         }
     }
@@ -2110,12 +2112,12 @@ const DocParser = struct {
     nextElementAttributes: ?tmd.ElementAttibutes = null,
 
     fn createAndPushBlockInfoElement(parser: *DocParser, allocator: mem.Allocator) !*tmd.BlockInfo {
-        var blockInfoElement = try createListElement(tmd.BlockInfo, allocator);
+        var blockInfoElement = try list.createListElement(tmd.BlockInfo, allocator);
         parser.tmdDoc.blocks.push(blockInfoElement);
         const blockInfo = &blockInfoElement.value;
 
         if (parser.nextElementAttributes) |as| {
-            var blockAttributesElement = try createListElement(tmd.BlockAttibutes, allocator);
+            var blockAttributesElement = try list.createListElement(tmd.BlockAttibutes, allocator);
             parser.tmdDoc.blockAttributes.push(blockAttributesElement);
 
             const attrs = &blockAttributesElement.value;
@@ -2125,14 +2127,20 @@ const DocParser = struct {
             blockInfo.attributes = attrs;
 
             if (attrs.common.id.len > 0) {
-                const blockTreeNodeElement = parser.tmdDoc.freeBlockTreeNodeElement orelse try createListElement(tmd.BlockInfoRedBlack.Node, allocator);
+                const blockTreeNodeElement = if (parser.tmdDoc.freeBlockTreeNodeElement) |e| blk: {
+                    parser.tmdDoc.freeBlockTreeNodeElement = null;
+                    break :blk e;
+                } else blk: {
+                    const element = try list.createListElement(tmd.BlockInfoRedBlack.Node, allocator);
+                    parser.tmdDoc.blockTreeNodes.push(element);
+                    break :blk element;
+                };
+
                 const blockTreeNode = &blockTreeNodeElement.value;
                 blockTreeNode.value = blockInfo;
                 const n = parser.tmdDoc.blocksByID.insert(blockTreeNode);
                 if (n != blockTreeNode) {
                     parser.tmdDoc.freeBlockTreeNodeElement = blockTreeNodeElement;
-                } else {
-                    parser.tmdDoc.blockTreeNodes.push(blockTreeNodeElement);
                 }
             }
 
@@ -2220,7 +2228,7 @@ const DocParser = struct {
         var atomBlockCount: u32 = 0;
 
         while (lineScanner.proceedToNextLine()) {
-            var lineInfoElement = try createListElement(tmd.LineInfo, allocator);
+            var lineInfoElement = try list.createListElement(tmd.LineInfo, allocator);
             var lineInfo = &lineInfoElement.value;
             lineInfo.containerMark = null;
             lineInfo.range.start = lineScanner.cursor;
@@ -3001,17 +3009,17 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
 //     may be followed by any number of letters, digits ([0-9]),
 //     hyphens ("-"), underscores ("_"), colons (":"), and periods (".").
 const charIdLevels = blk: {
-    var table = [1]u2{0} ** 127;
+    var table = [1]u3{0} ** 127;
 
     for ('a'..'z', 'A'..'Z') |i, j| {
-        table[i] = 2;
-        table[j] = 2;
+        table[i] = 6;
+        table[j] = 6;
     }
-    for ('0'..'9') |i| table[i] = 1;
-    table['_'] = 1;
-    table['-'] = 1;
+    for ('0'..'9') |i| table[i] = 5;
+    table['_'] = 4;
+    table['-'] = 3;
+    table['.'] = 2;
     table[':'] = 1;
-    table['.'] = 1;
     break :blk table;
 };
 
@@ -3036,9 +3044,9 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
                 '#' => {
                     if (lastOrder >= id) break;
                     if (item.len == 1) break;
-                    if (item[1] >= 128 or charIdLevels[item[1]] != 2) break;
+                    if (item[1] >= 128 or charIdLevels[item[1]] != 6) break;
                     for (item[2..]) |c| {
-                        if (c >= 128 or charIdLevels[c] == 0) break;
+                        if (c >= 128 or charIdLevels[c] < 2) break;
                     }
                     attrs.id = item[1..];
                     lastOrder = id;
@@ -3247,6 +3255,12 @@ pub fn parse_block_close_playload(playload: []const u8) tmd.ContentStreamAttribu
 
     attrs.content = content;
     return attrs;
+}
+
+pub fn isValidURL(text: []const u8) bool {
+    // ToDo: more precisely.
+
+    return mem.startsWith(u8, text, "#") or mem.startsWith(u8, text, "http") or mem.endsWith(u8, text, ".htm") or mem.endsWith(u8, text, ".html");
 }
 
 pub fn trim_blanks(str: []const u8) []const u8 {
