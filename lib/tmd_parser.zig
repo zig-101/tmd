@@ -71,9 +71,9 @@ const BlockArranger = struct {
         openingListCount: tmd.ListNestingDepthType = 0,
     };
 
-    fn start(root: *tmd.BlockInfo) BlockArranger {
+    fn start(root: *tmd.BlockInfo, doc: *tmd.Doc) BlockArranger {
         root.* = .{ .nestingDepth = 0, .blockType = .{
-            .root = .{},
+            .root = .{.doc = doc},
         } };
 
         var s = BlockArranger{
@@ -2196,7 +2196,7 @@ const DocParser = struct {
 
     fn parseAll(parser: *DocParser, tmdData: []const u8, allocator: mem.Allocator) !void {
         const rootBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
-        var blockArranger = BlockArranger.start(rootBlockInfo);
+        var blockArranger = BlockArranger.start(rootBlockInfo, parser.tmdDoc);
         defer blockArranger.end();
 
         const lineScanner = &parser.lineScanner;

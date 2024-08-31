@@ -308,7 +308,7 @@ pub const BlockType = union(enum) {
     // base context block
 
     root: struct {
-        headers: list.List(*BlockInfo) = .{},
+        doc: *Doc, // ToDo: doc embedding
     },
 
     base: struct {
