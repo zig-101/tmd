@@ -1,14 +1,16 @@
 
 ##### Tapir's Markdown Format
 
-Tapir's Markdown (TMD) is a distinct evolution of traditional markdown,
+Tapir's Markdown (TMD) is a distinct evolution of traditional markdown __#note-1__,
 offering both increased specificity and enhanced power
 while preserving the familiar readability of its predecessor.
 
 ##-
 
+////@@ #section-demos
 ##======= Demos
 
+////@@ #section-demo-1
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 1 (span styles)
 
@@ -47,6 +49,7 @@ This is a code span: ` var ok = x && y `.
 ^`text with mono font`.
 }
 
+////@@ #section-demo-2
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 2 (line leading marks)
 
@@ -70,6 +73,7 @@ This block
 && ./static/image/sample-image.png
 }
 
+////@@ #section-demo-3
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 3 (link definitions)
 
@@ -82,7 +86,7 @@ This block
 {
 ////__Go 101 website ``https://go101.org
 
-Visit __Go 101 website__ (the link is defined above).
+Visit __Go 101 website__ (the link is defined above) __#note-2__.
 
 Go 1.22 broke backwards compatibility. More information
 is on __`for` Loop Semantic Changes in Go 1.22:
@@ -96,6 +100,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ////__...in Go `` https://go101.org/blog/2022-10-01-three-way-string-comparison.html
 }
 
+////@@ #section-demo-4
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 4 (built-in containers)
 
@@ -152,6 +157,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
   }
 }
 
+////@@ #section-demo-5
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 5 (atom blocks)
 
@@ -172,6 +178,10 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 
 This is a usual block. Nothing special.
 
+The below is a horizontal line.
+
+---
+
 //// This is a directive block.
 //// We can define links here and specify IDs for blocks.
 
@@ -186,6 +196,7 @@ This is a usual block. Nothing special.
 '''
 }
 
+////@@ #section-demo-6
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 6 (line spacing)
 
@@ -222,6 +233,7 @@ hello
 world
 }
 
+////@@ #section-demo-7
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 7 (character escaping)
 
@@ -241,4 +253,11 @@ Backticks in code span: `!!`code`!!`
 `` // This is not a comment line.
 }
 
+---
 
+{//
+////@@ #note-1
+Traditional markdown is known for it is limited and not well specified.
+////@@ #note-2
+The **%% Go 101 %%** website is an up-to-date knowledge base for Go programming self learning.
+}
