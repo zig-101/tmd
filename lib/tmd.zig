@@ -28,6 +28,10 @@ pub const Doc = struct {
 
     links: list.List(Link) = .{}, // ToDo: use SinglyLinkedList
 
+    // ToDo: need an option: whether or not title is set externally.
+    //       If not, the first non-bare h1 header will be viewed as tiltle.
+    catalogHeaders: list.List(*BlockInfo) = .{},
+    
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
         var a = BlockAttibutes{
             .common = .{ .id = id },
@@ -46,6 +50,8 @@ pub const Range = struct {
     end: u32,
 };
 
+// ToDo: u8 -> usize?
+pub const MaxHeaderLevel: u8 = 4;
 pub fn headerLevel(headeMark: []const u8) ?u8 {
     if (headeMark.len < 2) return null;
     if (headeMark[0] != '#' or headeMark[1] != '#') return null;
@@ -308,7 +314,7 @@ pub const BlockType = union(enum) {
     // base context block
 
     root: struct {
-        doc: *Doc, // ToDo: doc embedding
+        doc: *Doc,
     },
 
     base: struct {
@@ -378,6 +384,11 @@ pub const BlockType = union(enum) {
             const start = headerLine.containerMarkEnd();
             const end = start + headerLine.lineType.header.markLen;
             return headerLevel(tmdData[start..end]) orelse unreachable;
+        }
+
+        // An empty header is used to insert catalog.
+        pub fn isBare(self: @This()) bool {
+            return self.startLine == self.endLine and self.startLine.tokens().?.empty();
         }
     },
 
@@ -602,7 +613,8 @@ pub const LineType = union(enum) {
         //       The header list should be put in that element.
         //       That element should store more info, like commentedOut etc.
         //       Similar for codeSnippet ...
-        headers: list.List(*BlockInfo) = .{}, // for .base BlockInfo
+        // ToDo: now only for .root block.
+        //headers: ?*list.List(*BlockInfo) = .{}, // for .base BlockInfo
     },
     baseBlockClose: struct {
         markLen: u32,

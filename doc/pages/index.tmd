@@ -5,12 +5,14 @@ Tapir's Markdown (TMD) is a distinct evolution of traditional markdown,
 offering both increased specificity and enhanced power
 while preserving the familiar readability of its predecessor.
 
+##-
+
 ##======= Demos
 
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 1 (span styles)
 
-### TMD source of demo 1
+. ### TMD source of demo 1
 '''''
 ''''' << #demo-1
 
@@ -48,7 +50,7 @@ This is a code span: ` var ok = x && y `.
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 2 (line leading marks)
 
-### TMD source of demo 2
+. ### TMD source of demo 2
 '''''
 ''''' << #demo-2
 
@@ -71,7 +73,7 @@ This block
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 3 (link definitions)
 
-### TMD source of demo 3
+. ### TMD source of demo 3
 '''''
 ''''' << #demo-3
 
@@ -97,7 +99,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 4 (built-in containers)
 
-### TMD source of demo 4
+. ### TMD source of demo 4
 '''''
 ''''' << #demo-4
 
@@ -142,7 +144,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
   This is a note box with header.
   }
 
-? This is a disclosure box without summary.
+? This is a reveal box without summary.
 
 ? ### Why TMD?
   {
@@ -153,7 +155,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 5 (atom blocks)
 
-### TMD source of demo 5
+. ### TMD source of demo 5
 '''''
 ''''' << #demo-5
 
@@ -174,7 +176,7 @@ This is a usual block. Nothing special.
 //// We can define links here and specify IDs for blocks.
 
 ////@@ #code-snippet-1
-### code-snippet-1.zig
+. ### code-snippet-1.zig
 '''zig
 	const std = @import("std");
 	
@@ -187,7 +189,7 @@ This is a usual block. Nothing special.
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 6 (line spacing)
 
-### TMD source of demo 6
+. ### TMD source of demo 6
 '''
 ''' << #demo-6
 
@@ -223,7 +225,7 @@ world
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 7 (character escaping)
 
-### TMD source of demo 7
+. ### TMD source of demo 7
 '''''
 ''''' << #demo-7
 

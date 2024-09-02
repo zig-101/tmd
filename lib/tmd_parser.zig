@@ -23,6 +23,7 @@ pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
     list.destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
 
     list.destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
+    list.destroyListElements(*tmd.BlockInfo, tmdDoc.catalogHeaders, null, allocator);
 
     tmdDoc.* = .{ .data = "" };
 }
@@ -41,10 +42,11 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     tmdDoc.blocksByID.init(nilBlockTreeNode);
 
     var docParser = DocParser{
+        .allocator = allocator,
         .tmdDoc = &tmdDoc,
         .lineScanner = LineScanner{ .data = tmdDoc.data },
     };
-    try docParser.parseAll(tmdData, allocator);
+    try docParser.parseAll(tmdData);
 
     if (false and builtin.mode == .Debug)
         dumpTmdDoc(&tmdDoc);
@@ -178,6 +180,10 @@ const BlockArranger = struct {
         self.count_1 = baseContext.nestingDepth + 1;
         blockInfo.nestingDepth = self.count_1;
         self.stackedBlocks[self.count_1] = blockInfo;
+    }
+
+    fn hasNotActiveBuiltinContainers(self: *BlockArranger) bool {
+        return self.stackedBlocks[self.count_1].nestingDepth - 1 == self.baseCount_1;
     }
 
     fn stackContainerBlock(self: *BlockArranger, blockInfo: *tmd.BlockInfo) !void {
@@ -384,7 +390,6 @@ const BlockArranger = struct {
 
 const ContentParser = struct {
     docParser: *DocParser,
-    allocator: mem.Allocator,
 
     escapedSpanStatus: *SpanStatus = undefined,
     codeSpanStatus: *SpanStatus = undefined,
@@ -440,12 +445,11 @@ const ContentParser = struct {
         openTextNumber: u32 = 0,
     };
 
-    fn make(allocator: mem.Allocator, docParser: *DocParser) ContentParser {
+    fn make(docParser: *DocParser) ContentParser {
         std.debug.assert(MarkCount <= 32);
 
         return .{
             .docParser = docParser,
-            .allocator = allocator,
         };
     }
 
@@ -562,7 +566,7 @@ const ContentParser = struct {
     }
 
     fn create_token(self: ContentParser) !*tmd.TokenInfo {
-        var tokenInfoElement = try list.createListElement(tmd.TokenInfo, self.allocator);
+        var tokenInfoElement = try list.createListElement(tmd.TokenInfo, self.docParser.allocator);
         self.lineSession.tokens.push(tokenInfoElement);
 
         return &tokenInfoElement.value;
@@ -654,7 +658,7 @@ const ContentParser = struct {
             };
             self.blockSession.lastLinkInfoToken = tokenInfo;
 
-            var linkElement = try list.createListElement(tmd.Link, self.allocator);
+            var linkElement = try list.createListElement(tmd.Link, self.docParser.allocator);
             self.docParser.tmdDoc.links.push(linkElement);
             const link = &linkElement.value;
             link.* = .{
@@ -1679,13 +1683,13 @@ const ContentParser = struct {
         if (links.empty()) return;
 
         var linksForTree: list.List(LinkForTree) = .{};
-        defer list.destroyListElements(LinkForTree, linksForTree, destroyRevisedLinkText, self.allocator);
+        defer list.destroyListElements(LinkForTree, linksForTree, destroyRevisedLinkText, self.docParser.allocator);
 
-        var normalPatricia = NormalPatricia{ .allocator = self.allocator };
+        var normalPatricia = NormalPatricia{ .allocator = self.docParser.allocator };
         normalPatricia.init();
         defer normalPatricia.deinit();
 
-        var invertedPatricia = InvertedPatricia{ .allocator = self.allocator };
+        var invertedPatricia = InvertedPatricia{ .allocator = self.docParser.allocator };
         invertedPatricia.init();
         defer invertedPatricia.deinit();
 
@@ -1755,13 +1759,13 @@ const ContentParser = struct {
 
                     // build RevisedLinkText
 
-                    const textPtr: [*]u8 = (try self.allocator.alloc(u8, linkTextLen)).ptr;
+                    const textPtr: [*]u8 = (try self.docParser.allocator.alloc(u8, linkTextLen)).ptr;
                     const revisedLinkText = RevisedLinkText{
                         .len = linkTextLen,
                         .text = textPtr,
                     };
 
-                    const theElement = try self.allocator.create(list.Element(LinkForTree));
+                    const theElement = try self.docParser.allocator.create(list.Element(LinkForTree));
                     linksForTree.push(theElement);
                     theElement.value.setInfoAndText(linkInfo, revisedLinkText);
                     const linkForTree = &theElement.value;
@@ -2105,19 +2109,26 @@ const LineScanner = struct {
 };
 
 const DocParser = struct {
+    allocator: mem.Allocator,
+
     tmdDoc: *tmd.Doc,
 
     lineScanner: LineScanner,
 
     nextElementAttributes: ?tmd.ElementAttibutes = null,
 
-    fn createAndPushBlockInfoElement(parser: *DocParser, allocator: mem.Allocator) !*tmd.BlockInfo {
-        var blockInfoElement = try list.createListElement(tmd.BlockInfo, allocator);
+    pendingCatalogHeaderInfo: ?struct{
+        headerBlock: *tmd.BlockInfo,
+        //isFirstLevel: bool,
+    } = null,
+
+    fn createAndPushBlockInfoElement(parser: *DocParser) !*tmd.BlockInfo {
+        var blockInfoElement = try list.createListElement(tmd.BlockInfo, parser.allocator);
         parser.tmdDoc.blocks.push(blockInfoElement);
         const blockInfo = &blockInfoElement.value;
 
         if (parser.nextElementAttributes) |as| {
-            var blockAttributesElement = try list.createListElement(tmd.BlockAttibutes, allocator);
+            var blockAttributesElement = try list.createListElement(tmd.BlockAttibutes, parser.allocator);
             parser.tmdDoc.blockAttributes.push(blockAttributesElement);
 
             const attrs = &blockAttributesElement.value;
@@ -2131,7 +2142,7 @@ const DocParser = struct {
                     parser.tmdDoc.freeBlockTreeNodeElement = null;
                     break :blk e;
                 } else blk: {
-                    const element = try list.createListElement(tmd.BlockInfoRedBlack.Node, allocator);
+                    const element = try list.createListElement(tmd.BlockInfoRedBlack.Node, parser.allocator);
                     parser.tmdDoc.blockTreeNodes.push(element);
                     break :blk element;
                 };
@@ -2184,24 +2195,43 @@ const DocParser = struct {
     }
 
     // atomBlockInfo is an atom block, or a base/root block.
-    fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) void {
+    fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) !void {
         if (parser.tmdDoc.lines.tail()) |lastLineInfoElement| {
             std.debug.assert(!parser.tmdDoc.blocks.empty());
             std.debug.assert(atomBlockInfo.blockType != .root);
-            if (atomBlockInfo.blockType != .base) {
+            if (atomBlockInfo.blockType != .base) handle: {
                 atomBlockInfo.setEndLine(&lastLineInfoElement.value);
+
+                const headerInfo = if (parser.pendingCatalogHeaderInfo) |info| blk: {
+                    std.debug.assert(info.headerBlock == atomBlockInfo);
+                    std.debug.assert(atomBlockInfo.blockType == .header);
+                    if (atomBlockInfo.blockType.header.isBare()) break :handle;
+                    break :blk info;
+                } else break :handle;
+
+                _ = headerInfo;
+                //if (headerInfo.isFirstLevel and parser.tmdDoc.titleHeader == null) {
+                //    parser.tmdDoc.titleHeader = atomBlockInfo;
+                //    break :handle;
+                //}
+
+                const element = try list.createListElement(*tmd.BlockInfo, parser.allocator);
+                parser.tmdDoc.catalogHeaders.push(element);
+                element.value = atomBlockInfo;
             }
         } else std.debug.assert(atomBlockInfo.blockType == .root);
+
+        parser.pendingCatalogHeaderInfo = null;
     }
 
-    fn parseAll(parser: *DocParser, tmdData: []const u8, allocator: mem.Allocator) !void {
-        const rootBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+    fn parseAll(parser: *DocParser, tmdData: []const u8) !void {
+        const rootBlockInfo = try parser.createAndPushBlockInfoElement();
         var blockArranger = BlockArranger.start(rootBlockInfo, parser.tmdDoc);
         defer blockArranger.end();
 
         const lineScanner = &parser.lineScanner;
 
-        var contentParser = ContentParser.make(allocator, parser);
+        var contentParser = ContentParser.make(parser);
         contentParser.init();
         defer contentParser.deinit(); // ToDo: needed?
 
@@ -2228,7 +2258,7 @@ const DocParser = struct {
         var atomBlockCount: u32 = 0;
 
         while (lineScanner.proceedToNextLine()) {
-            var lineInfoElement = try list.createListElement(tmd.LineInfo, allocator);
+            var lineInfoElement = try list.createListElement(tmd.LineInfo, parser.allocator);
             var lineInfo = &lineInfoElement.value;
             lineInfo.containerMark = null;
             lineInfo.range.start = lineScanner.cursor;
@@ -2319,7 +2349,7 @@ const DocParser = struct {
                     lineInfo.rangeTrimmed.end = leadingBlankEnd;
 
                     if (currentAtomBlockInfo.blockType != .blank) {
-                        const blankBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        const blankBlockInfo = try parser.createAndPushBlockInfoElement();
                         blankBlockInfo.blockType = .{
                             .blank = .{
                                 .startLine = lineInfo,
@@ -2327,7 +2357,7 @@ const DocParser = struct {
                         };
                         try blockArranger.stackAtomBlock(blankBlockInfo, false);
 
-                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = blankBlockInfo;
                         atomBlockCount += 1;
                     }
@@ -2376,7 +2406,7 @@ const DocParser = struct {
                             .markEndWithSpaces = markEndWithSpaces,
                         } };
 
-                        const listItemBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        const listItemBlockInfo = try parser.createAndPushBlockInfoElement();
                         listItemBlockInfo.blockType = .{
                             .bullet = .{
                                 .isFirst = false, // will be modified eventually
@@ -2409,7 +2439,7 @@ const DocParser = struct {
                             break :blk markEnd;
                         } else lineScanner.cursor;
 
-                        const containerBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        const containerBlockInfo = try parser.createAndPushBlockInfoElement();
                         switch (mark) {
                             ':' => {
                                 lineInfo.containerMark = .{ .indented = .{
@@ -2487,7 +2517,7 @@ const DocParser = struct {
                             .markLen = markLen,
                         } };
 
-                        const lineBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        const lineBlockInfo = try parser.createAndPushBlockInfoElement();
                         lineBlockInfo.blockType = .{
                             .line = .{
                                 .startLine = lineInfo,
@@ -2495,7 +2525,7 @@ const DocParser = struct {
                         };
                         try blockArranger.stackAtomBlock(lineBlockInfo, isContainerFirstLine);
 
-                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = lineBlockInfo;
                         atomBlockCount += 1;
 
@@ -2532,7 +2562,7 @@ const DocParser = struct {
                                 .markEndWithSpaces = playloadStart,
                             } };
 
-                            const baseBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            const baseBlockInfo = try parser.createAndPushBlockInfoElement();
                             baseBlockInfo.blockType = .{
                                 .base = .{
                                     .openLine = lineInfo,
@@ -2540,7 +2570,7 @@ const DocParser = struct {
                             };
                             try blockArranger.openBaseBlock(baseBlockInfo, isContainerFirstLine);
 
-                            parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                            try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = baseBlockInfo;
                             atomBlockCount += 1;
                         } else {
@@ -2552,7 +2582,7 @@ const DocParser = struct {
                             const baseBlockInfo = try blockArranger.closeCurrentBaseBlock();
                             baseBlockInfo.blockType.base.closeLine = lineInfo;
 
-                            parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                            try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = baseBlockInfo;
                             atomBlockCount += 1;
                         }
@@ -2589,7 +2619,7 @@ const DocParser = struct {
                                 .codeSnippetStart = &lineInfo.lineType.codeSnippetStart,
                             };
 
-                            const codeSnippetBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            const codeSnippetBlockInfo = try parser.createAndPushBlockInfoElement();
                             codeSnippetBlockInfo.* = .{ .blockType = .{
                                 .code = .{
                                     .startLine = lineInfo,
@@ -2608,7 +2638,7 @@ const DocParser = struct {
                                 .customStart = &lineInfo.lineType.customStart,
                             };
 
-                            const customBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            const customBlockInfo = try parser.createAndPushBlockInfoElement();
                             customBlockInfo.* = .{ .blockType = .{
                                 .custom = .{
                                     .startLine = lineInfo,
@@ -2619,7 +2649,7 @@ const DocParser = struct {
 
                         try blockArranger.stackAtomBlock(atomBlock, isContainerFirstLine);
 
-                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = atomBlock;
                         atomBlockCount += 1;
                     },
@@ -2663,7 +2693,7 @@ const DocParser = struct {
                             .markEndWithSpaces = lineScanner.cursor,
                         } };
 
-                        const headerBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        const headerBlockInfo = try parser.createAndPushBlockInfoElement();
                         headerBlockInfo.blockType = .{
                             .header = .{
                                 .startLine = lineInfo,
@@ -2675,9 +2705,18 @@ const DocParser = struct {
                             try blockArranger.stackAtomBlock(headerBlockInfo, isContainerFirstLine);
                         }
 
-                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = headerBlockInfo;
                         atomBlockCount += 1;
+
+                        if (blockArranger.hasNotActiveBuiltinContainers()) {
+                            // Will use the info in setEndLineForAtomBlock.
+                            // Note: whether or not headerBlockInfo is empty can't be determined now.
+                            parser.pendingCatalogHeaderInfo = .{
+                                .headerBlock = headerBlockInfo,
+                                //.isFirstLevel = isFirstLevel,
+                            };
+                        }
 
                         contentParser.on_new_atom_block(currentAtomBlockInfo);
 
@@ -2715,7 +2754,7 @@ const DocParser = struct {
                             .markEndWithSpaces = lineScanner.cursor,
                         } };
 
-                        const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        const usualBlockInfo = try parser.createAndPushBlockInfoElement();
                         usualBlockInfo.blockType = .{
                             .usual = .{
                                 .startLine = lineInfo,
@@ -2725,7 +2764,7 @@ const DocParser = struct {
 
                         try blockArranger.stackAtomBlock(newAtomBlock, isContainerFirstLine);
 
-                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = newAtomBlock;
                         atomBlockCount += 1;
 
@@ -2767,7 +2806,7 @@ const DocParser = struct {
                         } };
 
                         if (isContainerFirstLine or currentAtomBlockInfo.blockType != .directive) {
-                            const commentBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                            const commentBlockInfo = try parser.createAndPushBlockInfoElement();
                             commentBlockInfo.blockType = .{
                                 .directive = .{
                                     .startLine = lineInfo,
@@ -2776,7 +2815,7 @@ const DocParser = struct {
 
                             try blockArranger.stackAtomBlock(commentBlockInfo, isContainerFirstLine);
 
-                            parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                            try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = commentBlockInfo;
                             atomBlockCount += 1;
 
@@ -2814,7 +2853,7 @@ const DocParser = struct {
                         currentAtomBlockInfo.blockType != .usual and currentAtomBlockInfo.blockType != .header
                     //and currentAtomBlockInfo.blockType != .footer
                     ) {
-                        const usualBlockInfo = try parser.createAndPushBlockInfoElement(allocator);
+                        const usualBlockInfo = try parser.createAndPushBlockInfoElement();
                         usualBlockInfo.blockType = .{
                             .usual = .{
                                 .startLine = lineInfo,
@@ -2822,7 +2861,7 @@ const DocParser = struct {
                         };
                         try blockArranger.stackAtomBlock(usualBlockInfo, isContainerFirstLine);
 
-                        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                         currentAtomBlockInfo = usualBlockInfo;
                         atomBlockCount += 1;
 
@@ -2853,7 +2892,7 @@ const DocParser = struct {
         }
 
         // Meaningful only for code snippet block (and popential later custom app block).
-        parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
 
         // ToDo: remove this line. (Forget the reason.;( )
         contentParser.on_new_atom_block(currentAtomBlockInfo); // try to determine line-end render manner for the last coment line.
