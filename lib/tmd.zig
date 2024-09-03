@@ -31,7 +31,7 @@ pub const Doc = struct {
     // ToDo: need an option: whether or not title is set externally.
     //       If not, the first non-bare h1 header will be viewed as tiltle.
     catalogHeaders: list.List(*BlockInfo) = .{},
-    
+
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
         var a = BlockAttibutes{
             .common = .{ .id = id },

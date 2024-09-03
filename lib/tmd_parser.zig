@@ -75,7 +75,7 @@ const BlockArranger = struct {
 
     fn start(root: *tmd.BlockInfo, doc: *tmd.Doc) BlockArranger {
         root.* = .{ .nestingDepth = 0, .blockType = .{
-            .root = .{.doc = doc},
+            .root = .{ .doc = doc },
         } };
 
         var s = BlockArranger{
@@ -776,16 +776,18 @@ const ContentParser = struct {
         }
     }
 
-    fn parse_directive_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32, isPureComment: bool) !u32 {
+    fn parse_directive_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32) !u32 {
         const lineScanner = &self.docParser.lineScanner;
 
         self.set_currnet_line(lineInfo, lineStart);
 
-        const isComment = if (isPureComment) true else blk: {
+        const isComment = blk: {
             const c = lineScanner.peekCursor();
             switch (c) {
                 '_' => {
-                    if (lineScanner.peekNext() != '_') break :blk true;
+                    if (lineScanner.peekNext() != '_') {
+                        break :blk true;
+                    }
                     break :blk false;
                 },
                 else => break :blk true,
@@ -2117,7 +2119,7 @@ const DocParser = struct {
 
     nextElementAttributes: ?tmd.ElementAttibutes = null,
 
-    pendingCatalogHeaderInfo: ?struct{
+    pendingCatalogHeaderInfo: ?struct {
         headerBlock: *tmd.BlockInfo,
         //isFirstLevel: bool,
     } = null,
@@ -2171,13 +2173,7 @@ const DocParser = struct {
         std.debug.assert(headElement.next == null);
         const commentToken = &headElement.value;
         const comment = parser.tmdDoc.data[commentToken.start()..commentToken.end()];
-        const playload = for (comment, 0..) |c, i| {
-            if (c == '@') continue;
-            if (i < 2) return;
-            break comment[i..];
-        } else return;
-
-        const attrs = parse_element_attributes(playload);
+        const attrs = parse_element_attributes(comment);
         if (attrs.id.len > 0) {
             if (parser.nextElementAttributes) |*as| {
                 as.id = attrs.id;
@@ -2780,7 +2776,7 @@ const DocParser = struct {
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
                     },
-                    '/' => |mark| handle: {
+                    '@' => |mark| handle: {
                         lineScanner.advance(1);
                         const markLen = lineScanner.readUntilNotChar(mark) + 1;
                         if (markLen < 3) {
@@ -2818,9 +2814,6 @@ const DocParser = struct {
                             try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = commentBlockInfo;
                             atomBlockCount += 1;
-
-                            // No need to do this.
-                            // contentParser.on_new_atom_block(currentAtomBlockInfo);
                         }
 
                         contentParser.on_new_atom_block(currentAtomBlockInfo);
@@ -2832,7 +2825,7 @@ const DocParser = struct {
                             break :handle;
                         }
 
-                        const contentEnd = try contentParser.parse_directive_line_tokens(lineInfo, lineScanner.cursor, markLen == 3);
+                        const contentEnd = try contentParser.parse_directive_line_tokens(lineInfo, lineScanner.cursor);
 
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);

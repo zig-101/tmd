@@ -7,10 +7,10 @@ while preserving the familiar readability of its predecessor.
 
 ##-
 
-////@@ #section-demos
+@@@ #section-demos
 ##======= Demos
 
-////@@ #section-demo-1
+@@@ #section-demo-1
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 1 (span styles)
 
@@ -19,7 +19,7 @@ while preserving the familiar readability of its predecessor.
 ''''' << #demo-1
 
 ! ### **Render result of demo 1
-////@@ #demo-1
+@@@ #demo-1
 {
 **bold text** and ^**dimmed text**.
 
@@ -49,7 +49,7 @@ This is a code span: ` var ok = x && y `.
 ^`text with mono font`.
 }
 
-////@@ #section-demo-2
+@@@ #section-demo-2
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 2 (line leading marks)
 
@@ -58,7 +58,7 @@ This is a code span: ` var ok = x && y `.
 ''''' << #demo-2
 
 ! ### **Render result of demo 2
-////@@ #demo-2
+@@@ #demo-2
 {
 A comment line is between the following two words: foo
 // comment text
@@ -73,7 +73,7 @@ This block
 && ./static/image/sample-image.png
 }
 
-////@@ #section-demo-3
+@@@ #section-demo-3
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 3 (link definitions)
 
@@ -82,9 +82,9 @@ This block
 ''''' << #demo-3
 
 ! ### **Render result of demo 3
-////@@ #demo-3
+@@@ #demo-3
 {
-////__Go 101 website ``https://go101.org
+@@@__Go 101 website ``https://go101.org
 
 Visit __Go 101 website__ (the link is defined above) __#note-2__.
 
@@ -92,15 +92,15 @@ Go 1.22 broke backwards compatibility. More information
 is on __`for` Loop Semantic Changes in Go 1.22:
 Be Aware of the Impact__ (the link is defined below).
 
-////__for Loop... ``https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+@@@__for Loop... ``https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
 
 __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 (the link is defined below).
 
-////__...in Go `` https://go101.org/blog/2022-10-01-three-way-string-comparison.html
+@@@__...in Go `` https://go101.org/blog/2022-10-01-three-way-string-comparison.html
 }
 
-////@@ #section-demo-4
+@@@ #section-demo-4
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 4 (built-in containers)
 
@@ -109,7 +109,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ''''' << #demo-4
 
 ! ### **Render result of demo 4
-////@@ #demo-4
+@@@ #demo-4
 {
 * This is a 1st-level list item.
   -. This is a 2nd-level list item (ordered).
@@ -157,7 +157,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
   }
 }
 
-////@@ #section-demo-5
+@@@ #section-demo-5
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 5 (atom blocks)
 
@@ -166,7 +166,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ''''' << #demo-5
 
 ! ### **Render result of demo 5
-////@@ #demo-5
+@@@ #demo-5
 {
 ####### Header 1
 
@@ -182,10 +182,11 @@ The below is a horizontal line.
 
 ---
 
-//// This is a directive block.
-//// We can define links here and specify IDs for blocks.
+@@@ This is a directive block. The texts here must be
+@@@ of certain formats to be meaningful.
+@@@ We can define links here and specify IDs for blocks.
 
-////@@ #code-snippet-1
+@@@ #code-snippet-1
 . ### code-snippet-1.zig
 '''zig
 	const std = @import("std");
@@ -196,7 +197,7 @@ The below is a horizontal line.
 '''
 }
 
-////@@ #section-demo-6
+@@@ #section-demo-6
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 6 (line spacing)
 
@@ -205,7 +206,7 @@ The below is a horizontal line.
 ''' << #demo-6
 
 ! ### **Render result of demo 6
-////@@ #demo-6
+@@@ #demo-6
 {
 
 hello
@@ -233,7 +234,7 @@ hello
 world
 }
 
-////@@ #section-demo-7
+@@@ #section-demo-7
 ##+++++++++++++++++++++++++++++++++++++++++
 	Demo 7 (character escaping)
 
@@ -242,7 +243,7 @@ world
 ''''' << #demo-7
 
 ! ### **Render result of demo 7
-////@@ #demo-7
+@@@ #demo-7
 {
 !! ** all marks %% are escaped ** `` !!!. !!
 
@@ -256,8 +257,8 @@ Backticks in code span: `!!`code`!!`
 ---
 
 {//
-////@@ #note-1
+@@@ #note-1
 Traditional markdown is known for it is limited and not well specified.
-////@@ #note-2
+@@@ #note-2
 The **%% Go 101 %%** website is an up-to-date knowledge base for Go programming self learning.
 }

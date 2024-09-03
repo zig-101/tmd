@@ -153,21 +153,20 @@ const TmdRender = struct {
                 };
             } else if (lastLevel < headerLevel) {
                 // open level
-                levelOpened[headerLevel-1] = true;
+                levelOpened[headerLevel - 1] = true;
                 _ = try w.write("\n<ul class=\"tmd-list tmd-catalog\">\n");
             }
 
             _ = try w.write("<li class=\"tmd-list-item tmd-catalog-item\">");
-            
+
             const id = if (headerBlock.attributes) |as| as.common.id else "";
-  
+
             // ToDo:
             //_ = try w.write("hdr:");
             // try self.writeUsualContentAsID(w, headerBlock);
             // Maybe it is better to pre-generate the IDs, to avoid duplications.
 
-            if (id.len == 0) _ = try w.write("<span class=\"tmd-broken-link\"")
-            else {
+            if (id.len == 0) _ = try w.write("<span class=\"tmd-broken-link\"") else {
                 _ = try w.write("<a href=\"#");
                 _ = try w.write(id);
             }
@@ -175,8 +174,7 @@ const TmdRender = struct {
 
             try self.writeUsualContentBlockLines(w, headerBlock, false);
 
-            if (id.len == 0) _ = try w.write("</span>\n")
-            else _ = try w.write("</a>\n");
+            if (id.len == 0) _ = try w.write("</span>\n") else _ = try w.write("</a>\n");
 
             _ = try w.write("</li>\n");
         }
