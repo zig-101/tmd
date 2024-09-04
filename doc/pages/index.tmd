@@ -84,7 +84,7 @@ This block
 ! ### **Render result of demo 3
 @@@ #demo-3
 {
-@@@__Go 101 website ``https://go101.org
+@@@__Go 101 website ` https://go101.org
 
 Visit __Go 101 website__ (the link is defined above) __#note-2__.
 
@@ -92,12 +92,12 @@ Go 1.22 broke backwards compatibility. More information
 is on __`for` Loop Semantic Changes in Go 1.22:
 Be Aware of the Impact__ (the link is defined below).
 
-@@@__for Loop... ``https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+@@@__for Loop... :: https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
 
 __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 (the link is defined below).
 
-@@@__...in Go `` https://go101.org/blog/2022-10-01-three-way-string-comparison.html
+@@@__...in Go ~~ https://go101.org/blog/2022-10-01-three-way-string-comparison.html
 }
 
 @@@ #section-demo-4
