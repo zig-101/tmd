@@ -30,7 +30,7 @@ pub const Doc = struct {
 
     // ToDo: need an option: whether or not title is set externally.
     //       If not, the first non-bare h1 header will be viewed as tiltle.
-    catalogHeaders: list.List(*BlockInfo) = .{},
+    tocHeaders: list.List(*BlockInfo) = .{},
 
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
         var a = BlockAttibutes{
@@ -373,7 +373,7 @@ pub const BlockType = union(enum) {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
 
-        // ToDo: for generating catalog
+        // ToDo: for generating toc
         // nextInBase: ?*BlockInfo = null,
 
         // traits:
@@ -386,7 +386,7 @@ pub const BlockType = union(enum) {
             return headerLevel(tmdData[start..end]) orelse unreachable;
         }
 
-        // An empty header is used to insert catalog.
+        // An empty header is used to insert toc.
         pub fn isBare(self: @This()) bool {
             return self.startLine == self.endLine and self.startLine.tokens().?.empty();
         }

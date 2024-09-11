@@ -23,7 +23,7 @@ pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
     list.destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
 
     list.destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
-    list.destroyListElements(*tmd.BlockInfo, tmdDoc.catalogHeaders, null, allocator);
+    list.destroyListElements(*tmd.BlockInfo, tmdDoc.tocHeaders, null, allocator);
 
     tmdDoc.* = .{ .data = "" };
 }
@@ -2119,7 +2119,7 @@ const DocParser = struct {
 
     nextElementAttributes: ?tmd.ElementAttibutes = null,
 
-    pendingCatalogHeaderInfo: ?struct {
+    pendingTocHeaderInfo: ?struct {
         headerBlock: *tmd.BlockInfo,
         //isFirstLevel: bool,
     } = null,
@@ -2198,7 +2198,7 @@ const DocParser = struct {
             if (atomBlockInfo.blockType != .base) handle: {
                 atomBlockInfo.setEndLine(&lastLineInfoElement.value);
 
-                const headerInfo = if (parser.pendingCatalogHeaderInfo) |info| blk: {
+                const headerInfo = if (parser.pendingTocHeaderInfo) |info| blk: {
                     std.debug.assert(info.headerBlock == atomBlockInfo);
                     std.debug.assert(atomBlockInfo.blockType == .header);
                     if (atomBlockInfo.blockType.header.isBare()) break :handle;
@@ -2212,12 +2212,12 @@ const DocParser = struct {
                 //}
 
                 const element = try list.createListElement(*tmd.BlockInfo, parser.allocator);
-                parser.tmdDoc.catalogHeaders.push(element);
+                parser.tmdDoc.tocHeaders.push(element);
                 element.value = atomBlockInfo;
             }
         } else std.debug.assert(atomBlockInfo.blockType == .root);
 
-        parser.pendingCatalogHeaderInfo = null;
+        parser.pendingTocHeaderInfo = null;
     }
 
     fn parseAll(parser: *DocParser, tmdData: []const u8) !void {
@@ -2708,7 +2708,7 @@ const DocParser = struct {
                         if (blockArranger.hasNotActiveBuiltinContainers()) {
                             // Will use the info in setEndLineForAtomBlock.
                             // Note: whether or not headerBlockInfo is empty can't be determined now.
-                            parser.pendingCatalogHeaderInfo = .{
+                            parser.pendingTocHeaderInfo = .{
                                 .headerBlock = headerBlockInfo,
                                 //.isFirstLevel = isFirstLevel,
                             };

@@ -242,7 +242,7 @@ img {
   text-decoration: dotted underline 3px;
 }
 
-.tmd-code .tmd-code-span {
+.tmd-code-span {
   background: #ddd;
   border: solid 1px #666;
   padding: 1px 2px;

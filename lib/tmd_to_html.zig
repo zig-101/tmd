@@ -124,14 +124,14 @@ const TmdRender = struct {
         } else unreachable;
     }
 
-    fn writeCatalog(self: *TmdRender, w: anytype, level: u8) !void {
-        if (self.doc.catalogHeaders.empty()) return;
+    fn writeTableOfContents(self: *TmdRender, w: anytype, level: u8) !void {
+        if (self.doc.tocHeaders.empty()) return;
 
-        _ = try w.write("\n<ul class=\"tmd-list tmd-catalog\">\n");
+        _ = try w.write("\n<ul class=\"tmd-list tmd-toc\">\n");
 
         var levelOpened: [tmd.MaxHeaderLevel + 1]bool = .{false} ** (tmd.MaxHeaderLevel + 1);
         var lastLevel: u8 = tmd.MaxHeaderLevel + 1;
-        var listElement = self.doc.catalogHeaders.head();
+        var listElement = self.doc.tocHeaders.head();
         if (listElement) |element| if (element.value.blockType.header.level(self.doc.data) == 1) {
             listElement = element.next; // skip the title header
         };
@@ -154,10 +154,10 @@ const TmdRender = struct {
             } else if (lastLevel < headerLevel) {
                 // open level
                 levelOpened[headerLevel - 1] = true;
-                _ = try w.write("\n<ul class=\"tmd-list tmd-catalog\">\n");
+                _ = try w.write("\n<ul class=\"tmd-list tmd-toc\">\n");
             }
 
-            _ = try w.write("<li class=\"tmd-list-item tmd-catalog-item\">");
+            _ = try w.write("<li class=\"tmd-list-item tmd-toc-item\">");
 
             const id = if (headerBlock.attributes) |as| as.common.id else "";
 
@@ -533,7 +533,7 @@ const TmdRender = struct {
 
                         const level = header.level(self.doc.data);
                         if (header.isBare()) {
-                            try self.writeCatalog(w, level);
+                            try self.writeTableOfContents(w, level);
                         } else {
                             _ = try w.print("\n<h{}", .{level});
                             try writeBlockAttributes(w, tmdHeaderClass(level), blockInfo.attributes);
