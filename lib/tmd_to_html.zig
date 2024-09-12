@@ -189,7 +189,7 @@ const TmdRender = struct {
     fn writeFootnotes(self: *TmdRender, w: anytype) !void {
         if (self.footnoteNodes.empty()) return;
 
-        _ = try w.write("\n<ol class=\"tmd-list tmd-footnotes\">\n");
+        _ = try w.write("\n<hr>\n<ol class=\"tmd-list tmd-footnotes\">\n");
 
         var listElement = self.footnoteNodes.head();
         while (listElement) |element| {
@@ -198,9 +198,6 @@ const TmdRender = struct {
 
             _ = try w.print("<li id=\"fn:{s}\" class=\"tmd-list-item tmd-footnote-item\">\n", .{footnote.id});
             const missing_flag = if (footnote.block) |block| blk: {
-                if (block.isContainer() and block.blockType != .unstyled) {
-                    break :blk "!";
-                }
                 _ = try self.renderBlock(w, block);
                 break :blk "";
             } else "?";
@@ -241,6 +238,25 @@ const TmdRender = struct {
             }
         }
         return null;
+    }
+
+    fn renderListItems(self: *TmdRender, w: anytype, listBlockInfo: *tmd.BlockInfo) !*BlockInfoElement {
+        std.debug.assert(listBlockInfo.nestingDepth >= 1);
+        const parentNestingDepth_1 = listBlockInfo.nestingDepth - 1;
+        var lastElement = listBlockInfo.ownerListElement();
+        while (true) {
+            const nextElement = try self.renderNextBlocks(w, parentNestingDepth_1, lastElement, 1);
+
+            // if (nextElement == &self.nullBlockInfoElement) return nextElement; // will enter the else branch below
+
+            switch (nextElement.value.blockType) {
+                .bullet => |listItem| {
+                    if (listItem.list != listBlockInfo) return nextElement;
+                    lastElement = nextElement.prev.?;
+                },
+                else => return nextElement,
+            }
+        }
     }
 
     fn renderBlockChildrenForIndentedBlock(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
@@ -397,11 +413,13 @@ const TmdRender = struct {
 
                     // containers
 
-                    .bullet => |listItem| {
-                        if (listItem.isTabItem()) {
-                            const tabInfo = if (listItem.isFirst) blk: {
+                    .list => |itemList| {
+                        if (itemList.isTab) {
+                            // open
+                            {
                                 _ = try w.write("\n<div");
-                                _ = try w.write(" class=\"tmd-tab\">\n");
+                                try writeBlockAttributes(w, "tmd-tab", blockInfo.attributes);
+                                _ = try w.write(">");
 
                                 const orderId = self.nextTabListOrderId;
                                 self.nextTabListOrderId += 1;
@@ -411,13 +429,47 @@ const TmdRender = struct {
                                 self.tabListInfos[@intCast(self.currentTabListDepth)] = TabListInfo{
                                     .orderId = orderId,
                                 };
+                            }
 
-                                break :blk self.tabListInfos[@intCast(self.currentTabListDepth)];
-                            } else blk: {
+                            // items
+                            element = try self.renderListItems(w, blockInfo);
+
+                            // close
+                            {
+                                _ = try w.write("\n</div>\n");
+
                                 std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
-                                self.tabListInfos[@intCast(self.currentTabListDepth)].nextItemOrderId += 1;
-                                break :blk self.tabListInfos[@intCast(self.currentTabListDepth)];
-                            };
+                                self.currentTabListDepth -= 1;
+                            }
+                        } else {
+                            // open
+                            {
+                                switch (itemList.bulletType()) {
+                                    .unordered => _ = try w.write("\n<ul"),
+                                    .ordered => _ = try w.write("\n<ol"),
+                                }
+
+                                try writeBlockAttributes(w, "tmd-list", blockInfo.attributes);
+                                _ = try w.write(">");
+                            }
+
+                            // items
+                            element = try self.renderListItems(w, blockInfo);
+
+                            // close
+                            {
+                                switch (itemList.bulletType()) {
+                                    .unordered => _ = try w.write("\n</ul>\n"),
+                                    .ordered => _ = try w.write("\n</ol>\n"),
+                                }
+                            }
+                        }
+                    },
+                    .bullet => |listItem| {
+                        if (listItem.list.blockType.list.isTab) {
+                            std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
+                            self.tabListInfos[@intCast(self.currentTabListDepth)].nextItemOrderId += 1;
+                            const tabInfo = self.tabListInfos[@intCast(self.currentTabListDepth)];
 
                             _ = try w.print("<input type=\"radio\" class=\"tmd-tab-radio\" name=\"tmd-tab-{d}\" id=\"tmd-tab-{d}-input-{d}\"", .{
                                 tabInfo.orderId, tabInfo.orderId, tabInfo.nextItemOrderId,
@@ -451,32 +503,12 @@ const TmdRender = struct {
                             _ = try w.write(">\n");
                             element = try self.renderNextBlocks(w, element.value.nestingDepth, afterElement2, 0);
                             _ = try w.write("\n</div>\n");
-
-                            if (listItem.isLast) {
-                                _ = try w.write("\n</div>\n");
-
-                                std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
-                                self.currentTabListDepth -= 1;
-                            }
                         } else {
-                            if (listItem.isFirst) {
-                                switch (listItem.bulletType()) {
-                                    .unordered => _ = try w.write("\n<ul"),
-                                    .ordered => _ = try w.write("\n<ol"),
-                                }
-                                _ = try w.write(" class=\"tmd-list\">\n");
-                            }
                             _ = try w.write("\n<li");
                             try writeBlockAttributes(w, "tmd-list-item", blockInfo.attributes);
                             _ = try w.write(">\n");
                             element = try self.renderBlockChildren(w, element, 0);
                             _ = try w.write("\n</li>\n");
-                            if (listItem.isLast) {
-                                switch (listItem.bulletType()) {
-                                    .unordered => _ = try w.write("\n</ul>\n"),
-                                    .ordered => _ = try w.write("\n</ol>\n"),
-                                }
-                            }
                         }
                     },
                     .indented => {
@@ -1272,7 +1304,7 @@ const TmdRender = struct {
 
                     // containers
 
-                    .bullet, .indented, .quotation, .note, .reveal, .unstyled => {
+                    .list, .bullet, .indented, .quotation, .note, .reveal, .unstyled => {
                         element = try self.renderTmdCodeForBlockChildren(w, element);
                     },
 

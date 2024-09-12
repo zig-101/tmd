@@ -171,7 +171,7 @@ pub const BlockInfo = struct {
 
     attributes: ?*BlockAttibutes = null,
 
-    hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual?)
+    hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual? ToDo: not only)
 
     pub fn typeName(self: *@This()) []const u8 {
         return @tagName(self.blockType);
@@ -260,19 +260,21 @@ pub const BlockType = union(enum) {
     // ToDo: add .firstBlock and .lastBlock fileds for container blocks?
 
     bullet: struct {
-        isFirst: bool,
-        isLast: bool,
+        isFirst: bool, // ToDo: can be saved
+        isLast: bool, // ToDo: can be saved (need .list.lastItem)
 
-        isTab: bool = false, // only valid when ifFirst == true
-        firstItem: *BlockInfo = undefined,
+        list: *BlockInfo, // a .list
 
-        // ToDo: only meaningful when .isFirst == true.
-        //       Can be unioned with .firstItem.
-        //       Note: in parsing phase, the union is always .firstItem.
-        //       The parse should maintain tmmp list to record listAttributes.
-        // listAttributes: ?*ElementAttibutes = null,
+        const Container = void;
+    },
 
-        _markTypeIndex: ListMarkTypeIndex,
+    list: struct { // lists are implicitly formed.
+        _markTypeIndex: ListMarkTypeIndex, // ToDo: save it or not?
+
+        isTab: bool, // ToDo: can be saved.
+        index: u32, // for debug purpose
+
+        // Note: the depth of the list is the same as its children
 
         const Container = void;
 
@@ -285,19 +287,12 @@ pub const BlockType = union(enum) {
             if (self._markTypeIndex & 0b100 != 0) return .ordered;
             return .unordered;
         }
-
-        pub fn isTabItem(self: @This()) bool {
-            return if (self.isFirst) self.isTab else self.firstItem.blockType.bullet.isTab;
-        }
-
-        pub fn confirmTabItem(self: *@This()) void {
-            if (self.isFirst) self.isTab = true else self.firstItem.blockType.bullet.isTab = true;
-        }
     },
 
-    indented: struct {
+    indented: struct { // ToDo: merged with bullet as dl.
         const Container = void;
     },
+
     quotation: struct {
         const Container = void;
     },
@@ -372,9 +367,6 @@ pub const BlockType = union(enum) {
     header: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
-
-        // ToDo: for generating toc
-        // nextInBase: ?*BlockInfo = null,
 
         // traits:
         const Atom = void;
