@@ -189,7 +189,7 @@ const TmdRender = struct {
     fn writeFootnotes(self: *TmdRender, w: anytype) !void {
         if (self.footnoteNodes.empty()) return;
 
-        _ = try w.write("\n<hr>\n<ol class=\"tmd-list tmd-footnotes\">\n");
+        _ = try w.write("\n<ol class=\"tmd-list tmd-footnotes\">\n");
 
         var listElement = self.footnoteNodes.head();
         while (listElement) |element| {
@@ -576,15 +576,6 @@ const TmdRender = struct {
                             _ = try w.print("</h{}>\n", .{level});
                         }
                     },
-                    //.footer => {
-                    //    _ = try w.write("\n<footer");
-                    //    try writeBlockAttributes(w, "tmd-footer", blockInfo.attributes);
-                    //    _ = try w.write(">\n");
-                    //    try self.writeUsualContentBlockLines(w, blockInfo, false);
-                    //    _ = try w.write("\n</footer>\n");
-                    //
-                    //    element = element.next orelse &self.nullBlockInfoElement;
-                    //},
                     .usual => |usual| {
                         const usualLine = usual.startLine.lineType.usual;
                         const writeBlank = usualLine.markLen > 0 and usualLine.tokens.empty();
@@ -789,6 +780,7 @@ const TmdRender = struct {
     fn writeUsualContentBlockLines(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo, writeBlank: bool) !void {
         if (writeBlank) _ = try w.write("<p></p>\n");
 
+        const inHeader = blockInfo.blockType == .header;
         var tracker: MarkStatusesTracker = .{};
 
         const endLine = blockInfo.getEndLine();
@@ -925,7 +917,7 @@ const TmdRender = struct {
                                     }
 
                                     const mediaInfoElement = tokenInfoElement.next.?;
-                                    const isInline = blockInfo.hasNonMediaTokens;
+                                    const isInline = inHeader or blockInfo.hasNonMediaTokens;
 
                                     writeMedia: {
                                         const mediaInfoToken = mediaInfoElement.value;

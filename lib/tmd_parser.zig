@@ -839,7 +839,8 @@ const ContentParser = struct {
     fn parse_header_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32) !u32 {
         self.set_currnet_line(lineInfo, lineStart);
 
-        return try self.parse_line_tokens(false);
+        //return try self.parse_line_tokens(false);
+        return try self.parse_line_tokens(true);
     }
 
     fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
@@ -2905,7 +2906,8 @@ const DocParser = struct {
                         const contentEnd = try contentParser.parse_usual_line_tokens(
                             lineInfo,
                             contentStart,
-                            currentAtomBlockInfo.blockType != .header and contentStart == lineScanner.cursor,
+                            //currentAtomBlockInfo.blockType != .header and
+                            contentStart == lineScanner.cursor,
                         );
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
