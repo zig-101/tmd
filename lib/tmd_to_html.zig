@@ -198,7 +198,10 @@ const TmdRender = struct {
 
             _ = try w.print("<li id=\"fn:{s}\" class=\"tmd-list-item tmd-footnote-item\">\n", .{footnote.id});
             const missing_flag = if (footnote.block) |block| blk: {
-                _ = try self.renderBlock(w, block);
+                switch (block.blockType) {
+                    .bullet => _ = try self.renderBlockChildren(w, block.ownerListElement(), 0),
+                    else => _ = try self.renderBlock(w, block),
+                }
                 break :blk "";
             } else "?";
 
