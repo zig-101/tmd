@@ -245,7 +245,7 @@ const BlockArranger = struct {
         if (listBlock) |theListBlock| {
             std.debug.assert(theListBlock.blockType.list._markTypeIndex == markTypeIndex);
 
-            newListItem.isFirst = true;
+            //newListItem.isFirst = true;
             //newListItem.firstItem = listItemBlock;
             newListItem.list = theListBlock;
 
@@ -272,7 +272,8 @@ const BlockArranger = struct {
                     newListItem.list = item.list;
                     break;
                 }
-                item.isLast = true;
+                //item.isLast = true;
+                item.list.blockType.list.lastBullet = item.ownerBlockInfo();
                 baseContext.openingListNestingDepths[item.list.blockType.list._markTypeIndex] = 0;
                 deltaCount += 1;
             }
@@ -329,7 +330,8 @@ const BlockArranger = struct {
                 std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
                 std.debug.assert(self.stackedBlocks[depth].blockType == .bullet);
                 var item = &self.stackedBlocks[depth].blockType.bullet;
-                item.isLast = true;
+                //item.isLast = true;
+                item.list.blockType.list.lastBullet = item.ownerBlockInfo();
                 baseContext.openingListNestingDepths[item.list.blockType.list._markTypeIndex] = 0;
                 deltaCount += 1;
             }
@@ -2201,8 +2203,6 @@ const DocParser = struct {
         const comment = parser.tmdDoc.data[commentToken.start()..commentToken.end()];
         const attrs = parse_element_attributes(comment);
 
-        std.debug.print("=== forBulletContainer: {}\n", .{forBulletContainer});
-
         if (forBulletContainer) {
             std.debug.assert(parser.nextElementAttributes == null);
             const directiveElement = parser.tmdDoc.blocks.tail() orelse unreachable;
@@ -2454,8 +2454,8 @@ const DocParser = struct {
                         const listItemBlockInfo = try parser.createAndPushBlockInfoElement();
                         listItemBlockInfo.blockType = .{
                             .bullet = .{
-                                .isFirst = false, // will be modified eventually
-                                .isLast = false, // will be modified eventually
+                                //.isFirst = false, // will be modified eventually
+                                //.isLast = false, // will be modified eventually
                                 .list = undefined, // will be modified below in stackListItemBlock
                             },
                         };
@@ -2969,13 +2969,13 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                     std.debug.print(" (tab)", .{});
                 }
             },
-            .bullet => |listItem| {
+            .bullet => |*listItem| {
                 std.debug.print(" (list#{})", .{listItem.list.blockType.list.index});
-                if (listItem.isFirst and listItem.isLast) {
+                if (listItem.isFirst() and listItem.isLast()) {
                     std.debug.print(" (first, last)", .{});
-                } else if (listItem.isFirst) {
+                } else if (listItem.isFirst()) {
                     std.debug.print(" (first)", .{});
-                } else if (listItem.isLast) {
+                } else if (listItem.isLast()) {
                     std.debug.print(" (last)", .{});
                 }
             },

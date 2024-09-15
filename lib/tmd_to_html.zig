@@ -468,7 +468,7 @@ const TmdRender = struct {
                             }
                         }
                     },
-                    .bullet => |listItem| {
+                    .bullet => |*listItem| {
                         if (listItem.list.blockType.list.isTab) {
                             std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
                             self.tabListInfos[@intCast(self.currentTabListDepth)].nextItemOrderId += 1;
@@ -477,7 +477,7 @@ const TmdRender = struct {
                             _ = try w.print("<input type=\"radio\" class=\"tmd-tab-radio\" name=\"tmd-tab-{d}\" id=\"tmd-tab-{d}-input-{d}\"", .{
                                 tabInfo.orderId, tabInfo.orderId, tabInfo.nextItemOrderId,
                             });
-                            if (listItem.isFirst) {
+                            if (listItem.isFirst()) {
                                 _ = try w.write(" checked");
                             }
                             _ = try w.write(">\n");

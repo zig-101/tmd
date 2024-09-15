@@ -260,12 +260,25 @@ pub const BlockType = union(enum) {
     // ToDo: add .firstBlock and .lastBlock fileds for container blocks?
 
     bullet: struct {
-        isFirst: bool, // ToDo: can be saved
-        isLast: bool, // ToDo: can be saved (need .list.lastItem)
+        //isFirst: bool, // ToDo: can be saved
+        //isLast: bool, // ToDo: can be saved (need .list.lastItem)
 
         list: *BlockInfo, // a .list
 
         const Container = void;
+
+        pub fn isFirst(self: *@This()) bool {
+            return self.list.ownerListElement().next.? == self.ownerBlockInfo().ownerListElement();
+        }
+
+        pub fn isLast(self: *@This()) bool {
+            return self.list.lastBullet == self.ownerBlockInfo();
+        }
+
+        pub fn ownerBlockInfo(self: *@This()) *BlockInfo {
+            const blockType: *BlockType = @alignCast(@fieldParentPtr("bullet", self));
+            return @alignCast(@fieldParentPtr("blockType", blockType));
+        }
     },
 
     list: struct { // lists are implicitly formed.
@@ -273,6 +286,8 @@ pub const BlockType = union(enum) {
 
         isTab: bool, // ToDo: can be saved.
         index: u32, // for debug purpose
+
+        lastBullet: *BlockInfo = undefined,
 
         // Note: the depth of the list is the same as its children
 
