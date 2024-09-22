@@ -48,7 +48,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     };
     try docParser.parseAll(tmdData);
 
-    if (false and builtin.mode == .Debug) {
+    if (true and builtin.mode == .Debug) {
         dumpTmdDoc(&tmdDoc);
     }
 
@@ -70,7 +70,7 @@ const BlockArranger = struct {
     const BaseContext = struct {
         nestingDepth: tmd.BlockNestingDepthType,
 
-        // !!! here, u6 must be larger than tmd.ListMarkTypeIndex.
+        // !!! here, u6 must be larger than tmd.ListBulletTypeIndex.
         openingListNestingDepths: [tmd.MaxListNestingDepthPerBase]u6 = [_]u6{0} ** tmd.MaxListNestingDepthPerBase,
         openingListCount: tmd.ListNestingDepthType = 0,
     };
@@ -199,18 +199,20 @@ const BlockArranger = struct {
         if (builtin.mode == .Debug) {
             var baseContext = &self.openingBaseBlocks[self.baseCount_1];
             if (baseContext.openingListCount > 0) {
-                //std.debug.print("assertBaseOpeningListCount {}, {} - {} - 1\n", .{baseContext.openingListCount, self.count_1, baseContext.nestingDepth});
+                std.debug.print("assertBaseOpeningListCount {}, {} - {} - 1\n", .{ baseContext.openingListCount, self.count_1, baseContext.nestingDepth });
                 std.debug.assert(self.count_1 == baseContext.nestingDepth + baseContext.openingListCount + 1);
             }
             var count: @TypeOf(baseContext.openingListCount) = 0;
             for (&baseContext.openingListNestingDepths) |d| {
                 if (d != 0) count += 1;
             }
+            std.debug.print("==== {} : {}\n", .{ count, baseContext.openingListCount });
             std.debug.assert(count == baseContext.openingListCount);
         }
     }
 
-    fn isFirstListItemInList(self: *BlockArranger, bulletMarkTypeIndex: tmd.ListMarkTypeIndex) !bool {
+    // Returns whether or not a new list should be created.
+    fn toCreateNewListItem(self: *BlockArranger, markTypeIndex: tmd.ListBulletTypeIndex) !bool {
         const baseContext = &self.openingBaseBlocks[self.baseCount_1];
         std.debug.assert(self.count_1 > baseContext.nestingDepth);
 
@@ -226,14 +228,15 @@ const BlockArranger = struct {
             }
 
             break :blk true;
-        } else baseContext.openingListNestingDepths[bulletMarkTypeIndex] == 0;
+        } else if (baseContext.openingListNestingDepths[markTypeIndex] != 0) blk: {
+            const last = self.stackedBlocks[self.count_1];
+            break :blk last.blockType == .directive;
+        } else true;
     }
 
     // listBlock != null means this is the first item in list.
-    fn stackListItemBlock(self: *BlockArranger, listItemBlock: *tmd.BlockInfo, markTypeIndex: tmd.ListMarkTypeIndex, listBlock: ?*tmd.BlockInfo) !void {
+    fn stackListItemBlock(self: *BlockArranger, listItemBlock: *tmd.BlockInfo, markTypeIndex: tmd.ListBulletTypeIndex, listBlock: ?*tmd.BlockInfo) !void {
         std.debug.assert(listItemBlock.blockType == .bullet);
-
-        std.debug.assert((try self.isFirstListItemInList(markTypeIndex)) == (listBlock != null));
 
         self.assertBaseOpeningListCount();
 
@@ -243,7 +246,31 @@ const BlockArranger = struct {
         const newListItem = &listItemBlock.blockType.bullet;
 
         if (listBlock) |theListBlock| {
-            std.debug.assert(theListBlock.blockType.list._markTypeIndex == markTypeIndex);
+            std.debug.assert(theListBlock.blockType.list._bulletTypeIndex == markTypeIndex);
+
+            if (baseContext.openingListNestingDepths[markTypeIndex] != 0) {
+                // ToDo: now there are 3 alike such code pieces, unify them?
+
+                var deltaCount: @TypeOf(baseContext.openingListCount) = 0;
+                var depth = self.count_1 - 1;
+                while (depth > baseContext.nestingDepth) : (depth -= 1) {
+                    std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
+                    std.debug.assert(self.stackedBlocks[depth].blockType == .bullet);
+                    var item = &self.stackedBlocks[depth].blockType.bullet;
+
+                    //item.isLast = true;
+                    item.list.blockType.list.lastBullet = item.ownerBlockInfo();
+                    baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
+                    deltaCount += 1;
+
+                    if (item.list.blockType.list._bulletTypeIndex == markTypeIndex) {
+                        break;
+                    }
+                }
+
+                baseContext.openingListCount -= deltaCount;
+                self.count_1 = depth;
+            }
 
             //newListItem.isFirst = true;
             //newListItem.firstItem = listItemBlock;
@@ -267,14 +294,14 @@ const BlockArranger = struct {
                 std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
                 std.debug.assert(self.stackedBlocks[depth].blockType == .bullet);
                 var item = &self.stackedBlocks[depth].blockType.bullet;
-                if (item.list.blockType.list._markTypeIndex == markTypeIndex) {
+                if (item.list.blockType.list._bulletTypeIndex == markTypeIndex) {
                     //newListItem.firstItem = item.firstItem;
                     newListItem.list = item.list;
                     break;
                 }
                 //item.isLast = true;
                 item.list.blockType.list.lastBullet = item.ownerBlockInfo();
-                baseContext.openingListNestingDepths[item.list.blockType.list._markTypeIndex] = 0;
+                baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
                 deltaCount += 1;
             }
 
@@ -300,6 +327,8 @@ const BlockArranger = struct {
 
     // ToDo: remove the forClosingBase parameter?
     fn clearListContextInBase(self: *BlockArranger, forClosingBase: bool) void {
+        _ = forClosingBase; // ToDo: the logic will be a bit simpler but might be unnecessary.
+
         const baseContext = &self.openingBaseBlocks[self.baseCount_1];
         std.debug.assert(self.count_1 > baseContext.nestingDepth);
         std.debug.assert(self.stackedBlocks[baseContext.nestingDepth].blockType == .base or self.stackedBlocks[baseContext.nestingDepth].blockType == .root);
@@ -307,7 +336,7 @@ const BlockArranger = struct {
         const last = self.stackedBlocks[self.count_1];
         std.debug.assert(last.blockType == .root or last.nestingDepth == self.count_1);
         std.debug.assert(last.blockType != .bullet);
-        defer { // ToDo: forget why defer it here?
+        defer {
             self.count_1 = baseContext.nestingDepth + 1;
             if (last.blockType == .blank) {
                 // Ensure the nestingDepth of the blank block.
@@ -321,8 +350,6 @@ const BlockArranger = struct {
 
         self.assertBaseOpeningListCount();
 
-        _ = forClosingBase; // ToDo: the logic will be a bit simpler but might be unnecessary.
-
         {
             var deltaCount: @TypeOf(baseContext.openingListCount) = 0;
             var depth = self.count_1 - 1;
@@ -332,7 +359,7 @@ const BlockArranger = struct {
                 var item = &self.stackedBlocks[depth].blockType.bullet;
                 //item.isLast = true;
                 item.list.blockType.list.lastBullet = item.ownerBlockInfo();
-                baseContext.openingListNestingDepths[item.list.blockType.list._markTypeIndex] = 0;
+                baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
                 deltaCount += 1;
             }
 
@@ -386,9 +413,11 @@ const BlockArranger = struct {
             std.debug.assert(last.isContainer());
             std.debug.assert(last.nestingDepth == self.count_1);
             switch (last.blockType) {
-                .bullet => |*listItem| {
+                .bullet => |listItem| {
                     // listItem.confirmTabItem();
-                    listItem.list.blockType.list.isTab = true;
+                    //listItem.list.blockType.list.isTab = true;
+                    if (listItem.list.blockType.list.listType == .bullets)
+                        listItem.list.blockType.list.listType = .tabs;
                 },
                 else => {},
             }
@@ -399,9 +428,11 @@ const BlockArranger = struct {
             if (last.blockType == .directive) {
                 const container = self.stackedBlocks[self.count_1 - 1];
                 switch (container.blockType) {
-                    .bullet => |*listItem| {
+                    .bullet => |listItem| {
                         // listItem.confirmTabItem();
-                        listItem.list.blockType.list.isTab = true;
+                        //listItem.list.blockType.list.isTab = true;
+                        if (listItem.list.blockType.list.listType == .bullets)
+                            listItem.list.blockType.list.listType = .tabs;
                     },
                     else => {},
                 }
@@ -2405,7 +2436,7 @@ const DocParser = struct {
 
                 // try to parse leading container mark.
                 switch (lineScanner.peekCursor()) {
-                    '*', '+', '-', '~' => |mark| handle: {
+                    '*', '+', '-', '~', ':', '=' => |mark| handle: {
                         const lastMark = if (lineScanner.peekNext() == '.') blk: {
                             lineScanner.advance(1);
                             break :blk '.';
@@ -2436,14 +2467,17 @@ const DocParser = struct {
                             .markEndWithSpaces = markEndWithSpaces,
                         } };
 
-                        const markTypeIndex = tmd.listBulletIndex(tmdData[leadingBlankEnd..markEnd]);
-                        const isFirstItemInList = try blockArranger.isFirstListItemInList(markTypeIndex);
-                        const listBlockInfo: ?*tmd.BlockInfo = if (isFirstItemInList) blk: {
+                        std.debug.assert(markEnd - leadingBlankEnd == 1 or markEnd - leadingBlankEnd == 2);
+                        const markStr = tmdData[leadingBlankEnd..markEnd];
+                        const markTypeIndex = tmd.listBulletTypeIndex(markStr);
+                        const createNewList = try blockArranger.toCreateNewListItem(markTypeIndex);
+                        const listBlockInfo: ?*tmd.BlockInfo = if (createNewList) blk: {
                             const listBlockInfo = try parser.createAndPushBlockInfoElement();
                             listBlockInfo.blockType = .{
                                 .list = .{
-                                    ._markTypeIndex = markTypeIndex,
-                                    .isTab = false, // might be changed later
+                                    ._bulletTypeIndex = markTypeIndex,
+                                    .listType = tmd.listType(markStr), // if .bullets, might be adjusted to .tabs later
+                                    .secondMode = markStr.len == 2,
                                     .index = listCount,
                                 },
                             };
@@ -2462,7 +2496,7 @@ const DocParser = struct {
 
                         try blockArranger.stackListItemBlock(listItemBlockInfo, markTypeIndex, listBlockInfo);
                     },
-                    ':', '>', '!', '?', '.' => |mark| handle: {
+                    '>', '!', '?', '.' => |mark| handle: {
                         lineScanner.advance(1);
                         const markEnd = lineScanner.cursor;
                         const numSpaces = lineScanner.readUntilNotBlank();
@@ -2483,15 +2517,6 @@ const DocParser = struct {
 
                         const containerBlockInfo = try parser.createAndPushBlockInfoElement();
                         switch (mark) {
-                            ':' => {
-                                lineInfo.containerMark = .{ .indented = .{
-                                    .markEnd = markEnd,
-                                    .markEndWithSpaces = markEndWithSpaces,
-                                } };
-                                containerBlockInfo.blockType = .{
-                                    .indented = .{},
-                                };
-                            },
                             '>' => {
                                 lineInfo.containerMark = .{ .quotation = .{
                                     .markEnd = markEnd,
@@ -2832,17 +2857,18 @@ const DocParser = struct {
                             break :handle;
                         }
 
-                        const forBulletContainer = while (lineInfo.containerMark) |m| {
-                            if (m == .bullet and lineScanner.peekCursor() == '<') {
-                                lineScanner.advance(1);
-                                break true;
-                            } else break false;
-                        } else false;
-
+                        var forBulletContainer = false;
                         var playloadStart = lineScanner.cursor;
                         if (lineScanner.lineEnd) |_| {
                             lineInfo.rangeTrimmed.end = playloadStart;
                         } else {
+                            if (lineInfo.containerMark) |m| {
+                                if (m == .bullet and lineScanner.peekCursor() == '<') {
+                                    lineScanner.advance(1);
+                                    forBulletContainer = true;
+                                }
+                            }
+
                             _ = lineScanner.readUntilNotBlank();
                             if (lineScanner.lineEnd) |_| {
                                 lineInfo.rangeTrimmed.end = playloadStart;
@@ -2964,13 +2990,10 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
         std.debug.print("+{}: {s}", .{ blockInfo.nestingDepth, blockInfo.typeName() });
         switch (blockInfo.blockType) {
             .list => |itemList| {
-                std.debug.print(" (index: {})", .{itemList.index});
-                if (itemList.isTab) {
-                    std.debug.print(" (tab)", .{});
-                }
+                std.debug.print(" (index: {}, type: {s}), second mode: {}", .{ itemList.index, itemList.typeName(), itemList.secondMode });
             },
             .bullet => |*listItem| {
-                std.debug.print(" (list#{})", .{listItem.list.blockType.list.index});
+                std.debug.print(" (@list#{})", .{listItem.list.blockType.list.index});
                 if (listItem.isFirst() and listItem.isLast()) {
                     std.debug.print(" (first, last)", .{});
                 } else if (listItem.isFirst()) {

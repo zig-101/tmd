@@ -68,20 +68,20 @@ pub fn headerLevel(headeMark: []const u8) ?u8 {
 pub const MaxSpanMarkLength = 8; // not inclusive. And not include ^.
 
 // Note: the two should be consistent.
-pub const MaxListNestingDepthPerBase = 8;
-pub const ListMarkTypeIndex = u3;
+pub const MaxListNestingDepthPerBase = 11;
+pub const ListBulletTypeIndex = u4;
 pub const ListNestingDepthType = u8; // in fact, u4 is enough now
 
-pub fn listBulletIndex(bulletMark: []const u8) ListMarkTypeIndex {
-    if (bulletMark.len > 2) unreachable;
-
+pub fn listBulletTypeIndex(bulletMark: []const u8) ListBulletTypeIndex {
     switch (bulletMark.len) {
         1, 2 => {
-            var index: ListMarkTypeIndex = switch (bulletMark[0]) {
+            var index: ListBulletTypeIndex = switch (bulletMark[0]) {
                 '+' => 0,
                 '-' => 1,
                 '*' => 2,
                 '~' => 3,
+                ':' => 4,
+                '=' => 5,
                 else => unreachable,
             };
 
@@ -90,9 +90,21 @@ pub fn listBulletIndex(bulletMark: []const u8) ListMarkTypeIndex {
             }
 
             if (bulletMark[1] != '.') unreachable;
-            index += 4;
+            index += 6;
 
             return index;
+        },
+        else => unreachable,
+    }
+}
+
+// When this function is called, .tabs is still unable to be determined.
+pub fn listType(bulletMark: []const u8) ListType {
+    switch (bulletMark.len) {
+        1, 2 => return switch (bulletMark[0]) {
+            '+', '-', '*', '~' => .bullets,
+            ':' => .definitions,
+            else => unreachable,
         },
         else => unreachable,
     }
@@ -254,6 +266,12 @@ pub const BlockInfo = struct {
     }
 };
 
+pub const ListType = enum {
+    bullets,
+    tabs,
+    definitions,
+};
+
 pub const BlockType = union(enum) {
     // container block types
 
@@ -264,6 +282,7 @@ pub const BlockType = union(enum) {
         //isLast: bool, // ToDo: can be saved (need .list.lastItem)
 
         list: *BlockInfo, // a .list
+        // nextSibling: ?*BlockInfo, // for .list.lastBullet, it is .list's sibling.
 
         const Container = void;
 
@@ -272,7 +291,7 @@ pub const BlockType = union(enum) {
         }
 
         pub fn isLast(self: *@This()) bool {
-            return self.list.lastBullet == self.ownerBlockInfo();
+            return self.list.blockType.list.lastBullet == self.ownerBlockInfo();
         }
 
         pub fn ownerBlockInfo(self: *@This()) *BlockInfo {
@@ -282,43 +301,44 @@ pub const BlockType = union(enum) {
     },
 
     list: struct { // lists are implicitly formed.
-        _markTypeIndex: ListMarkTypeIndex, // ToDo: save it or not?
+        _bulletTypeIndex: ListBulletTypeIndex, // ToDo: can be saved, just need a little more computitation.
 
-        isTab: bool, // ToDo: can be saved.
+        listType: ListType,
+        secondMode: bool, // for .bullets: unordered/ordered, for .definitions, one-line or not
         index: u32, // for debug purpose
 
         lastBullet: *BlockInfo = undefined,
+        // nextSibling: ?*BlockInfo, // .lastBulletnextSibling
 
         // Note: the depth of the list is the same as its children
 
         const Container = void;
 
-        const BulletType = enum {
-            unordered,
-            ordered,
-        };
-
-        pub fn bulletType(self: @This()) BulletType {
-            if (self._markTypeIndex & 0b100 != 0) return .ordered;
-            return .unordered;
+        pub fn typeName(self: @This()) []const u8 {
+            return @tagName(self.listType);
         }
-    },
 
-    indented: struct { // ToDo: merged with bullet as dl.
-        const Container = void;
+        //pub fn bulletType(self: @This()) BulletType {
+        //    if (self._bulletTypeIndex & 0b100 != 0) return .ordered;
+        //    return .unordered;
+        //}
     },
 
     quotation: struct {
         const Container = void;
+        // nextSibling: ?*BlockInfo,
     },
     note: struct {
         const Container = void;
+        // nextSibling: ?*BlockInfo,
     },
     reveal: struct {
         const Container = void;
+        // nextSibling: ?*BlockInfo,
     },
     unstyled: struct {
         const Container = void;
+        // nextSibling: ?*BlockInfo,
     },
 
     // base context block
@@ -328,8 +348,9 @@ pub const BlockType = union(enum) {
     },
 
     base: struct {
-        openLine: *LineInfo, // header list is stored in .openLine.
+        openLine: *LineInfo,
         closeLine: ?*LineInfo = null,
+        // nextSibling: ?*BlockInfo, // ToDo: openLine.baseNextSibling
 
         pub fn openPlayloadRange(self: @This()) ?Range {
             const openLine = self.openLine;
@@ -567,10 +588,6 @@ pub const ContainerLeadingMark = union(enum) {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
-    indented: struct {
-        markEnd: u32,
-        markEndWithSpaces: u32,
-    },
     quotation: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
@@ -615,13 +632,7 @@ pub const LineType = union(enum) {
         markLen: u32,
         markEndWithSpaces: u32,
 
-        // ToDo: doc should maintain a base list.
-        //       Here should use a pointer pointing element in that list.
-        //       The header list should be put in that element.
-        //       That element should store more info, like commentedOut etc.
-        //       Similar for codeSnippet ...
-        // ToDo: now only for .root block.
-        //headers: ?*list.List(*BlockInfo) = .{}, // for .base BlockInfo
+        // baseNextSibling: ?*BlockInfo,
     },
     baseBlockClose: struct {
         markLen: u32,

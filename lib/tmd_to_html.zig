@@ -262,26 +262,6 @@ const TmdRender = struct {
         }
     }
 
-    fn renderBlockChildrenForIndentedBlock(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
-        const afterElement = if (self.getFollowingLevel1HeaderBlockElement(parentElement)) |headerElement| blk: {
-            const blockInfo = &headerElement.value;
-
-            _ = try w.write("<div");
-            try writeBlockAttributes(w, "tmd-indented-header", blockInfo.attributes);
-            _ = try w.write(">");
-            try self.writeUsualContentBlockLines(w, blockInfo, false);
-            _ = try w.write("</div>");
-
-            break :blk headerElement;
-        } else parentElement;
-
-        _ = try w.write("\n<div class=\"tmd-indented-content\">\n");
-
-        const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
-        _ = try w.write("\n</div>\n");
-        return element;
-    }
-
     fn renderBlockChildrenForLargeQuotationBlock(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
         const afterElement = if (self.getFollowingLevel1HeaderBlockElement(parentElement)) |headerElement| blk: {
             const blockInfo = &headerElement.value;
@@ -417,109 +397,146 @@ const TmdRender = struct {
                     // containers
 
                     .list => |itemList| {
-                        if (itemList.isTab) {
-                            // open
-                            {
-                                _ = try w.write("\n<div");
-                                try writeBlockAttributes(w, "tmd-tab", blockInfo.attributes);
-                                _ = try w.write(">");
+                        switch (itemList.listType) {
+                            .bullets => {
+                                // open
+                                {
+                                    _ = try w.write(if (itemList.secondMode) "\n<ol" else "\n<ul");
 
-                                const orderId = self.nextTabListOrderId;
-                                self.nextTabListOrderId += 1;
-
-                                std.debug.assert(self.currentTabListDepth >= -1 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
-                                self.currentTabListDepth += 1;
-                                self.tabListInfos[@intCast(self.currentTabListDepth)] = TabListInfo{
-                                    .orderId = orderId,
-                                };
-                            }
-
-                            // items
-                            element = try self.renderListItems(w, blockInfo);
-
-                            // close
-                            {
-                                _ = try w.write("\n</div>\n");
-
-                                std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
-                                self.currentTabListDepth -= 1;
-                            }
-                        } else {
-                            // open
-                            {
-                                switch (itemList.bulletType()) {
-                                    .unordered => _ = try w.write("\n<ul"),
-                                    .ordered => _ = try w.write("\n<ol"),
+                                    try writeBlockAttributes(w, "tmd-list", blockInfo.attributes);
+                                    _ = try w.write(">");
                                 }
 
-                                try writeBlockAttributes(w, "tmd-list", blockInfo.attributes);
-                                _ = try w.write(">");
-                            }
+                                // items
+                                element = try self.renderListItems(w, blockInfo);
 
-                            // items
-                            element = try self.renderListItems(w, blockInfo);
-
-                            // close
-                            {
-                                switch (itemList.bulletType()) {
-                                    .unordered => _ = try w.write("\n</ul>\n"),
-                                    .ordered => _ = try w.write("\n</ol>\n"),
+                                // close
+                                {
+                                    _ = try w.write(if (itemList.secondMode) "\n</ol>\n" else "\n</ul>\n");
                                 }
-                            }
+                            },
+                            .tabs => {
+                                // Todo: if secondMode, prefixed a number in tab?
+
+                                // open
+                                {
+                                    _ = try w.write("\n<div");
+                                    try writeBlockAttributes(w, "tmd-tab", blockInfo.attributes);
+                                    _ = try w.write(">");
+
+                                    const orderId = self.nextTabListOrderId;
+                                    self.nextTabListOrderId += 1;
+
+                                    std.debug.assert(self.currentTabListDepth >= -1 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
+                                    self.currentTabListDepth += 1;
+                                    self.tabListInfos[@intCast(self.currentTabListDepth)] = TabListInfo{
+                                        .orderId = orderId,
+                                    };
+                                }
+
+                                // items
+                                element = try self.renderListItems(w, blockInfo);
+
+                                // close
+                                {
+                                    _ = try w.write("\n</div>\n");
+
+                                    std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
+                                    self.currentTabListDepth -= 1;
+                                }
+                            },
+                            .definitions => {
+                                // open
+                                {
+                                    _ = try w.write("\n<dl");
+                                    const defsClass = if (itemList.secondMode) "tmd-list tmd-defs-oneline" else "tmd-list tmd-defs";
+                                    try writeBlockAttributes(w, defsClass, blockInfo.attributes);
+                                    _ = try w.write(">");
+                                }
+
+                                // items
+                                element = try self.renderListItems(w, blockInfo);
+
+                                // close
+                                {
+                                    _ = try w.write("\n</dl>\n");
+                                }
+                            },
                         }
                     },
                     .bullet => |*listItem| {
-                        if (listItem.list.blockType.list.isTab) {
-                            std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
-                            self.tabListInfos[@intCast(self.currentTabListDepth)].nextItemOrderId += 1;
-                            const tabInfo = self.tabListInfos[@intCast(self.currentTabListDepth)];
-
-                            _ = try w.print("<input type=\"radio\" class=\"tmd-tab-radio\" name=\"tmd-tab-{d}\" id=\"tmd-tab-{d}-input-{d}\"", .{
-                                tabInfo.orderId, tabInfo.orderId, tabInfo.nextItemOrderId,
-                            });
-                            if (listItem.isFirst()) {
-                                _ = try w.write(" checked");
-                            }
-                            _ = try w.write(">\n");
-                            _ = try w.print("<label for=\"tmd-tab-{d}-input-{d}\" class=\"tmd-tab-label\"", .{
-                                tabInfo.orderId, tabInfo.nextItemOrderId,
-                            });
-
-                            const afterElement2 = if (self.getFollowingLevel1HeaderBlockElement(element)) |headerElement| blk: {
-                                const headerBlockInfo = &headerElement.value;
-
-                                try writeBlockAttributes(w, "tmd-tab-header", headerBlockInfo.attributes);
-                                _ = try w.write(">");
-
-                                try self.writeUsualContentBlockLines(w, headerBlockInfo, false);
-
-                                break :blk headerElement;
-                            } else blk: {
+                        switch (listItem.list.blockType.list.listType) {
+                            .bullets => {
+                                _ = try w.write("\n<li");
+                                try writeBlockAttributes(w, "tmd-list-item", blockInfo.attributes);
                                 _ = try w.write(">\n");
-                                break :blk element;
-                            };
+                                element = try self.renderBlockChildren(w, element, 0);
+                                _ = try w.write("\n</li>\n");
+                            },
+                            .tabs => {
+                                std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
+                                //self.tabListInfos[@intCast(self.currentTabListDepth)].nextItemOrderId += 1;
+                                const tabInfo = &self.tabListInfos[@intCast(self.currentTabListDepth)];
+                                tabInfo.nextItemOrderId += 1;
 
-                            _ = try w.write("</label>\n");
+                                _ = try w.print("<input type=\"radio\" class=\"tmd-tab-radio\" name=\"tmd-tab-{d}\" id=\"tmd-tab-{d}-input-{d}\"", .{
+                                    tabInfo.orderId, tabInfo.orderId, tabInfo.nextItemOrderId,
+                                });
+                                if (listItem.isFirst()) {
+                                    _ = try w.write(" checked");
+                                }
+                                _ = try w.write(">\n");
+                                _ = try w.print("<label for=\"tmd-tab-{d}-input-{d}\" class=\"tmd-tab-label\"", .{
+                                    tabInfo.orderId, tabInfo.nextItemOrderId,
+                                });
 
-                            _ = try w.write("\n<div");
-                            try writeBlockAttributes(w, "tmd-tab-content", blockInfo.attributes);
-                            _ = try w.write(">\n");
-                            element = try self.renderNextBlocks(w, element.value.nestingDepth, afterElement2, 0);
-                            _ = try w.write("\n</div>\n");
-                        } else {
-                            _ = try w.write("\n<li");
-                            try writeBlockAttributes(w, "tmd-list-item", blockInfo.attributes);
-                            _ = try w.write(">\n");
-                            element = try self.renderBlockChildren(w, element, 0);
-                            _ = try w.write("\n</li>\n");
+                                const afterElement2 = if (self.getFollowingLevel1HeaderBlockElement(element)) |headerElement| blk: {
+                                    const headerBlockInfo = &headerElement.value;
+
+                                    try writeBlockAttributes(w, "tmd-tab-header", headerBlockInfo.attributes);
+                                    _ = try w.write(">");
+
+                                    if (listItem.list.blockType.list.secondMode)
+                                        _ = try w.print("{d}. ", .{tabInfo.nextItemOrderId});
+
+                                    try self.writeUsualContentBlockLines(w, headerBlockInfo, false);
+
+                                    break :blk headerElement;
+                                } else blk: {
+                                    _ = try w.write(">\n");
+
+                                    if (listItem.list.blockType.list.secondMode)
+                                        _ = try w.print("{d}. ", .{tabInfo.nextItemOrderId});
+
+                                    break :blk element;
+                                };
+
+                                _ = try w.write("</label>\n");
+
+                                _ = try w.write("\n<div");
+                                try writeBlockAttributes(w, "tmd-tab-content", blockInfo.attributes);
+                                _ = try w.write(">\n");
+                                element = try self.renderNextBlocks(w, element.value.nestingDepth, afterElement2, 0);
+                                _ = try w.write("\n</div>\n");
+                            },
+                            .definitions => {
+                                const lastElement = if (self.getFollowingLevel1HeaderBlockElement(element)) |headerElement| blk: {
+                                    const headerBlockInfo = &headerElement.value;
+
+                                    _ = try w.write("<dt");
+                                    try writeBlockAttributes(w, "", headerBlockInfo.attributes);
+                                    _ = try w.write(">");
+                                    try self.writeUsualContentBlockLines(w, headerBlockInfo, false);
+                                    _ = try w.write("</dt>");
+
+                                    break :blk headerElement;
+                                } else element;
+
+                                _ = try w.write("\n<dd >\n");
+                                element = try self.renderNextBlocks(w, element.value.nestingDepth, lastElement, 0);
+                                _ = try w.write("\n</dd>\n");
+                            },
                         }
-                    },
-                    .indented => {
-                        _ = try w.write("\n<div");
-                        try writeBlockAttributes(w, "tmd-indented", blockInfo.attributes);
-                        _ = try w.write(">\n");
-                        element = try self.renderBlockChildrenForIndentedBlock(w, element, 0);
-                        _ = try w.write("\n</div>\n");
                     },
                     .quotation => {
                         _ = try w.write("\n<div");
@@ -1299,7 +1316,7 @@ const TmdRender = struct {
 
                     // containers
 
-                    .list, .bullet, .indented, .quotation, .note, .reveal, .unstyled => {
+                    .list, .bullet, .quotation, .note, .reveal, .unstyled => {
                         element = try self.renderTmdCodeForBlockChildren(w, element);
                     },
 
