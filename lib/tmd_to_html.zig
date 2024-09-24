@@ -451,7 +451,7 @@ const TmdRender = struct {
                                     _ = try w.write("\n<dl");
                                     const defsClass = if (itemList.secondMode) "tmd-list tmd-defs-oneline" else "tmd-list tmd-defs";
                                     try writeBlockAttributes(w, defsClass, blockInfo.attributes);
-                                    _ = try w.write(">");
+                                    _ = try w.write(">\n");
                                 }
 
                                 // items
@@ -532,7 +532,7 @@ const TmdRender = struct {
                                     break :blk headerElement;
                                 } else element;
 
-                                _ = try w.write("\n<dd >\n");
+                                _ = try w.write("\n<dd>\n");
                                 element = try self.renderNextBlocks(w, element.value.nestingDepth, lastElement, 0);
                                 _ = try w.write("\n</dd>\n");
                             },
@@ -1230,6 +1230,8 @@ const TmdRender = struct {
     }
 
     fn writeClasses(w: anytype, classesSeperatedBySpace: []const u8, classesSeperatedBySemicolon: []const u8) !void {
+        if (classesSeperatedBySpace.len == 0 and classesSeperatedBySemicolon.len == 0) return;
+
         _ = try w.write(" class=\"");
         var needSpace = classesSeperatedBySpace.len > 0;
         if (needSpace) _ = try w.write(classesSeperatedBySpace);

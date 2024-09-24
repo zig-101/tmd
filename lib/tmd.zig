@@ -177,6 +177,7 @@ pub const MaxBlockNestingDepth = 64; // should be 2^N
 pub const BlockNestingDepthType = u6; // must be capable of storing MaxBlockNestingDepth-1
 
 pub const BlockInfo = struct {
+    index: u32 = undefined, // one basedd (for debug purpose only)
     nestingDepth: u32 = 0,
 
     blockType: BlockType,
@@ -191,19 +192,19 @@ pub const BlockInfo = struct {
 
     // for atom blocks
 
-    pub fn isContainer(self: @This()) bool {
+    pub fn isContainer(self: *const @This()) bool {
         return switch (self.blockType) {
             inline else => |bt| @hasDecl(@TypeOf(bt), "Container"),
         };
     }
 
-    pub fn isAtom(self: @This()) bool {
+    pub fn isAtom(self: *const @This()) bool {
         return switch (self.blockType) {
             inline else => |bt| @hasDecl(@TypeOf(bt), "Atom"),
         };
     }
 
-    pub fn getStartLine(self: @This()) *LineInfo {
+    pub fn getStartLine(self: *const @This()) *LineInfo {
         return switch (self.blockType) {
             inline else => |bt| {
                 if (@hasDecl(@TypeOf(bt), "Atom")) {
@@ -226,7 +227,7 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn getEndLine(self: @This()) *LineInfo {
+    pub fn getEndLine(self: *const @This()) *LineInfo {
         return switch (self.blockType) {
             inline else => |bt| {
                 if (@hasDecl(@TypeOf(bt), "Atom")) {
@@ -261,8 +262,60 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn ownerListElement(self: *@This()) *list.Element(@This()) {
-        return @alignCast(@fieldParentPtr("value", self));
+    pub fn ownerListElement(self: *const @This()) *list.Element(@This()) {
+        return @alignCast(@fieldParentPtr("value", @constCast(self)));
+    }
+
+    pub fn getNextSibling(self: *const @This()) ?*BlockInfo {
+        return switch (self.blockType) {
+            .root => null,
+            .base => |base| blk: {
+                const next = base.openLine.lineType.baseBlockOpen.baseNextSibling orelse break :blk null;
+                // The assurence is necessary.
+                break :blk if (next.nestingDepth == self.nestingDepth) next else null;
+            },
+            .list => |itemList| blk: {
+                std.debug.assert(itemList._lastBulletConfirmed);
+                break :blk itemList.lastBullet.blockType.bullet.nextSibling;
+            },
+            .bullet => |*bullet| if (bullet.ownerBlockInfo() == bullet.list.blockType.list.lastBullet) null else bullet.nextSibling,
+            inline .quotation, .note, .reveal, .unstyled => |container| blk: {
+                const next = container.nextSibling orelse break :blk null;
+                // ToDo: the assurence might be unnecessary.
+                break :blk if (next.nestingDepth == self.nestingDepth) next else null;
+            },
+            inline else => blk: {
+                std.debug.assert(self.isAtom());
+                if (self.blockType.ownerBlockInfo().ownerListElement().next) |next| {
+                    const nextBlock = &next.value;
+                    std.debug.assert(nextBlock.nestingDepth <= self.nestingDepth);
+                    if (nextBlock.nestingDepth == self.nestingDepth)
+                        break :blk nextBlock;
+                }
+                break :blk null;
+            },
+        };
+    }
+
+    pub fn setNextSibling(self: *@This(), sibling: *BlockInfo) void {
+        return switch (self.blockType) {
+            .root => unreachable,
+            .base => |base| {
+                base.openLine.lineType.baseBlockOpen.baseNextSibling = sibling;
+            },
+            .list => |itemList| {
+                std.debug.assert(itemList._lastBulletConfirmed);
+                itemList.lastBullet.blockType.bullet.nextSibling = sibling;
+                unreachable;
+            },
+            inline .bullet, .quotation, .note, .reveal, .unstyled => |*container| {
+                container.nextSibling = sibling;
+            },
+            else => {
+                std.debug.assert(self.isAtom());
+                // do nothing
+            },
+        };
     }
 };
 
@@ -282,7 +335,7 @@ pub const BlockType = union(enum) {
         //isLast: bool, // ToDo: can be saved (need .list.lastItem)
 
         list: *BlockInfo, // a .list
-        // nextSibling: ?*BlockInfo, // for .list.lastBullet, it is .list's sibling.
+        nextSibling: ?*BlockInfo = null, // for .list.lastBullet, it is .list's sibling.
 
         const Container = void;
 
@@ -294,13 +347,14 @@ pub const BlockType = union(enum) {
             return self.list.blockType.list.lastBullet == self.ownerBlockInfo();
         }
 
-        pub fn ownerBlockInfo(self: *@This()) *BlockInfo {
-            const blockType: *BlockType = @alignCast(@fieldParentPtr("bullet", self));
-            return @alignCast(@fieldParentPtr("blockType", blockType));
+        pub fn ownerBlockInfo(self: *const @This()) *BlockInfo {
+            const blockType: *BlockType = @alignCast(@fieldParentPtr("bullet", @constCast(self)));
+            return blockType.ownerBlockInfo();
         }
     },
 
     list: struct { // lists are implicitly formed.
+        _lastBulletConfirmed: bool = false, // for debug
         _bulletTypeIndex: ListBulletTypeIndex, // ToDo: can be saved, just need a little more computitation.
 
         listType: ListType,
@@ -308,7 +362,7 @@ pub const BlockType = union(enum) {
         index: u32, // for debug purpose
 
         lastBullet: *BlockInfo = undefined,
-        // nextSibling: ?*BlockInfo, // .lastBulletnextSibling
+        // nextSibling: ?*BlockInfo, // .lastBullet.nextSibling
 
         // Note: the depth of the list is the same as its children
 
@@ -326,19 +380,19 @@ pub const BlockType = union(enum) {
 
     quotation: struct {
         const Container = void;
-        // nextSibling: ?*BlockInfo,
+        nextSibling: ?*BlockInfo = null,
     },
     note: struct {
         const Container = void;
-        // nextSibling: ?*BlockInfo,
+        nextSibling: ?*BlockInfo = null,
     },
     reveal: struct {
         const Container = void;
-        // nextSibling: ?*BlockInfo,
+        nextSibling: ?*BlockInfo = null,
     },
     unstyled: struct {
         const Container = void;
-        // nextSibling: ?*BlockInfo,
+        nextSibling: ?*BlockInfo = null,
     },
 
     // base context block
@@ -444,6 +498,10 @@ pub const BlockType = union(enum) {
     code: AtomBlockWithBoundary,
 
     custom: AtomBlockWithBoundary,
+
+    pub fn ownerBlockInfo(self: *const @This()) *BlockInfo {
+        return @alignCast(@fieldParentPtr("blockType", @constCast(self)));
+    }
 };
 
 pub const AtomBlockWithBoundary = struct {
@@ -543,8 +601,8 @@ pub const LineInfo = struct {
         };
     }
 
-    pub fn ownerListElement(self: *@This()) *list.Element(@This()) {
-        return @alignCast(@fieldParentPtr("value", self));
+    pub fn ownerListElement(self: *const @This()) *list.Element(@This()) {
+        return @alignCast(@fieldParentPtr("value", @constCast(self)));
     }
 
     pub fn start(self: *const @This(), trimContainerMark: bool, trimLeadingSpaces: bool) u32 {
@@ -632,7 +690,7 @@ pub const LineType = union(enum) {
         markLen: u32,
         markEndWithSpaces: u32,
 
-        // baseNextSibling: ?*BlockInfo,
+        baseNextSibling: ?*BlockInfo = null,
     },
     baseBlockClose: struct {
         markLen: u32,

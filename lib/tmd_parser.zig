@@ -177,9 +177,14 @@ const BlockArranger = struct {
             return error.NestingDepthTooLarge;
         }
 
-        self.clearListContextInBase(false);
+        self.clearListContextInBase(false); // here, if the last is a blank, its nestingDepth will be adjusted.
 
         self.count_1 = baseContext.nestingDepth + 1;
+
+        const last = self.stackedBlocks[self.count_1];
+        std.debug.assert(last.blockType == .root or last.nestingDepth == self.count_1);
+        if (last.blockType != .root) last.setNextSibling(blockInfo);
+
         blockInfo.nestingDepth = self.count_1;
         self.stackedBlocks[self.count_1] = blockInfo;
     }
@@ -199,14 +204,14 @@ const BlockArranger = struct {
         if (builtin.mode == .Debug) {
             var baseContext = &self.openingBaseBlocks[self.baseCount_1];
             if (baseContext.openingListCount > 0) {
-                std.debug.print("assertBaseOpeningListCount {}, {} - {} - 1\n", .{ baseContext.openingListCount, self.count_1, baseContext.nestingDepth });
+                //std.debug.print("assertBaseOpeningListCount {}, {} - {} - 1\n", .{ baseContext.openingListCount, self.count_1, baseContext.nestingDepth });
                 std.debug.assert(self.count_1 == baseContext.nestingDepth + baseContext.openingListCount + 1);
             }
             var count: @TypeOf(baseContext.openingListCount) = 0;
             for (&baseContext.openingListNestingDepths) |d| {
                 if (d != 0) count += 1;
             }
-            std.debug.print("==== {} : {}\n", .{ count, baseContext.openingListCount });
+            //std.debug.print("==== {} : {}\n", .{ count, baseContext.openingListCount });
             std.debug.assert(count == baseContext.openingListCount);
         }
     }
@@ -260,6 +265,7 @@ const BlockArranger = struct {
 
                     //item.isLast = true;
                     item.list.blockType.list.lastBullet = item.ownerBlockInfo();
+                    item.list.blockType.list._lastBulletConfirmed = true;
                     baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
                     deltaCount += 1;
 
@@ -293,14 +299,17 @@ const BlockArranger = struct {
             while (depth > baseContext.nestingDepth) : (depth -= 1) {
                 std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
                 std.debug.assert(self.stackedBlocks[depth].blockType == .bullet);
-                var item = &self.stackedBlocks[depth].blockType.bullet;
+                var itemBlock = self.stackedBlocks[depth];
+                var item = &itemBlock.blockType.bullet;
                 if (item.list.blockType.list._bulletTypeIndex == markTypeIndex) {
                     //newListItem.firstItem = item.firstItem;
+                    itemBlock.setNextSibling(listItemBlock);
                     newListItem.list = item.list;
                     break;
                 }
                 //item.isLast = true;
                 item.list.blockType.list.lastBullet = item.ownerBlockInfo();
+                item.list.blockType.list._lastBulletConfirmed = true;
                 baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
                 deltaCount += 1;
             }
@@ -338,9 +347,14 @@ const BlockArranger = struct {
         std.debug.assert(last.blockType != .bullet);
         defer {
             self.count_1 = baseContext.nestingDepth + 1;
-            if (last.blockType == .blank) {
+            if (last.blockType == .blank and last.nestingDepth != self.count_1) {
+                const prevOfLast = self.stackedBlocks[self.count_1];
+                std.debug.assert(prevOfLast.blockType == .root or prevOfLast.nestingDepth == self.count_1);
+                if (prevOfLast.blockType != .root) prevOfLast.setNextSibling(last);
+
                 // Ensure the nestingDepth of the blank block.
                 last.nestingDepth = self.count_1;
+                self.stackedBlocks[self.count_1] = last;
             }
         }
 
@@ -359,6 +373,7 @@ const BlockArranger = struct {
                 var item = &self.stackedBlocks[depth].blockType.bullet;
                 //item.isLast = true;
                 item.list.blockType.list.lastBullet = item.ownerBlockInfo();
+                item.list.blockType.list._lastBulletConfirmed = true;
                 baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
                 deltaCount += 1;
             }
@@ -401,6 +416,10 @@ const BlockArranger = struct {
             std.debug.assert(blockInfo.blockType != .blank);
             try self.stackAsChildOfBase(blockInfo);
             return;
+        }
+
+        if (last.blockType == .base) {
+            @constCast(last).setNextSibling(blockInfo);
         }
 
         blockInfo.nestingDepth = self.count_1;
@@ -2170,6 +2189,7 @@ const DocParser = struct {
     allocator: mem.Allocator,
 
     tmdDoc: *tmd.Doc,
+    numBlocks: u32 = 0,
 
     lineScanner: LineScanner,
 
@@ -2184,6 +2204,9 @@ const DocParser = struct {
         var blockInfoElement = try list.createListElement(tmd.BlockInfo, parser.allocator);
         parser.tmdDoc.blocks.push(blockInfoElement);
         const blockInfo = &blockInfoElement.value;
+
+        parser.numBlocks += 1;
+        blockInfo.index = parser.numBlocks;
 
         if (parser.nextElementAttributes) |as| {
             try parser.setBlockAttributes(blockInfo, as);
@@ -2436,7 +2459,7 @@ const DocParser = struct {
 
                 // try to parse leading container mark.
                 switch (lineScanner.peekCursor()) {
-                    '*', '+', '-', '~', ':', '=' => |mark| handle: {
+                    '*', '+', '-', '~', ':' => |mark| handle: {
                         const lastMark = if (lineScanner.peekNext() == '.') blk: {
                             lineScanner.advance(1);
                             break :blk '.';
@@ -2689,11 +2712,11 @@ const DocParser = struct {
                             };
 
                             const codeSnippetBlockInfo = try parser.createAndPushBlockInfoElement();
-                            codeSnippetBlockInfo.* = .{ .blockType = .{
+                            codeSnippetBlockInfo.blockType = .{
                                 .code = .{
                                     .startLine = lineInfo,
                                 },
-                            } };
+                            };
                             break :blk codeSnippetBlockInfo;
                         } else blk: {
                             std.debug.assert(mark == '"');
@@ -2708,11 +2731,11 @@ const DocParser = struct {
                             };
 
                             const customBlockInfo = try parser.createAndPushBlockInfoElement();
-                            customBlockInfo.* = .{ .blockType = .{
+                            customBlockInfo.blockType = .{
                                 .custom = .{
                                     .startLine = lineInfo,
                                 },
-                            } };
+                            };
                             break :blk customBlockInfo;
                         };
 
@@ -2987,7 +3010,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                 std.debug.print("  ", .{});
             }
         }
-        std.debug.print("+{}: {s}", .{ blockInfo.nestingDepth, blockInfo.typeName() });
+        std.debug.print("+{}: #{} {s}", .{ blockInfo.nestingDepth, blockInfo.index, blockInfo.typeName() });
         switch (blockInfo.blockType) {
             .list => |itemList| {
                 std.debug.print(" (index: {}, type: {s}), second mode: {}", .{ itemList.index, itemList.typeName(), itemList.secondMode });
@@ -3004,7 +3027,11 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
             },
             else => {},
         }
+        if (blockInfo.getNextSibling()) |sibling| {
+            std.debug.print(" (next sibling: #{} {s})", .{ sibling.index, sibling.typeName() });
+        } else std.debug.print(" (next sibling: <null>)", .{});
         std.debug.print("\n", .{});
+
         if (blockInfo.isAtom()) {
             var lineInfo = blockInfo.getStartLine();
             const end = blockInfo.getEndLine();
