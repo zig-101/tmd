@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub fn List(comptime Value: type) type {
     return struct {
+        // ToDo: use the std.Lists ...
         info: ?struct {
             head: *Element(Value),
             tail: *Element(Value),

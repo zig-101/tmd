@@ -124,6 +124,9 @@ const BlockArranger = struct {
             if (last.blockType == .blank) {
                 try self.stackAsChildOfBase(newBaseBlock);
             } else {
+                if (last.blockType == .base) {
+                    @constCast(last).setNextSibling(newBaseBlock);
+                }
                 newBaseBlock.nestingDepth = self.count_1;
                 self.stackedBlocks[self.count_1] = newBaseBlock;
             }
@@ -2008,7 +2011,11 @@ const LineScanner = struct {
         if (ls.lineEnd) |lineEnd| {
             switch (lineEnd) {
                 .void => return false,
-                else => ls.cursor += lineEnd.len(),
+                else => {
+                    ls.cursor += lineEnd.len();
+                    std.debug.assert(ls.cursor <= ls.data.len);
+                    if (ls.cursor >= ls.data.len) return false;
+                },
             }
         } else unreachable;
 
@@ -2326,7 +2333,7 @@ const DocParser = struct {
         var listCount: u32 = 0;
 
         var boundedBlockStartInfo: ?union(enum) {
-            codeSnippetStart: *std.meta.FieldType(tmd.LineType, .codeSnippetStart),
+            codeBlockStart: *std.meta.FieldType(tmd.LineType, .codeBlockStart),
             customStart: *std.meta.FieldType(tmd.LineType, .customStart),
 
             fn markLen(self: @This()) u32 {
@@ -2337,7 +2344,7 @@ const DocParser = struct {
 
             fn markChar(self: @This()) u8 {
                 return switch (self) {
-                    .codeSnippetStart => '\'',
+                    .codeBlockStart => '\'',
                     .customStart => '"',
                 };
             }
@@ -2372,8 +2379,8 @@ const DocParser = struct {
                         lineScanner.advance(1);
                         const markLen = lineScanner.readUntilNotChar(markChar) + 1;
 
-                        //const codeSnippetStartLineType: *tmd.LineType = @alignCast(@fieldParentPtr("codeSnippetStart", codeSnippetStart));
-                        //const codeSnippetStartLineInfo: *tmd.LineInfo = @alignCast(@fieldParentPtr("lineType", codeSnippetStartLineType));
+                        //const codeBlockStartLineType: *tmd.LineType = @alignCast(@fieldParentPtr("codeBlockStart", codeBlockStart));
+                        //const codeBlockStartLineInfo: *tmd.LineInfo = @alignCast(@fieldParentPtr("lineType", codeBlockStartLineType));
                         //std.debug.print("=== {}, {}, {s}\n", .{boundedBlockStart.markLen(), markLen, tmdData[lineInfo.rangeTrimmed.start..lineInfo.rangeTrimmed.end]});
 
                         if (markLen != boundedBlockStart.markLen()) {
@@ -2398,7 +2405,7 @@ const DocParser = struct {
                         }
 
                         lineInfo.lineType = switch (boundedBlockStart) {
-                            .codeSnippetStart => .{ .codeSnippetEnd = .{
+                            .codeBlockStart => .{ .codeBlockEnd = .{
                                 .markLen = markLen,
                                 .markEndWithSpaces = playloadStart,
                             } },
@@ -2416,7 +2423,7 @@ const DocParser = struct {
                         std.debug.assert(boundedBlockStartInfo != null);
 
                         lineInfo.lineType = switch (boundedBlockStart) {
-                            .codeSnippetStart => .{ .code = .{} },
+                            .codeBlockStart => .{ .code = .{} },
                             .customStart => .{ .data = .{} },
                         };
                         lineInfo.rangeTrimmed.start = lineInfo.range.start;
@@ -2424,7 +2431,7 @@ const DocParser = struct {
                     } else {
                         std.debug.assert(boundedBlockStartInfo == null);
 
-                        std.debug.assert(lineInfo.lineType == .codeSnippetEnd or
+                        std.debug.assert(lineInfo.lineType == .codeBlockEnd or
                             lineInfo.lineType == .customEnd);
                     }
 
@@ -2455,8 +2462,6 @@ const DocParser = struct {
                     break :parse_line;
                 }
 
-                var noAtomBlockMarkForSure = false;
-
                 // try to parse leading container mark.
                 switch (lineScanner.peekCursor()) {
                     '*', '+', '-', '~', ':' => |mark| handle: {
@@ -2475,7 +2480,6 @@ const DocParser = struct {
                             if (lineScanner.cursor == markEnd and lineScanner.peekCursor() == lastMark) {
                                 lineScanner.setCursor(markEnd - 1);
                             }
-                            noAtomBlockMarkForSure = true;
                             lineInfo.containerMark = null;
                             break :handle;
                         }
@@ -2519,7 +2523,7 @@ const DocParser = struct {
 
                         try blockArranger.stackListItemBlock(listItemBlockInfo, markTypeIndex, listBlockInfo);
                     },
-                    '>', '!', '?', '.' => |mark| handle: {
+                    '#', '>', '!', '?', '.' => |mark| handle: {
                         lineScanner.advance(1);
                         const markEnd = lineScanner.cursor;
                         const numSpaces = lineScanner.readUntilNotBlank();
@@ -2528,7 +2532,6 @@ const DocParser = struct {
                             if (lineScanner.cursor == markEnd and lineScanner.peekCursor() == mark) {
                                 lineScanner.setCursor(markEnd - 1);
                             }
-                            noAtomBlockMarkForSure = true;
                             lineInfo.containerMark = null;
                             break :handle;
                         }
@@ -2540,6 +2543,15 @@ const DocParser = struct {
 
                         const containerBlockInfo = try parser.createAndPushBlockInfoElement();
                         switch (mark) {
+                            '#' => {
+                                lineInfo.containerMark = .{ .table = .{
+                                    .markEnd = markEnd,
+                                    .markEndWithSpaces = markEndWithSpaces,
+                                } };
+                                containerBlockInfo.blockType = .{
+                                    .table = .{},
+                                };
+                            },
                             '>' => {
                                 lineInfo.containerMark = .{ .quotation = .{
                                     .markEnd = markEnd,
@@ -2588,7 +2600,7 @@ const DocParser = struct {
                 const contentStart: u32 = lineScanner.cursor;
 
                 // try to parse atom block mark.
-                if (noAtomBlockMarkForSure or lineScanner.lineEnd != null) {
+                if (lineScanner.lineEnd != null) {
                     // contentStart keeps unchanged.
                 } else switch (lineScanner.peekCursor()) { // try to parse atom block mark
                     '-' => handle: {
@@ -2702,22 +2714,22 @@ const DocParser = struct {
                         }
 
                         const atomBlock = if (mark == '\'') blk: {
-                            lineInfo.lineType = .{ .codeSnippetStart = .{
+                            lineInfo.lineType = .{ .codeBlockStart = .{
                                 .markLen = markLen,
                                 .markEndWithSpaces = playloadStart,
                             } };
 
                             boundedBlockStartInfo = .{
-                                .codeSnippetStart = &lineInfo.lineType.codeSnippetStart,
+                                .codeBlockStart = &lineInfo.lineType.codeBlockStart,
                             };
 
-                            const codeSnippetBlockInfo = try parser.createAndPushBlockInfoElement();
-                            codeSnippetBlockInfo.blockType = .{
+                            const codeBlockInfo = try parser.createAndPushBlockInfoElement();
+                            codeBlockInfo.blockType = .{
                                 .code = .{
                                     .startLine = lineInfo,
                                 },
                             };
-                            break :blk codeSnippetBlockInfo;
+                            break :blk codeBlockInfo;
                         } else blk: {
                             std.debug.assert(mark == '"');
 

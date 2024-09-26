@@ -262,6 +262,190 @@ const TmdRender = struct {
         }
     }
 
+    const TableCell = struct {
+        row: u32,
+        col: u32,
+        block: *tmd.BlockInfo,
+
+        // Used to sort column-oriented table cells.
+        fn compare(_: void, x: @This(), y: @This()) bool {
+            if (x.col < y.col) return true;
+            if (x.col > y.col) return false;
+            if (x.row < y.row) return true;
+            if (x.row > y.row) return false;
+            unreachable;
+        }
+    };
+
+    fn collectTableCells(self: *TmdRender, firstTableChild: *tmd.BlockInfo) ![]TableCell {
+        var numCells: usize = 0;
+        var firstNonLineChild: ?*tmd.BlockInfo = null;
+        var child = firstTableChild;
+        while (true) {
+            switch (child.blockType) {
+                .directive => {},
+                .line => {},
+                else => {
+                    numCells += 1;
+                    if (firstNonLineChild == null) firstNonLineChild = child;
+                },
+            }
+
+            child = child.getNextSibling() orelse break;
+            std.debug.assert(child.nestingDepth == firstTableChild.nestingDepth);
+        }
+
+        if (numCells == 0) return &.{};
+
+        const cells = try self.allocator.alloc(TableCell, numCells);
+        var row: u32 = 0;
+        var col: u32 = 0;
+        var index: usize = 0;
+        var rowNeedChange = false;
+        child = firstNonLineChild orelse unreachable;
+        while (true) {
+            switch (child.blockType) {
+                .directive => {},
+                .line => {
+                    rowNeedChange = true;
+                    col = 0;
+                },
+                else => {
+                    if (rowNeedChange) {
+                        row += 1;
+                        rowNeedChange = false;
+                    }
+                    defer col += 1;
+                    defer index += 1;
+
+                    cells[index] = .{
+                        .row = row,
+                        .col = col,
+                        .block = child,
+                    };
+                },
+            }
+
+            child = child.getNextSibling() orelse break;
+        }
+        std.debug.assert(index == cells.len);
+
+        return cells;
+    }
+
+    fn renderTableHeaderCellBlock(self: *TmdRender, w: anytype, tableHeaderCellBlock: *tmd.BlockInfo) !void {
+        _ = try w.write("<th>\n");
+        try self.writeUsualContentBlockLines(w, tableHeaderCellBlock, false);
+        _ = try w.write("</th>\n");
+    }
+
+    fn renderTableCellBlock(self: *TmdRender, w: anytype, tableCellBlock: *tmd.BlockInfo) !void {
+        switch (tableCellBlock.blockType) {
+            .header => |header| {
+                if (header.level(self.doc.data) == 1)
+                    return try self.renderTableHeaderCellBlock(w, tableCellBlock);
+            },
+            .base => |_| {
+                if (self.getFollowingLevel1HeaderBlockElement(tableCellBlock.ownerListElement())) |headerElement| {
+                    const headerBlock = &headerElement.value;
+                    if (headerBlock.getNextSibling() == null)
+                        return try self.renderTableHeaderCellBlock(w, headerBlock);
+                }
+            },
+            else => {},
+        }
+
+        _ = try w.write("<td>\n");
+        _ = try self.renderBlock(w, tableCellBlock);
+        _ = try w.write("</td>\n");
+    }
+
+    fn renderTableBlock_RowOriented(self: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo, firstChild: *tmd.BlockInfo) !?*tmd.BlockInfo {
+        const cells = try self.collectTableCells(firstChild);
+        if (cells.len == 0) return try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+        defer self.allocator.free(cells);
+
+        _ = try w.write("\n<table");
+        try writeBlockAttributes(w, "tmd-table", tableBlockInfo.attributes);
+        _ = try w.write(">\n");
+        _ = try w.write("<tr>\n");
+
+        var lastRow: u32 = 0;
+        for (cells) |cell| {
+            if (cell.row != lastRow) {
+                lastRow = cell.row;
+
+                _ = try w.write("</tr>\n");
+                _ = try w.write("<tr>\n");
+            }
+
+            try self.renderTableCellBlock(w, cell.block);
+        }
+
+        _ = try w.write("</tr>\n");
+        _ = try w.write("</table>\n");
+
+        return tableBlockInfo.getNextSibling();
+    }
+
+    fn renderTableBlock_ColumnOriented(self: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo, firstChild: *tmd.BlockInfo) !?*tmd.BlockInfo {
+        const cells = try self.collectTableCells(firstChild);
+        if (cells.len == 0) return try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+        defer self.allocator.free(cells);
+
+        std.sort.pdq(TableCell, cells, {}, TableCell.compare);
+
+        _ = try w.write("\n<table");
+        try writeBlockAttributes(w, "tmd-table", tableBlockInfo.attributes);
+        _ = try w.write(">\n");
+        _ = try w.write("<tr>\n");
+
+        var lastCol: u32 = 0;
+        for (cells) |cell| {
+            if (cell.col != lastCol) {
+                lastCol = cell.col;
+
+                _ = try w.write("</tr>\n");
+                _ = try w.write("<tr>\n");
+            }
+
+            try self.renderTableCellBlock(w, cell.block);
+        }
+
+        _ = try w.write("</tr>\n");
+        _ = try w.write("</table>\n");
+
+        return tableBlockInfo.getNextSibling();
+    }
+
+    fn renderTableBlocks_WithoutCells(_: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo) !?*tmd.BlockInfo {
+        _ = try w.write("\n<div");
+        try writeBlockAttributes(w, "tmd-table-no-cells", tableBlockInfo.attributes);
+        _ = try w.write("></div>\n");
+
+        return tableBlockInfo.getNextSibling();
+    }
+
+    fn renderTableBlock(self: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo) !*BlockInfoElement {
+        const child = tableBlockInfo.next() orelse unreachable;
+        const columnOriented = switch (child.blockType) {
+            .usual => |usual| blk: {
+                if (usual.startLine != usual.endLine) break :blk false;
+                break :blk if (usual.startLine.tokens()) |tokens| tokens.empty() else false;
+            },
+            else => false,
+        };
+
+        const nextBlock = if (columnOriented) blk: {
+            if (child.getNextSibling()) |sibling|
+                break :blk try self.renderTableBlock_ColumnOriented(w, tableBlockInfo, sibling);
+
+            break :blk try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+        } else try self.renderTableBlock_RowOriented(w, tableBlockInfo, child);
+
+        return if (nextBlock) |sibling| sibling.ownerListElement() else &self.nullBlockInfoElement;
+    }
+
     fn renderBlockChildrenForLargeQuotationBlock(self: *TmdRender, w: anytype, parentElement: *BlockInfoElement, atMostCount: u32) !*BlockInfoElement {
         const afterElement = if (self.getFollowingLevel1HeaderBlockElement(parentElement)) |headerElement| blk: {
             const blockInfo = &headerElement.value;
@@ -538,6 +722,9 @@ const TmdRender = struct {
                             },
                         }
                     },
+                    .table => {
+                        element = try self.renderTableBlock(w, blockInfo);
+                    },
                     .quotation => {
                         _ = try w.write("\n<div");
                         if (self.getFollowingLevel1HeaderBlockElement(element)) |_| {
@@ -738,8 +925,6 @@ const TmdRender = struct {
         //std.debug.print("language: {s}\n", .{@tagName(attrs.language)});
         //std.debug.print("==========\n", .{});
 
-        // ToDo: support customApp on codeSnippetBlock or customAppBlock?
-
         _ = try w.write("<pre");
         try writeBlockAttributes(w, "tmd-code", blockInfo.attributes);
         if (attrs.language.len > 0) {
@@ -750,7 +935,7 @@ const TmdRender = struct {
 
         const endLine = blockInfo.getEndLine();
         const startLine = blockInfo.getStartLine();
-        std.debug.assert(startLine.lineType == .codeSnippetStart);
+        std.debug.assert(startLine.lineType == .codeBlockStart);
 
         var lineInfoElement = startLine.ownerListElement();
         if (startLine != endLine) {
@@ -758,7 +943,7 @@ const TmdRender = struct {
             while (true) {
                 const lineInfo = &lineInfoElement.value;
                 switch (lineInfo.lineType) {
-                    .codeSnippetEnd => break,
+                    .codeBlockEnd => break,
                     .code => {
                         const r = lineInfo.range;
                         try writeHtmlContentText(w, self.doc.data[r.start..r.end]);
@@ -810,7 +995,7 @@ const TmdRender = struct {
 
             // Just to check all possible types. Don't remove.
             switch (lineInfo.lineType) {
-                .blank, .usual, .header, .line, .directive, .baseBlockOpen, .baseBlockClose, .codeSnippetStart, .codeSnippetEnd, .code, .customStart, .customEnd, .data => {},
+                .blank, .usual, .header, .line, .directive, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customStart, .customEnd, .data => {},
             }
 
             {
@@ -1318,7 +1503,7 @@ const TmdRender = struct {
 
                     // containers
 
-                    .list, .bullet, .quotation, .note, .reveal, .unstyled => {
+                    .list, .bullet, .table, .quotation, .note, .reveal, .unstyled => {
                         element = try self.renderTmdCodeForBlockChildren(w, element);
                     },
 

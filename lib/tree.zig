@@ -98,8 +98,9 @@ pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
                             current = current.left;
                         } else {
                             pre.right = t._nilNodePtr;
+                            const right = current.right; // the next line might modify/destroy current!
                             nodeHandler.onNode(current);
-                            current = current.right;
+                            current = right;
                         }
                     }
                 }

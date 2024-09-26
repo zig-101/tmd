@@ -111,7 +111,6 @@ pub fn listType(bulletMark: []const u8) ListType {
 }
 
 pub const ElementAttibutes = struct {
-    // For any block:
     id: []const u8 = "", // ToDo: should be a Range?
     classes: []const u8 = "", // ToDo: should be Range list?
     kvs: []const u8 = "", // ToDo: should be Range list?
@@ -266,28 +265,34 @@ pub const BlockInfo = struct {
         return @alignCast(@fieldParentPtr("value", @constCast(self)));
     }
 
+    // ToDo: make ownerListElement private by using this one instead.
+    pub fn next(self: *const @This()) ?*BlockInfo {
+        return &(self.ownerListElement().next orelse return null).value;
+    }
+
     pub fn getNextSibling(self: *const @This()) ?*BlockInfo {
         return switch (self.blockType) {
             .root => null,
             .base => |base| blk: {
-                const next = base.openLine.lineType.baseBlockOpen.baseNextSibling orelse break :blk null;
+                const closeLine = base.closeLine orelse break :blk null;
+                const nextBlock = closeLine.lineType.baseBlockClose.baseNextSibling orelse break :blk null;
                 // The assurence is necessary.
-                break :blk if (next.nestingDepth == self.nestingDepth) next else null;
+                break :blk if (nextBlock.nestingDepth == self.nestingDepth) nextBlock else null;
             },
             .list => |itemList| blk: {
                 std.debug.assert(itemList._lastBulletConfirmed);
                 break :blk itemList.lastBullet.blockType.bullet.nextSibling;
             },
             .bullet => |*bullet| if (bullet.ownerBlockInfo() == bullet.list.blockType.list.lastBullet) null else bullet.nextSibling,
-            inline .quotation, .note, .reveal, .unstyled => |container| blk: {
-                const next = container.nextSibling orelse break :blk null;
+            inline .table, .quotation, .note, .reveal, .unstyled => |container| blk: {
+                const nextBlock = container.nextSibling orelse break :blk null;
                 // ToDo: the assurence might be unnecessary.
-                break :blk if (next.nestingDepth == self.nestingDepth) next else null;
+                break :blk if (nextBlock.nestingDepth == self.nestingDepth) nextBlock else null;
             },
             inline else => blk: {
                 std.debug.assert(self.isAtom());
-                if (self.blockType.ownerBlockInfo().ownerListElement().next) |next| {
-                    const nextBlock = &next.value;
+                if (self.blockType.ownerBlockInfo().ownerListElement().next) |nextElement| {
+                    const nextBlock = &nextElement.value;
                     std.debug.assert(nextBlock.nestingDepth <= self.nestingDepth);
                     if (nextBlock.nestingDepth == self.nestingDepth)
                         break :blk nextBlock;
@@ -301,14 +306,15 @@ pub const BlockInfo = struct {
         return switch (self.blockType) {
             .root => unreachable,
             .base => |base| {
-                base.openLine.lineType.baseBlockOpen.baseNextSibling = sibling;
+                if (base.closeLine) |closeLine|
+                    closeLine.lineType.baseBlockClose.baseNextSibling = sibling;
             },
             .list => |itemList| {
                 std.debug.assert(itemList._lastBulletConfirmed);
                 itemList.lastBullet.blockType.bullet.nextSibling = sibling;
                 unreachable;
             },
-            inline .bullet, .quotation, .note, .reveal, .unstyled => |*container| {
+            inline .bullet, .table, .quotation, .note, .reveal, .unstyled => |*container| {
                 container.nextSibling = sibling;
             },
             else => {
@@ -378,6 +384,10 @@ pub const BlockType = union(enum) {
         //}
     },
 
+    table: struct {
+        const Container = void;
+        nextSibling: ?*BlockInfo = null,
+    },
     quotation: struct {
         const Container = void;
         nextSibling: ?*BlockInfo = null,
@@ -404,7 +414,7 @@ pub const BlockType = union(enum) {
     base: struct {
         openLine: *LineInfo,
         closeLine: ?*LineInfo = null,
-        // nextSibling: ?*BlockInfo, // ToDo: openLine.baseNextSibling
+        // nextSibling: ?*BlockInfo, // openLine.baseNextSibling
 
         pub fn openPlayloadRange(self: @This()) ?Range {
             const openLine = self.openLine;
@@ -430,11 +440,6 @@ pub const BlockType = union(enum) {
             return null;
         }
     },
-
-    // ToDo:
-    //table: struct {},
-    //tableRow: struct {},
-    //tableCell: struct {},
 
     // atom block types
 
@@ -509,8 +514,8 @@ pub const AtomBlockWithBoundary = struct {
     endLine: *LineInfo = undefined,
 
     // Note: the custom block end tag line might be missing.
-    //       For .code, the endLine might not be a .codeSnippetEnd line.
-    //          It can be also of .code or .codeSnippetStart.
+    //       For .code, the endLine might not be a .codeBlockEnd line.
+    //          It can be also of .code or .codeBlockStart.
     //       For .custom, the endLine might not be a .customEnd line.
     //          It can be also of .data or .customStart.
 
@@ -519,7 +524,7 @@ pub const AtomBlockWithBoundary = struct {
 
     pub fn startPlayloadRange(self: @This()) Range {
         return switch (self.startLine.lineType) {
-            inline .codeSnippetStart, .customStart => |start| blk: {
+            inline .codeBlockStart, .customStart => |start| blk: {
                 std.debug.assert(start.markEndWithSpaces <= self.startLine.rangeTrimmed.end);
                 break :blk Range{ .start = start.markEndWithSpaces, .end = self.startLine.rangeTrimmed.end };
             },
@@ -529,7 +534,7 @@ pub const AtomBlockWithBoundary = struct {
 
     pub fn endPlayloadRange(self: @This()) ?Range {
         return switch (self.endLine.lineType) {
-            inline .codeSnippetEnd, .customEnd => |end| blk: {
+            inline .codeBlockEnd, .customEnd => |end| blk: {
                 std.debug.assert(end.markEndWithSpaces <= self.endLine.rangeTrimmed.end);
                 break :blk Range{ .start = end.markEndWithSpaces, .end = self.endLine.rangeTrimmed.end };
             },
@@ -646,6 +651,10 @@ pub const ContainerLeadingMark = union(enum) {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
+    table: struct {
+        markEnd: u32,
+        markEndWithSpaces: u32,
+    },
     quotation: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
@@ -689,23 +698,25 @@ pub const LineType = union(enum) {
     baseBlockOpen: struct {
         markLen: u32,
         markEndWithSpaces: u32,
-
-        baseNextSibling: ?*BlockInfo = null,
     },
     baseBlockClose: struct {
         markLen: u32,
         markEndWithSpaces: u32,
+
+        baseNextSibling: ?*BlockInfo = null,
     },
 
-    codeSnippetStart: struct {
+    codeBlockStart: struct {
         markLen: u32,
         markEndWithSpaces: u32,
     },
-    codeSnippetEnd: struct {
+    codeBlockEnd: struct {
         markLen: u32,
         markEndWithSpaces: u32,
     },
     code: struct {},
+    // ToDo: use a single code line to represent all lines in a code block?
+    //       Now, each code line waste 3 words memory.
 
     customStart: struct {
         markLen: u32,
