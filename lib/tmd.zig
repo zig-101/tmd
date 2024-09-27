@@ -19,22 +19,28 @@ pub const Doc = struct {
     blocks: list.List(BlockInfo) = .{}, // ToDo: use SinglyLinkedList
     lines: list.List(LineInfo) = .{}, // ToDo: use SinglyLinkedList
 
-    blockAttributes: list.List(BlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
-
-    blocksByID: BlockInfoRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
-    blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{}, // ToDo: use SinglyLinkedList
-    // It is in blockTreeNodes when exists.
-    freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null, // ToDo: use SinglyLinkedList
-
-    links: list.List(Link) = .{}, // ToDo: use SinglyLinkedList
-
     // ToDo: need an option: whether or not title is set externally.
     //       If not, the first non-bare h1 header will be viewed as tiltle.
     tocHeaders: list.List(*BlockInfo) = .{},
 
+    blocksByID: BlockInfoRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
+
+    // The followings are used to track allocations for destroying.
+    // ToDo: prefix them with _?
+
+    links: list.List(Link) = .{}, // ToDo: use SinglyLinkedList
+    blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{}, // ToDo: use SinglyLinkedList
+    // It is in blockTreeNodes when exists. So no need to destroy it solely in the end.
+    freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null, // ToDo: use SinglyLinkedList
+    elementAttributes: list.List(ElementAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    baseBlockAttibutes: list.List(BaseBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    codeBlockAttibutes: list.List(CodeBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    customBlockAttibutes: list.List(CustomBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    contentStreamAttributes: list.List(ContentStreamAttributes) = .{}, // ToDo: use SinglyLinkedList
+
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
-        var a = BlockAttibutes{
-            .common = .{ .id = id },
+        var a = ElementAttibutes{
+            .id = id,
         };
         var b = BlockInfo{
             .blockType = undefined,
@@ -42,6 +48,10 @@ pub const Doc = struct {
         };
 
         return if (self.blocksByID.search(&b)) |node| node.value else null;
+    }
+
+    pub fn rangeData(self: *const @This(), r: Range) []const u8 {
+        return self.data[r.start..r.end];
     }
 };
 
@@ -125,16 +135,6 @@ pub const Link = struct {
     info: *LinkInfo,
 };
 
-pub const BlockAttibutes = struct {
-    common: ElementAttibutes = .{}, // ToDo: use pointer? Memory will be more fragmental.
-
-    extra: union(enum) {
-        base: BaseBlockAttibutes,
-        code: CodeBlockAttibutes, // ToDo: use pointer? Memory will be more fragmental.
-        none: void,
-    } = .none,
-};
-
 pub const BaseBlockAttibutes = struct {
     commentedOut: bool = false, // ToDo: use Range
     isFooter: bool = false, // ToDo: use Range
@@ -145,6 +145,10 @@ pub const BaseBlockAttibutes = struct {
         right,
         justify,
     } = .none,
+    cellSpans: struct {
+        axisSpan: u32 = 1,
+        crossSpan: u32 = 1,
+    } = .{},
 };
 
 pub const CodeBlockAttibutes = struct {
@@ -181,7 +185,7 @@ pub const BlockInfo = struct {
 
     blockType: BlockType,
 
-    attributes: ?*BlockAttibutes = null,
+    attributes: ?*ElementAttibutes = null,
 
     hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual? ToDo: not only)
 
@@ -252,8 +256,8 @@ pub const BlockInfo = struct {
     pub fn compare(x: *const @This(), y: *const @This()) isize {
         const xAttributes = x.attributes orelse unreachable;
         const yAttributes = y.attributes orelse unreachable;
-        const xID = if (xAttributes.common.id.len > 0) xAttributes.common.id else unreachable;
-        const yID = if (yAttributes.common.id.len > 0) yAttributes.common.id else unreachable;
+        const xID = if (xAttributes.id.len > 0) xAttributes.id else unreachable;
+        const yID = if (yAttributes.id.len > 0) yAttributes.id else unreachable;
         return switch (std.mem.order(u8, xID, yID)) {
             .lt => -1,
             .gt => 1,
@@ -416,28 +420,16 @@ pub const BlockType = union(enum) {
         closeLine: ?*LineInfo = null,
         // nextSibling: ?*BlockInfo, // openLine.baseNextSibling
 
-        pub fn openPlayloadRange(self: @This()) ?Range {
-            const openLine = self.openLine;
-            return switch (openLine.lineType) {
-                .baseBlockOpen => |baseBlockOpen| blk: {
-                    std.debug.assert(baseBlockOpen.markEndWithSpaces <= openLine.rangeTrimmed.end);
-                    break :blk Range{ .start = baseBlockOpen.markEndWithSpaces, .end = openLine.rangeTrimmed.end };
-                },
-                else => unreachable,
-            };
+        pub fn attributes(self: @This()) BaseBlockAttibutes {
+            return if (self.openLine.lineType.baseBlockOpen.attrs) |attrs| attrs.* else .{};
+        }
+
+        pub fn openPlayloadRange(self: @This()) Range {
+            return self.openLine.playloadRange();
         }
 
         pub fn closePlayloadRange(self: @This()) ?Range {
-            if (self.closeLine) |closeLine| {
-                return switch (closeLine.lineType) {
-                    .baseBlockClose => |baseBlockClose| blk: {
-                        std.debug.assert(baseBlockClose.markEndWithSpaces <= closeLine.rangeTrimmed.end);
-                        break :blk Range{ .start = baseBlockClose.markEndWithSpaces, .end = closeLine.rangeTrimmed.end };
-                    },
-                    else => unreachable,
-                };
-            }
-            return null;
+            return if (self.closeLine) |closeLine| closeLine.playloadRange() else null;
         }
     },
 
@@ -500,46 +492,69 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
-    code: AtomBlockWithBoundary,
+    code: struct {
+        startLine: *LineInfo = undefined,
+        endLine: *LineInfo = undefined,
 
-    custom: AtomBlockWithBoundary,
+        // Note: the block end tag line might be missing.
+        //       The endLine might not be a .codeBlockEnd line.
+        //       and it can be also of .code or .codeBlockStart.
+
+        // traits:
+        const Atom = void;
+
+        pub fn attributes(self: @This()) CodeBlockAttibutes {
+            return if (self.startLine.lineType.codeBlockStart.attrs) |attrs| attrs.* else .{};
+        }
+
+        pub fn contentStreamAttributes(self: @This()) ContentStreamAttributes {
+            return switch (self.endLine.lineType) {
+                .codeBlockEnd => |end| if (end.streamAttrs) |attrs| attrs.* else .{},
+                else => .{},
+            };
+        }
+
+        pub fn startPlayloadRange(self: @This()) Range {
+            return self.startLine.playloadRange();
+        }
+
+        pub fn endPlayloadRange(self: @This()) ?Range {
+            return switch (self.endLine.lineType) {
+                .codeBlockEnd => |_| self.endLine.playloadRange(),
+                else => null,
+            };
+        }
+    },
+
+    custom: struct {
+        startLine: *LineInfo = undefined,
+        endLine: *LineInfo = undefined,
+
+        // Note: the block end tag line might be missing.
+        //       And the endLine might not be a .customBlockEnd line.
+        //       It can be also of .data or .customBlockStart.
+
+        // traits:
+        const Atom = void;
+
+        pub fn attributes(self: @This()) CustomBlockAttibutes {
+            return if (self.startLine.lineType.customBlockStart.attrs) |attrs| attrs.* else .{};
+        }
+
+        pub fn startPlayloadRange(self: @This()) Range {
+            return self.startLine.playloadRange();
+        }
+
+        pub fn endPlayloadRange(self: @This()) ?Range {
+            return switch (self.endLine.lineType) {
+                .customBlockEnd => |_| self.endLine.playloadRange(),
+                else => null,
+            };
+        }
+    },
 
     pub fn ownerBlockInfo(self: *const @This()) *BlockInfo {
         return @alignCast(@fieldParentPtr("blockType", @constCast(self)));
-    }
-};
-
-pub const AtomBlockWithBoundary = struct {
-    startLine: *LineInfo = undefined,
-    endLine: *LineInfo = undefined,
-
-    // Note: the custom block end tag line might be missing.
-    //       For .code, the endLine might not be a .codeBlockEnd line.
-    //          It can be also of .code or .codeBlockStart.
-    //       For .custom, the endLine might not be a .customEnd line.
-    //          It can be also of .data or .customStart.
-
-    // traits:
-    const Atom = void;
-
-    pub fn startPlayloadRange(self: @This()) Range {
-        return switch (self.startLine.lineType) {
-            inline .codeBlockStart, .customStart => |start| blk: {
-                std.debug.assert(start.markEndWithSpaces <= self.startLine.rangeTrimmed.end);
-                break :blk Range{ .start = start.markEndWithSpaces, .end = self.startLine.rangeTrimmed.end };
-            },
-            else => unreachable,
-        };
-    }
-
-    pub fn endPlayloadRange(self: @This()) ?Range {
-        return switch (self.endLine.lineType) {
-            inline .codeBlockEnd, .customEnd => |end| blk: {
-                std.debug.assert(end.markEndWithSpaces <= self.endLine.rangeTrimmed.end);
-                break :blk Range{ .start = end.markEndWithSpaces, .end = self.endLine.rangeTrimmed.end };
-            },
-            else => null,
-        };
     }
 };
 
@@ -624,6 +639,24 @@ pub const LineInfo = struct {
     pub fn end(self: *const @This(), trimmTrailingSpaces: bool) u32 {
         return if (trimmTrailingSpaces) self.rangeTrimmed.end else self.range.end;
     }
+
+    // ToDo: to opotimize, don't let parser use this method to
+    //       get playload data for parsing.
+    pub fn playloadRange(self: @This()) Range {
+        return switch (self.lineType) {
+            inline .baseBlockOpen,
+            .baseBlockClose,
+            .codeBlockStart,
+            .codeBlockEnd,
+            .customBlockStart,
+            .customBlockEnd,
+            => |lineType| blk: {
+                std.debug.assert(lineType.markEndWithSpaces <= self.rangeTrimmed.end);
+                break :blk Range{ .start = lineType.markEndWithSpaces, .end = self.rangeTrimmed.end };
+            },
+            else => unreachable,
+        };
+    }
 };
 
 pub const LineEndType = enum {
@@ -698,6 +731,8 @@ pub const LineType = union(enum) {
     baseBlockOpen: struct {
         markLen: u32,
         markEndWithSpaces: u32,
+
+        attrs: ?*BaseBlockAttibutes = null, // ToDo
     },
     baseBlockClose: struct {
         markLen: u32,
@@ -709,20 +744,24 @@ pub const LineType = union(enum) {
     codeBlockStart: struct {
         markLen: u32,
         markEndWithSpaces: u32,
+
+        attrs: ?*CodeBlockAttibutes = null, // ToDo
     },
     codeBlockEnd: struct {
         markLen: u32,
         markEndWithSpaces: u32,
+
+        streamAttrs: ?*ContentStreamAttributes = null, // ToDo
     },
     code: struct {},
-    // ToDo: use a single code line to represent all lines in a code block?
-    //       Now, each code line waste 3 words memory.
 
-    customStart: struct {
+    customBlockStart: struct {
         markLen: u32,
         markEndWithSpaces: u32,
+
+        attrs: ?*CustomBlockAttibutes = null, // ToDo
     },
-    customEnd: struct {
+    customBlockEnd: struct {
         markLen: u32,
         markEndWithSpaces: u32,
     },
@@ -936,6 +975,11 @@ pub const TokenType = union(enum) {
             return @tagName(self.markType);
         }
     },
+    // ToDo: following a .media LineSpanMarkType.
+    //       Noneistance for nothing.
+    //mediaInfo: struct {
+    //    attrs: *MediaAttributes,
+    //},
 
     pub fn typeName(self: @This()) []const u8 {
         return @tagName(self);

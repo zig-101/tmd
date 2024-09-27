@@ -159,7 +159,7 @@ const TmdRender = struct {
 
             _ = try w.write("<li class=\"tmd-list-item tmd-toc-item\">");
 
-            const id = if (headerBlock.attributes) |as| as.common.id else "";
+            const id = if (headerBlock.attributes) |as| as.id else "";
 
             // ToDo:
             //_ = try w.write("hdr:");
@@ -544,10 +544,7 @@ const TmdRender = struct {
                 switch (blockInfo.blockType) {
                     .root => unreachable,
                     .base => |base| handle: {
-                        const attrs = if (base.openPlayloadRange()) |r| blk: {
-                            const playload = self.doc.data[r.start..r.end];
-                            break :blk parser.parse_base_block_open_playload(playload);
-                        } else tmd.BaseBlockAttibutes{};
+                        const attrs = base.attributes();
 
                         if (attrs.commentedOut) {
                             element = try self.renderBlockChildren(std.io.null_writer, element, 0);
@@ -804,7 +801,7 @@ const TmdRender = struct {
 
                         _ = try w.write("\n<p");
                         if (blockInfo.attributes) |as| {
-                            _ = try writeID(w, as.common.id);
+                            _ = try writeID(w, as.id);
                         }
                         _ = try w.write("></p>\n");
 
@@ -814,13 +811,11 @@ const TmdRender = struct {
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
                     .code => |code| {
-                        const r = code.startPlayloadRange();
-                        const playload = self.doc.data[r.start..r.end];
-                        const attrs = parser.parse_code_block_open_playload(playload);
+                        const attrs = code.attributes();
                         if (attrs.commentedOut) {
                             _ = try w.write("\n<div");
                             if (blockInfo.attributes) |as| {
-                                _ = try writeID(w, as.common.id);
+                                _ = try writeID(w, as.id);
                             }
                             _ = try w.write("></div>\n");
                         } else {
@@ -836,7 +831,7 @@ const TmdRender = struct {
                         if (attrs.commentedOut) {
                             _ = try w.write("\n<div");
                             if (blockInfo.attributes) |as| {
-                                _ = try writeID(w, as.common.id);
+                                _ = try writeID(w, as.id);
                             }
                             _ = try w.write("></div>\n");
                         } else {
@@ -882,7 +877,7 @@ const TmdRender = struct {
         } else if (std.ascii.eqlIgnoreCase(attrs.app, "html")) {
             const endLine = blockInfo.getEndLine();
             const startLine = blockInfo.getStartLine();
-            std.debug.assert(startLine.lineType == .customStart);
+            std.debug.assert(startLine.lineType == .customBlockStart);
 
             var lineInfoElement = startLine.ownerListElement();
             if (startLine != endLine) {
@@ -890,7 +885,7 @@ const TmdRender = struct {
                 while (true) {
                     const lineInfo = &lineInfoElement.value;
                     switch (lineInfo.lineType) {
-                        .customEnd => break,
+                        .customBlockEnd => break,
                         .data => {
                             const r = lineInfo.range;
                             _ = try w.write(self.doc.data[r.start..r.end]);
@@ -961,9 +956,7 @@ const TmdRender = struct {
         }
 
         blk: {
-            const r = blockInfo.blockType.code.endPlayloadRange() orelse break :blk;
-            const closePlayload = self.doc.data[r.start..r.end];
-            const streamAttrs = parser.parse_block_close_playload(closePlayload);
+            const streamAttrs = blockInfo.blockType.code.contentStreamAttributes();
             const content = streamAttrs.content;
             if (content.len == 0) break :blk;
             if (std.mem.startsWith(u8, content, "./") or std.mem.startsWith(u8, content, "../")) {
@@ -995,7 +988,7 @@ const TmdRender = struct {
 
             // Just to check all possible types. Don't remove.
             switch (lineInfo.lineType) {
-                .blank, .usual, .header, .line, .directive, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customStart, .customEnd, .data => {},
+                .blank, .usual, .header, .line, .directive, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customBlockStart, .customBlockEnd, .data => {},
             }
 
             {
@@ -1392,9 +1385,9 @@ const TmdRender = struct {
         };
     }
 
-    fn writeBlockAttributes(w: anytype, classesSeperatedBySpace: []const u8, attributes: ?*tmd.BlockAttibutes) !void {
+    fn writeBlockAttributes(w: anytype, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes) !void {
         if (attributes) |as| {
-            try writeElementAttributes(w, classesSeperatedBySpace, &as.common);
+            try writeElementAttributes(w, classesSeperatedBySpace, as);
         } else {
             try writeClasses(w, classesSeperatedBySpace, "");
         }

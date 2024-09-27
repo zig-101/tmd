@@ -19,7 +19,13 @@ pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
     };
 
     list.destroyListElements(tmd.LineInfo, tmdDoc.lines, T.destroyLineTokens, allocator);
-    list.destroyListElements(tmd.BlockAttibutes, tmdDoc.blockAttributes, null, allocator);
+
+    list.destroyListElements(tmd.ElementAttibutes, tmdDoc.elementAttributes, null, allocator);
+    list.destroyListElements(tmd.BaseBlockAttibutes, tmdDoc.baseBlockAttibutes, null, allocator);
+    list.destroyListElements(tmd.CodeBlockAttibutes, tmdDoc.codeBlockAttibutes, null, allocator);
+    list.destroyListElements(tmd.CustomBlockAttibutes, tmdDoc.customBlockAttibutes, null, allocator);
+    list.destroyListElements(tmd.ContentStreamAttributes, tmdDoc.contentStreamAttributes, null, allocator);
+
     list.destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
 
     list.destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
@@ -48,7 +54,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     };
     try docParser.parseAll(tmdData);
 
-    if (true and builtin.mode == .Debug) {
+    if (false and builtin.mode == .Debug) {
         dumpTmdDoc(&tmdDoc);
     }
 
@@ -2226,16 +2232,15 @@ const DocParser = struct {
     }
 
     fn setBlockAttributes(parser: *DocParser, blockInfo: *tmd.BlockInfo, as: tmd.ElementAttibutes) !void {
-        var blockAttributesElement = try list.createListElement(tmd.BlockAttibutes, parser.allocator);
-        parser.tmdDoc.blockAttributes.push(blockAttributesElement);
+        var blockAttributesElement = try list.createListElement(tmd.ElementAttibutes, parser.allocator);
+        parser.tmdDoc.elementAttributes.push(blockAttributesElement);
 
         const attrs = &blockAttributesElement.value;
-        attrs.* = .{ .common = as };
-        std.debug.assert(attrs.extra == .none);
+        attrs.* = as;
 
         blockInfo.attributes = attrs;
 
-        if (attrs.common.id.len > 0) {
+        if (attrs.id.len > 0) {
             const blockTreeNodeElement = if (parser.tmdDoc.freeBlockTreeNodeElement) |e| blk: {
                 parser.tmdDoc.freeBlockTreeNodeElement = null;
                 break :blk e;
@@ -2334,7 +2339,7 @@ const DocParser = struct {
 
         var boundedBlockStartInfo: ?union(enum) {
             codeBlockStart: *std.meta.FieldType(tmd.LineType, .codeBlockStart),
-            customStart: *std.meta.FieldType(tmd.LineType, .customStart),
+            customBlockStart: *std.meta.FieldType(tmd.LineType, .customBlockStart),
 
             fn markLen(self: @This()) u32 {
                 return switch (self) {
@@ -2345,7 +2350,7 @@ const DocParser = struct {
             fn markChar(self: @This()) u8 {
                 return switch (self) {
                     .codeBlockStart => '\'',
-                    .customStart => '"',
+                    .customBlockStart => '"',
                 };
             }
         } = null;
@@ -2370,7 +2375,7 @@ const DocParser = struct {
                 _ = lineScanner.readUntilNotBlank();
                 const leadingBlankEnd = lineScanner.cursor;
 
-                // handle code block context.
+                // handle code/custom block context.
                 if (boundedBlockStartInfo) |boundedBlockStart| {
                     const markChar = boundedBlockStart.markChar();
                     if (lineScanner.lineEnd) |_| {} else if (lineScanner.peekCursor() != markChar) {
@@ -2404,16 +2409,30 @@ const DocParser = struct {
                             }
                         }
 
-                        lineInfo.lineType = switch (boundedBlockStart) {
-                            .codeBlockStart => .{ .codeBlockEnd = .{
-                                .markLen = markLen,
-                                .markEndWithSpaces = playloadStart,
-                            } },
-                            .customStart => .{ .customEnd = .{
-                                .markLen = markLen,
-                                .markEndWithSpaces = playloadStart,
-                            } },
-                        };
+                        switch (boundedBlockStart) {
+                            .codeBlockStart => {
+                                lineInfo.lineType = .{ .codeBlockEnd = .{
+                                    .markLen = markLen,
+                                    .markEndWithSpaces = playloadStart,
+                                } };
+
+                                const playloadRange = lineInfo.playloadRange();
+                                const playload = parser.tmdDoc.rangeData(playloadRange);
+                                const attrs = parse_code_block_close_playload(playload);
+                                if (!std.meta.eql(attrs, .{})) {
+                                    var contentStreamAttributesElement = try list.createListElement(tmd.ContentStreamAttributes, parser.allocator);
+                                    parser.tmdDoc.contentStreamAttributes.push(contentStreamAttributesElement);
+                                    contentStreamAttributesElement.value = attrs;
+                                    lineInfo.lineType.codeBlockEnd.streamAttrs = &contentStreamAttributesElement.value;
+                                }
+                            },
+                            .customBlockStart => {
+                                lineInfo.lineType = .{ .customBlockEnd = .{
+                                    .markLen = markLen,
+                                    .markEndWithSpaces = playloadStart,
+                                } };
+                            },
+                        }
 
                         boundedBlockStartInfo = null;
                     }
@@ -2424,7 +2443,7 @@ const DocParser = struct {
 
                         lineInfo.lineType = switch (boundedBlockStart) {
                             .codeBlockStart => .{ .code = .{} },
-                            .customStart => .{ .data = .{} },
+                            .customBlockStart => .{ .data = .{} },
                         };
                         lineInfo.rangeTrimmed.start = lineInfo.range.start;
                         lineInfo.rangeTrimmed.end = lineScanner.cursor;
@@ -2432,11 +2451,11 @@ const DocParser = struct {
                         std.debug.assert(boundedBlockStartInfo == null);
 
                         std.debug.assert(lineInfo.lineType == .codeBlockEnd or
-                            lineInfo.lineType == .customEnd);
+                            lineInfo.lineType == .customBlockEnd);
                     }
 
                     break :parse_line;
-                } // code block context
+                } // atom code/custom block context
 
                 lineInfo.rangeTrimmed.start = leadingBlankEnd;
 
@@ -2677,6 +2696,16 @@ const DocParser = struct {
                             try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = baseBlockInfo;
                             atomBlockCount += 1;
+
+                            const playloadRange = baseBlockInfo.blockType.base.openPlayloadRange();
+                            const playload = parser.tmdDoc.rangeData(playloadRange);
+                            const attrs = parse_base_block_open_playload(playload);
+                            if (!std.meta.eql(attrs, .{})) {
+                                var baseBlockAttibutesElement = try list.createListElement(tmd.BaseBlockAttibutes, parser.allocator);
+                                parser.tmdDoc.baseBlockAttibutes.push(baseBlockAttibutesElement);
+                                baseBlockAttibutesElement.value = attrs;
+                                baseBlockInfo.blockType.base.openLine.lineType.baseBlockOpen.attrs = &baseBlockAttibutesElement.value;
+                            }
                         } else {
                             lineInfo.lineType = .{ .baseBlockClose = .{
                                 .markLen = markLen,
@@ -2729,17 +2758,28 @@ const DocParser = struct {
                                     .startLine = lineInfo,
                                 },
                             };
+
+                            const playloadRange = codeBlockInfo.blockType.code.startPlayloadRange();
+                            const playload = parser.tmdDoc.rangeData(playloadRange);
+                            const attrs = parse_code_block_open_playload(playload);
+                            if (!std.meta.eql(attrs, .{})) {
+                                var codeBlockAttibutesElement = try list.createListElement(tmd.CodeBlockAttibutes, parser.allocator);
+                                parser.tmdDoc.codeBlockAttibutes.push(codeBlockAttibutesElement);
+                                codeBlockAttibutesElement.value = attrs;
+                                codeBlockInfo.blockType.code.startLine.lineType.codeBlockStart.attrs = &codeBlockAttibutesElement.value;
+                            }
+
                             break :blk codeBlockInfo;
                         } else blk: {
                             std.debug.assert(mark == '"');
 
-                            lineInfo.lineType = .{ .customStart = .{
+                            lineInfo.lineType = .{ .customBlockStart = .{
                                 .markLen = markLen,
                                 .markEndWithSpaces = playloadStart,
                             } };
 
                             boundedBlockStartInfo = .{
-                                .customStart = &lineInfo.lineType.customStart,
+                                .customBlockStart = &lineInfo.lineType.customBlockStart,
                             };
 
                             const customBlockInfo = try parser.createAndPushBlockInfoElement();
@@ -2748,6 +2788,17 @@ const DocParser = struct {
                                     .startLine = lineInfo,
                                 },
                             };
+
+                            const playloadRange = customBlockInfo.blockType.code.startPlayloadRange();
+                            const playload = parser.tmdDoc.rangeData(playloadRange);
+                            const attrs = parse_custom_block_open_playload(playload);
+                            if (!std.meta.eql(attrs, .{})) {
+                                var customBlockAttibutesElement = try list.createListElement(tmd.CustomBlockAttibutes, parser.allocator);
+                                parser.tmdDoc.customBlockAttibutes.push(customBlockAttibutesElement);
+                                customBlockAttibutesElement.value = attrs;
+                                customBlockInfo.blockType.custom.startLine.lineType.customBlockStart.attrs = &customBlockAttibutesElement.value;
+                            }
+
                             break :blk customBlockInfo;
                         };
 
@@ -3248,7 +3299,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
     const commentedOut = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "commentedOut").?;
     const isFooter = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "isFooter").?;
     const horizontalAlign = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "horizontalAlign").?;
-    //const classes = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "classes").?;
+    const cellSpans = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "cellSpans").?;
 
     var lastOrder: isize = -1;
 
@@ -3259,22 +3310,26 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
             switch (item[0]) {
                 '/' => {
                     if (lastOrder >= commentedOut) break;
+                    defer lastOrder = commentedOut;
+
                     if (item.len == 1) break;
                     for (item[1..]) |c| {
                         if (c != '/') break;
                     }
                     attrs.commentedOut = true;
-                    lastOrder = commentedOut;
                 },
                 '&' => {
                     if (lastOrder >= isFooter) break;
+                    defer lastOrder = horizontalAlign;
+
                     if (item.len != 2) break;
                     if (item[1] != '&') break;
                     attrs.isFooter = true;
-                    lastOrder = horizontalAlign;
                 },
                 '>', '<' => {
                     if (lastOrder >= horizontalAlign) break;
+                    defer lastOrder = horizontalAlign;
+
                     if (item.len != 2) break;
                     if (item[1] != '>' and item[1] != '<') break;
                     if (mem.eql(u8, item, "<<"))
@@ -3285,7 +3340,33 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
                         attrs.horizontalAlign = .center
                     else if (mem.eql(u8, item, "<>"))
                         attrs.horizontalAlign = .justify;
-                    lastOrder = horizontalAlign;
+                },
+                '.' => {
+                    if (lastOrder >= cellSpans) break;
+                    defer lastOrder = cellSpans;
+
+                    if (item.len < 3) break;
+                    if (item[1] != '.') break;
+                    const trimDotDot = item[2..];
+                    const colonPos = std.mem.indexOfScalar(u8, trimDotDot, ':') orelse trimDotDot.len;
+                    if (colonPos == 0 or colonPos == trimDotDot.len - 1) break;
+                    const axisSpan = std.fmt.parseInt(u32, trimDotDot[0..colonPos], 10) catch break;
+                    const crossSpan = if (colonPos == trimDotDot.len) 1 else std.fmt.parseInt(u32, trimDotDot[colonPos + 1 ..], 10) catch break;
+                    attrs.cellSpans = .{
+                        .axisSpan = axisSpan,
+                        .crossSpan = crossSpan,
+                    };
+                },
+                ':' => {
+                    if (lastOrder >= cellSpans) break;
+                    defer lastOrder = cellSpans;
+
+                    if (item.len < 2) break;
+                    const crossSpan = std.fmt.parseInt(u32, item[1..], 10) catch break;
+                    attrs.cellSpans = .{
+                        .axisSpan = 1,
+                        .crossSpan = crossSpan,
+                    };
                 },
                 else => {
                     break; // break the loop
@@ -3341,6 +3422,36 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
     return attrs;
 }
 
+pub fn parse_code_block_close_playload(playload: []const u8) tmd.ContentStreamAttributes {
+    var attrs = tmd.ContentStreamAttributes{};
+
+    var arrowFound = false;
+    var content: []const u8 = "";
+
+    var it = mem.splitAny(u8, playload, " \t");
+    var item = it.first();
+    while (true) {
+        if (item.len != 0) {
+            if (!arrowFound) {
+                if (item.len != 2) return attrs;
+                for (item) |c| if (c != '<') return attrs;
+                arrowFound = true;
+            } else if (content.len > 0) {
+                return attrs;
+            } else if (item.len > 0) {
+                content = item;
+            }
+        }
+
+        if (it.next()) |next| {
+            item = next;
+        } else break;
+    }
+
+    attrs.content = content;
+    return attrs;
+}
+
 pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAttibutes {
     var attrs = tmd.CustomBlockAttibutes{};
 
@@ -3378,36 +3489,6 @@ pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAtt
         } else break;
     }
 
-    return attrs;
-}
-
-pub fn parse_block_close_playload(playload: []const u8) tmd.ContentStreamAttributes {
-    var attrs = tmd.ContentStreamAttributes{};
-
-    var arrowFound = false;
-    var content: []const u8 = "";
-
-    var it = mem.splitAny(u8, playload, " \t");
-    var item = it.first();
-    while (true) {
-        if (item.len != 0) {
-            if (!arrowFound) {
-                if (item.len != 2) return attrs;
-                for (item) |c| if (c != '<') return attrs;
-                arrowFound = true;
-            } else if (content.len > 0) {
-                return attrs;
-            } else if (item.len > 0) {
-                content = item;
-            }
-        }
-
-        if (it.next()) |next| {
-            item = next;
-        } else break;
-    }
-
-    attrs.content = content;
     return attrs;
 }
 
