@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const builtin = @import("builtin");
 
 const tmd = @import("tmd.zig");
 const parser = @import("tmd_parser.zig");
@@ -265,7 +266,10 @@ const TmdRender = struct {
     const TableCell = struct {
         row: u32,
         col: u32,
+        endRow: u32,
+        endCol: u32,
         block: *tmd.BlockInfo,
+        next: ?*TableCell = null,
 
         // Used to sort column-oriented table cells.
         fn compare(_: void, x: @This(), y: @This()) bool {
@@ -275,6 +279,23 @@ const TmdRender = struct {
             if (x.row > y.row) return false;
             unreachable;
         }
+
+        const Spans = struct {
+            rowSpan: u32,
+            colSpan: u32,
+        };
+
+        fn spans_RowOriented(
+            self: *const @This(),
+        ) Spans {
+            return .{ .rowSpan = self.endRow - self.row, .colSpan = self.endCol - self.col };
+        }
+
+        fn spans_ColumnOriented(
+            self: *const @This(),
+        ) Spans {
+            return .{ .rowSpan = self.endCol - self.col, .colSpan = self.endRow - self.row };
+        }
     };
 
     fn collectTableCells(self: *TmdRender, firstTableChild: *tmd.BlockInfo) ![]TableCell {
@@ -282,13 +303,17 @@ const TmdRender = struct {
         var firstNonLineChild: ?*tmd.BlockInfo = null;
         var child = firstTableChild;
         while (true) {
-            switch (child.blockType) {
-                .directive => {},
-                .line => {},
-                else => {
-                    numCells += 1;
-                    if (firstNonLineChild == null) firstNonLineChild = child;
-                },
+            check: {
+                switch (child.blockType) {
+                    .blank => unreachable,
+                    .directive => break :check,
+                    .line => break :check,
+                    .base => |base| if (base.attributes().commentedOut) break :check,
+                    else => std.debug.assert(child.isAtom()),
+                }
+
+                numCells += 1;
+                if (firstNonLineChild == null) firstNonLineChild = child;
             }
 
             child = child.getNextSibling() orelse break;
@@ -301,29 +326,105 @@ const TmdRender = struct {
         var row: u32 = 0;
         var col: u32 = 0;
         var index: usize = 0;
-        var rowNeedChange = false;
+
+        var toChangeRow = false;
+        var lastMinEndRow: u32 = 0;
+        var activeOldCells: ?*TableCell = null;
+        var lastActiveOldCell: ?*TableCell = null;
+        var uncheckedCells: ?*TableCell = null;
+
         child = firstNonLineChild orelse unreachable;
         while (true) {
-            switch (child.blockType) {
-                .directive => {},
-                .line => {
-                    rowNeedChange = true;
-                    col = 0;
-                },
-                else => {
-                    if (rowNeedChange) {
-                        row += 1;
-                        rowNeedChange = false;
-                    }
-                    defer col += 1;
-                    defer index += 1;
+            handle: {
+                const rowSpan: u32, const colSpan: u32 = switch (child.blockType) {
+                    .directive => break :handle,
+                    .line => {
+                        toChangeRow = true;
+                        break :handle;
+                    },
+                    .base => |base| blk: {
+                        const attrs = base.attributes();
+                        if (attrs.commentedOut) break :handle;
+                        break :blk .{ attrs.cellSpans.crossSpan, attrs.cellSpans.axisSpan };
+                    },
+                    else => .{ 1, 1 },
+                };
 
-                    cells[index] = .{
-                        .row = row,
-                        .col = col,
-                        .block = child,
-                    };
-                },
+                if (toChangeRow) {
+                    var cell = activeOldCells;
+                    uncheckedCells = while (cell) |c| {
+                        std.debug.assert(c.endRow >= lastMinEndRow);
+                        if (c.endRow > lastMinEndRow) {
+                            activeOldCells = c;
+                            var last = c;
+                            while (last.next) |next| {
+                                std.debug.assert(next.endRow >= lastMinEndRow);
+                                if (next.endRow > lastMinEndRow) {
+                                    last.next = next;
+                                    last = next;
+                                }
+                            }
+                            last.next = null;
+                            break c;
+                        }
+                        cell = c.next;
+                    } else null;
+
+                    activeOldCells = null;
+                    lastActiveOldCell = null;
+
+                    row = lastMinEndRow;
+                    col = 0;
+                    lastMinEndRow = 0;
+
+                    toChangeRow = false;
+                }
+                defer index += 1;
+
+                var cell = uncheckedCells;
+                while (cell) |c| {
+                    if (c.col <= col) {
+                        col = c.endCol;
+                        cell = c.next;
+
+                        if (c.endRow - row > 1) {
+                            if (activeOldCells == null) {
+                                activeOldCells = c;
+                            } else {
+                                lastActiveOldCell.?.next = c;
+                            }
+                            lastActiveOldCell = c;
+                            c.next = null;
+                        }
+                    } else {
+                        uncheckedCells = c;
+                        break;
+                    }
+                } else uncheckedCells = null;
+
+                const endRow = row +| rowSpan;
+                const endCol = col +| colSpan;
+                defer col = endCol;
+
+                cells[index] = .{
+                    .row = row,
+                    .col = col,
+                    .endRow = endRow,
+                    .endCol = endCol,
+                    .block = child,
+                };
+
+                if (lastMinEndRow == 0 or endRow < lastMinEndRow) lastMinEndRow = endRow;
+                if (rowSpan > 1) {
+                    const c = &cells[index];
+                    if (activeOldCells == null) {
+                        activeOldCells = c;
+                    } else {
+                        lastActiveOldCell.?.next = c;
+                    }
+                    lastActiveOldCell = c;
+                    c.next = null;
+                }
             }
 
             child = child.getNextSibling() orelse break;
@@ -333,29 +434,42 @@ const TmdRender = struct {
         return cells;
     }
 
-    fn renderTableHeaderCellBlock(self: *TmdRender, w: anytype, tableHeaderCellBlock: *tmd.BlockInfo) !void {
-        _ = try w.write("<th>\n");
+    fn writeTableCellSpans(w: anytype, spans: TableCell.Spans) !void {
+        std.debug.assert(spans.rowSpan > 0);
+        if (spans.rowSpan != 1) _ = try w.print(" rowspan=\"{}\"", .{spans.rowSpan});
+        std.debug.assert(spans.colSpan > 0);
+        if (spans.colSpan != 1) _ = try w.print(" colspan=\"{}\"", .{spans.colSpan});
+    }
+
+    // ToDo: write align
+    fn renderTableHeaderCellBlock(self: *TmdRender, w: anytype, tableHeaderCellBlock: *tmd.BlockInfo, spans: TableCell.Spans) !void {
+        _ = try w.write("<th");
+        try writeTableCellSpans(w, spans);
+        _ = try w.write(">\n");
         try self.writeUsualContentBlockLines(w, tableHeaderCellBlock, false);
         _ = try w.write("</th>\n");
     }
 
-    fn renderTableCellBlock(self: *TmdRender, w: anytype, tableCellBlock: *tmd.BlockInfo) !void {
+    // ToDo: write align
+    fn renderTableCellBlock(self: *TmdRender, w: anytype, tableCellBlock: *tmd.BlockInfo, spans: TableCell.Spans) !void {
         switch (tableCellBlock.blockType) {
             .header => |header| {
                 if (header.level(self.doc.data) == 1)
-                    return try self.renderTableHeaderCellBlock(w, tableCellBlock);
+                    return try self.renderTableHeaderCellBlock(w, tableCellBlock, spans);
             },
             .base => |_| {
                 if (self.getFollowingLevel1HeaderBlockElement(tableCellBlock.ownerListElement())) |headerElement| {
                     const headerBlock = &headerElement.value;
                     if (headerBlock.getNextSibling() == null)
-                        return try self.renderTableHeaderCellBlock(w, headerBlock);
+                        return try self.renderTableHeaderCellBlock(w, headerBlock, spans);
                 }
             },
             else => {},
         }
 
-        _ = try w.write("<td>\n");
+        _ = try w.write("<td");
+        try writeTableCellSpans(w, spans);
+        _ = try w.write(">\n");
         _ = try self.renderBlock(w, tableCellBlock);
         _ = try w.write("</td>\n");
     }
@@ -379,7 +493,7 @@ const TmdRender = struct {
                 _ = try w.write("<tr>\n");
             }
 
-            try self.renderTableCellBlock(w, cell.block);
+            try self.renderTableCellBlock(w, cell.block, cell.spans_RowOriented());
         }
 
         _ = try w.write("</tr>\n");
@@ -409,7 +523,7 @@ const TmdRender = struct {
                 _ = try w.write("<tr>\n");
             }
 
-            try self.renderTableCellBlock(w, cell.block);
+            try self.renderTableCellBlock(w, cell.block, cell.spans_ColumnOriented());
         }
 
         _ = try w.write("</tr>\n");
@@ -442,6 +556,15 @@ const TmdRender = struct {
 
             break :blk try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
         } else try self.renderTableBlock_RowOriented(w, tableBlockInfo, child);
+
+        if (true and builtin.mode == .Debug) {
+            if (columnOriented) {
+                if (child.getNextSibling()) |sibling|
+                    _ = try self.renderTableBlock_RowOriented(w, tableBlockInfo, sibling);
+
+                _ = try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+            } else _ = try self.renderTableBlock_ColumnOriented(w, tableBlockInfo, child);
+        }
 
         return if (nextBlock) |sibling| sibling.ownerListElement() else &self.nullBlockInfoElement;
     }
@@ -813,11 +936,11 @@ const TmdRender = struct {
                     .code => |code| {
                         const attrs = code.attributes();
                         if (attrs.commentedOut) {
-                            _ = try w.write("\n<div");
-                            if (blockInfo.attributes) |as| {
-                                _ = try writeID(w, as.id);
-                            }
-                            _ = try w.write("></div>\n");
+                            //_ = try w.write("\n<div");
+                            //if (blockInfo.attributes) |as| {
+                            //    _ = try writeID(w, as.id);
+                            //}
+                            //_ = try w.write("></div>\n");
                         } else {
                             try self.writeCodeBlockLines(w, blockInfo, attrs);
                         }
@@ -829,11 +952,11 @@ const TmdRender = struct {
                         const playload = self.doc.data[r.start..r.end];
                         const attrs = parser.parse_custom_block_open_playload(playload);
                         if (attrs.commentedOut) {
-                            _ = try w.write("\n<div");
-                            if (blockInfo.attributes) |as| {
-                                _ = try writeID(w, as.id);
-                            }
-                            _ = try w.write("></div>\n");
+                            //_ = try w.write("\n<div");
+                            //if (blockInfo.attributes) |as| {
+                            //    _ = try writeID(w, as.id);
+                            //}
+                            //_ = try w.write("></div>\n");
                         } else {
                             try self.writeCustomBlock(w, blockInfo, attrs);
                         }
