@@ -2210,10 +2210,7 @@ const DocParser = struct {
 
     nextElementAttributes: ?tmd.ElementAttibutes = null,
 
-    pendingTocHeaderInfo: ?struct {
-        headerBlock: *tmd.BlockInfo,
-        //isFirstLevel: bool,
-    } = null,
+    pendingTocHeaderBlock: ?*tmd.BlockInfo = null,
 
     fn createAndPushBlockInfoElement(parser: *DocParser) !*tmd.BlockInfo {
         var blockInfoElement = try list.createListElement(tmd.BlockInfo, parser.allocator);
@@ -2304,26 +2301,43 @@ const DocParser = struct {
             if (atomBlockInfo.blockType != .base) handle: {
                 atomBlockInfo.setEndLine(&lastLineInfoElement.value);
 
-                const headerInfo = if (parser.pendingTocHeaderInfo) |info| blk: {
-                    std.debug.assert(info.headerBlock == atomBlockInfo);
+                if (parser.pendingTocHeaderBlock) |headerBlock| {
                     std.debug.assert(atomBlockInfo.blockType == .header);
-                    if (atomBlockInfo.blockType.header.isBare()) break :handle;
-                    break :blk info;
-                } else break :handle;
+                    std.debug.assert(headerBlock == atomBlockInfo);
 
-                _ = headerInfo;
-                //if (headerInfo.isFirstLevel and parser.tmdDoc.titleHeader == null) {
-                //    parser.tmdDoc.titleHeader = atomBlockInfo;
-                //    break :handle;
-                //}
+                    const level = headerBlock.blockType.header.level(parser.tmdDoc.data);
+                    if (level == 1) {
+                        if (parser.tmdDoc.titleHeader == null) {
+                            parser.tmdDoc.titleHeader = headerBlock;
+                            break :handle;
+                        }
+                    }
 
-                const element = try list.createListElement(*tmd.BlockInfo, parser.allocator);
-                parser.tmdDoc.tocHeaders.push(element);
-                element.value = atomBlockInfo;
+                    if (headerBlock.blockType.header.isBare()) break :handle;
+
+                    std.debug.assert(1 <= level and level <= tmd.MaxHeaderLevel);
+                    // used as hasNonBareHeaders temporarily.
+                    // Will correct it at the end of parsing.
+                    parser.tmdDoc._headerLevelNeedAdjusted[level - 1] = true;
+
+                    const element = try list.createListElement(*tmd.BlockInfo, parser.allocator);
+                    parser.tmdDoc.tocHeaders.push(element);
+                    element.value = headerBlock;
+                }
             }
         } else std.debug.assert(atomBlockInfo.blockType == .root);
 
-        parser.pendingTocHeaderInfo = null;
+        parser.pendingTocHeaderBlock = null;
+    }
+
+    fn onParseEnd(parser: *DocParser) void {
+        const from = for (&parser.tmdDoc._headerLevelNeedAdjusted, 0..) |has, level| {
+            if (!has) break level + 1;
+        } else return;
+
+        for (from..parser.tmdDoc._headerLevelNeedAdjusted.len) |level| {
+            parser.tmdDoc._headerLevelNeedAdjusted[level] = false;
+        }
     }
 
     fn parseAll(parser: *DocParser, tmdData: []const u8) !void {
@@ -2871,10 +2885,7 @@ const DocParser = struct {
                         if (blockArranger.hasNotActiveBuiltinContainers()) {
                             // Will use the info in setEndLineForAtomBlock.
                             // Note: whether or not headerBlockInfo is empty can't be determined now.
-                            parser.pendingTocHeaderInfo = .{
-                                .headerBlock = headerBlockInfo,
-                                //.isFirstLevel = isFirstLevel,
-                            };
+                            parser.pendingTocHeaderBlock = headerBlockInfo;
                         }
 
                         contentParser.on_new_atom_block(currentAtomBlockInfo);
@@ -3063,6 +3074,8 @@ const DocParser = struct {
         contentParser.on_new_atom_block(currentAtomBlockInfo); // try to determine line-end render manner for the last coment line.
 
         try contentParser.matchLinks(); // ToDo: same effect when being put in the above else-block.
+
+        parser.onParseEnd();
     }
 };
 

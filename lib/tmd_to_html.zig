@@ -133,9 +133,6 @@ const TmdRender = struct {
         var levelOpened: [tmd.MaxHeaderLevel + 1]bool = .{false} ** (tmd.MaxHeaderLevel + 1);
         var lastLevel: u8 = tmd.MaxHeaderLevel + 1;
         var listElement = self.doc.tocHeaders.head();
-        if (listElement) |element| if (element.value.blockType.header.level(self.doc.data) == 1) {
-            listElement = element.next; // skip the title header
-        };
         while (listElement) |element| {
             defer listElement = element.next;
             const headerBlock = element.value;
@@ -894,13 +891,14 @@ const TmdRender = struct {
                         if (header.isBare()) {
                             try self.writeTableOfContents(w, level);
                         } else {
-                            _ = try w.print("\n<h{}", .{level});
-                            try writeBlockAttributes(w, tmdHeaderClass(level), blockInfo.attributes);
+                            const realLevel = if (blockInfo != self.doc.titleHeader and self.doc.headerLevelNeedAdjusted(level)) level + 1 else level;
+                            _ = try w.print("\n<h{}", .{realLevel});
+                            try writeBlockAttributes(w, tmdHeaderClass(realLevel), blockInfo.attributes);
                             _ = try w.write(">\n");
 
                             try self.writeUsualContentBlockLines(w, blockInfo, false);
 
-                            _ = try w.print("</h{}>\n", .{level});
+                            _ = try w.print("</h{}>\n", .{realLevel});
                         }
                     },
                     .usual => |usual| {
@@ -1504,6 +1502,7 @@ const TmdRender = struct {
             2 => "tmd-header-2",
             3 => "tmd-header-3",
             4 => "tmd-header-4",
+            5 => "tmd-header-5", // tmd.MaxHeaderLevel + 1
             else => unreachable,
         };
     }

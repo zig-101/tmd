@@ -193,6 +193,10 @@ img {
   font-size: large;
 }
 
+.tmd-header-5 {
+  font-size: 1em;
+}
+
 .tmd-bold {
   font-weight: bold;
 }

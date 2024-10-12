@@ -19,9 +19,10 @@ pub const Doc = struct {
     blocks: list.List(BlockInfo) = .{}, // ToDo: use SinglyLinkedList
     lines: list.List(LineInfo) = .{}, // ToDo: use SinglyLinkedList
 
-    // ToDo: need an option: whether or not title is set externally.
-    //       If not, the first non-bare h1 header will be viewed as tiltle.
     tocHeaders: list.List(*BlockInfo) = .{},
+    titleHeader: ?*BlockInfo = null,
+    // User should use the headerLevelNeedAdjusted method instead.
+    _headerLevelNeedAdjusted: [MaxHeaderLevel]bool = .{false} ** MaxHeaderLevel,
 
     blocksByID: BlockInfoRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
 
@@ -52,6 +53,11 @@ pub const Doc = struct {
 
     pub fn rangeData(self: *const @This(), r: Range) []const u8 {
         return self.data[r.start..r.end];
+    }
+
+    pub fn headerLevelNeedAdjusted(self: *const @This(), level: u8) bool {
+        std.debug.assert(1 <= level and level <= MaxHeaderLevel);
+        return self._headerLevelNeedAdjusted[level - 1];
     }
 };
 
