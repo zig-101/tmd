@@ -2055,8 +2055,10 @@ const LineScanner = struct {
         return null;
     }
 
-    fn peekPrefix(ls: *LineScanner, prefix: []const u8) bool {
-        return std.mem.startsWith(u8, ls.data[ls.cursor..], prefix);
+    fn checkFollowing(ls: *LineScanner, prefix: []const u8) bool {
+        const k = ls.cursor + 1;
+        if (k >= ls.data.len) return false;
+        return std.mem.startsWith(u8, ls.data[k..], prefix);
     }
 
     // ToDo: return the blankStart instead?
@@ -2813,25 +2815,27 @@ const DocParser = struct {
                         if (lineScanner.peekNext() != '#') {
                             lineScanner.setCursor(contentStart);
                             break :handle;
+                        } else {
+                            lineScanner.advance(1);
+                            if (lineScanner.peekNext() != '#') {
+                                lineScanner.setCursor(contentStart);
+                                break :handle;
+                            }
                         }
 
-                        var isFirstLevel = false;
+                        var isFirstLevel = true;
                         lineScanner.advance(1);
                         const markLen = if (lineScanner.peekNext()) |c| blk: {
+                            lineScanner.advance(1);
                             switch (c) {
                                 '#', '=', '+', '-' => |mark| {
                                     isFirstLevel = mark == '#';
-                                    lineScanner.advance(2);
-                                    break :blk 3 + lineScanner.readUntilNotChar(mark);
+                                    lineScanner.advance(1);
+                                    break :blk 4 + lineScanner.readUntilNotChar(mark);
                                 },
-                                else => break :blk 2,
+                                else => break :blk 3,
                             }
-                        } else 2;
-
-                        if (markLen == 2) {
-                            lineScanner.setCursor(contentStart);
-                            break :handle;
-                        }
+                        } else 3;
 
                         const markEnd = lineScanner.cursor;
                         if (lineScanner.lineEnd) |_| {
