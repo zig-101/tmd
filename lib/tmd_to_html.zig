@@ -200,7 +200,7 @@ const TmdRender = struct {
             _ = try w.print("<li id=\"fn:{s}\" class=\"tmd-list-item tmd-footnote-item\">\n", .{footnote.id});
             const missing_flag = if (footnote.block) |block| blk: {
                 switch (block.blockType) {
-                    .bullet => _ = try self.renderBlockChildren(w, block.ownerListElement(), 0),
+                    .item => _ = try self.renderBlockChildren(w, block.ownerListElement(), 0),
                     else => _ = try self.renderBlock(w, block),
                 }
                 break :blk "";
@@ -254,7 +254,7 @@ const TmdRender = struct {
             // if (nextElement == &self.nullBlockInfoElement) return nextElement; // will enter the else branch below
 
             switch (nextElement.value.blockType) {
-                .bullet => |listItem| {
+                .item => |listItem| {
                     if (listItem.list != listBlockInfo) return nextElement;
                     lastElement = nextElement.prev.?;
                 },
@@ -557,7 +557,7 @@ const TmdRender = struct {
             break :blk try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
         } else try self.renderTableBlock_RowOriented(w, tableBlockInfo, child);
 
-        if (true and builtin.mode == .Debug) {
+        if (false and builtin.mode == .Debug) {
             if (columnOriented) {
                 if (child.getNextSibling()) |sibling|
                     _ = try self.renderTableBlock_RowOriented(w, tableBlockInfo, sibling);
@@ -768,7 +768,7 @@ const TmdRender = struct {
                             },
                         }
                     },
-                    .bullet => |*listItem| {
+                    .item => |*listItem| {
                         switch (listItem.list.blockType.list.listType) {
                             .bullets => {
                                 _ = try w.write("\n<li");
@@ -858,7 +858,7 @@ const TmdRender = struct {
                         }
                         _ = try w.write("\n</div>\n");
                     },
-                    .note => {
+                    .notice => {
                         _ = try w.write("\n<div");
                         try writeBlockAttributes(w, "tmd-note", blockInfo.attributes);
                         _ = try w.write(">\n");
@@ -1619,7 +1619,7 @@ const TmdRender = struct {
 
                     // containers
 
-                    .list, .bullet, .table, .quotation, .note, .reveal, .unstyled => {
+                    .list, .item, .table, .quotation, .notice, .reveal, .unstyled => {
                         element = try self.renderTmdCodeForBlockChildren(w, element);
                     },
 

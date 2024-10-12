@@ -285,10 +285,10 @@ pub const BlockInfo = struct {
             },
             .list => |itemList| blk: {
                 std.debug.assert(itemList._lastBulletConfirmed);
-                break :blk itemList.lastBullet.blockType.bullet.nextSibling;
+                break :blk itemList.lastBullet.blockType.item.nextSibling;
             },
-            .bullet => |*bullet| if (bullet.ownerBlockInfo() == bullet.list.blockType.list.lastBullet) null else bullet.nextSibling,
-            inline .table, .quotation, .note, .reveal, .unstyled => |container| blk: {
+            .item => |*item| if (item.ownerBlockInfo() == item.list.blockType.list.lastBullet) null else item.nextSibling,
+            inline .table, .quotation, .notice, .reveal, .unstyled => |container| blk: {
                 const nextBlock = container.nextSibling orelse break :blk null;
                 // ToDo: the assurence might be unnecessary.
                 break :blk if (nextBlock.nestingDepth == self.nestingDepth) nextBlock else null;
@@ -315,10 +315,10 @@ pub const BlockInfo = struct {
             },
             .list => |itemList| {
                 std.debug.assert(itemList._lastBulletConfirmed);
-                itemList.lastBullet.blockType.bullet.nextSibling = sibling;
+                itemList.lastBullet.blockType.item.nextSibling = sibling;
                 unreachable;
             },
-            inline .bullet, .table, .quotation, .note, .reveal, .unstyled => |*container| {
+            inline .item, .table, .quotation, .notice, .reveal, .unstyled => |*container| {
                 container.nextSibling = sibling;
             },
             else => {
@@ -340,7 +340,7 @@ pub const BlockType = union(enum) {
 
     // ToDo: add .firstBlock and .lastBlock fileds for container blocks?
 
-    bullet: struct {
+    item: struct {
         //isFirst: bool, // ToDo: can be saved
         //isLast: bool, // ToDo: can be saved (need .list.lastItem)
 
@@ -358,7 +358,7 @@ pub const BlockType = union(enum) {
         }
 
         pub fn ownerBlockInfo(self: *const @This()) *BlockInfo {
-            const blockType: *BlockType = @alignCast(@fieldParentPtr("bullet", @constCast(self)));
+            const blockType: *BlockType = @alignCast(@fieldParentPtr("item", @constCast(self)));
             return blockType.ownerBlockInfo();
         }
     },
@@ -396,7 +396,7 @@ pub const BlockType = union(enum) {
         const Container = void;
         nextSibling: ?*BlockInfo = null,
     },
-    note: struct {
+    notice: struct {
         const Container = void;
         nextSibling: ?*BlockInfo = null,
     },
@@ -680,7 +680,7 @@ pub const LineEndType = enum {
 // ToDo: use an enum filed + common fileds.
 //       And use u30 for cursor values.
 pub const ContainerLeadingMark = union(enum) {
-    bullet: struct {
+    item: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
@@ -692,7 +692,7 @@ pub const ContainerLeadingMark = union(enum) {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
-    note: struct {
+    notice: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
