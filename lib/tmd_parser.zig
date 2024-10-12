@@ -546,6 +546,10 @@ const ContentParser = struct {
         self.linkSpanStatus = self.span_status(.link);
     }
 
+    fn isCommentLineParser(self: *const ContentParser) bool {
+        return self == self.docParser.commentLineParser;
+    }
+
     fn span_status(self: *ContentParser, markType: tmd.SpanMarkType) *SpanStatus {
         return &self.blockSession.spanStatuses[markType.asInt()];
     }
@@ -655,13 +659,13 @@ const ContentParser = struct {
         return &tokenInfoElement.value;
     }
 
-    fn create_comment_text_token(self: *ContentParser, start: u32, end: u32) !*tmd.TokenInfo {
+    fn create_comment_text_token(self: *ContentParser, start: u32, end: u32, inDirective: bool) !*tmd.TokenInfo {
         var tokenInfo = try self.create_token();
         tokenInfo.tokenType = .{
             .commentText = .{
                 .start = start,
                 .end = end,
-                .inDirective = self.lineSession.currentLine.isDirective(),
+                .inDirective = inDirective, // self.lineSession.currentLine.isDirective(),
             },
         };
         return tokenInfo;
@@ -766,7 +770,7 @@ const ContentParser = struct {
                 .markType = markType,
                 .markLen = @intCast(markLen),
                 .blankLen = undefined, // will be modified later
-                .inDirective = self.lineSession.currentLine.isDirective(),
+                .inComment = self.isCommentLineParser(),
                 .blankSpan = false, // will be determined finally later
             },
         };
@@ -812,7 +816,7 @@ const ContentParser = struct {
                 .markType = markType,
                 .markLen = @intCast(markLen),
                 .blankLen = undefined, // will be modified later
-                .inDirective = self.lineSession.currentLine.isDirective(),
+                .inComment = self.isCommentLineParser(),
                 .blankSpan = isBlankSpan,
             },
         };
@@ -860,35 +864,18 @@ const ContentParser = struct {
     }
 
     fn parse_directive_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32) !u32 {
-        const lineScanner = &self.docParser.lineScanner;
-
         self.set_currnet_line(lineInfo, lineStart);
 
-        const isComment = blk: {
-            const c = lineScanner.peekCursor();
-            switch (c) {
-                '_' => {
-                    if (lineScanner.peekNext() != '_') {
-                        break :blk true;
-                    }
-                    break :blk false;
-                },
-                else => break :blk true,
-            }
-        };
+        const lineScanner = &self.docParser.lineScanner;
 
-        if (isComment) {
-            const textStart = lineScanner.cursor;
-            const numBlanks = lineScanner.readUntilLineEnd();
-            const textEnd = lineScanner.cursor - numBlanks;
-            if (textEnd > textStart) {
-                _ = try self.create_comment_text_token(textStart, textEnd);
-            }
-
-            return textEnd;
+        const textStart = lineScanner.cursor;
+        const numBlanks = lineScanner.readUntilLineEnd();
+        const textEnd = lineScanner.cursor - numBlanks;
+        if (textEnd > textStart) {
+            _ = try self.create_comment_text_token(textStart, textEnd, true);
         }
 
-        return try self.parse_line_tokens(false);
+        return textEnd;
     }
 
     fn parse_usual_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32, handleLineSpanMark: bool) !u32 {
@@ -948,20 +935,37 @@ const ContentParser = struct {
                     textStart = lineScanner.cursor;
                     leadingMark.blankLen = textStart - markEnd;
 
-                    if (leadingMarkType == .lineBreak) break :handle_leading_mark;
+                    switch (leadingMarkType) {
+                        .lineBreak => break :handle_leading_mark,
+                        .comment => {
+                            const isLineDefinition = lineScanner.peekCursor() == '_' and lineScanner.peekNext() == '_';
+                            if (!isLineDefinition) {
+                                const numBlanks = lineScanner.readUntilLineEnd();
+                                const textEnd = lineScanner.cursor - numBlanks;
+                                std.debug.assert(textEnd > textStart);
+                                _ = try self.create_comment_text_token(textStart, textEnd, false);
+                                break :parse_tokens textEnd;
+                            }
 
-                    const numBlanks = lineScanner.readUntilLineEnd();
-                    const textEnd = lineScanner.cursor - numBlanks;
+                            // jump out of the swith block
+                        },
+                        .media => {
+                            const numBlanks = lineScanner.readUntilLineEnd();
+                            const textEnd = lineScanner.cursor - numBlanks;
+                            std.debug.assert(textEnd > textStart);
+                            _ = try self.create_plain_text_token(textStart, textEnd);
+                            break :parse_tokens textEnd;
+                        },
+                    }
 
-                    std.debug.assert(textEnd > textStart);
+                    // To parse link definition tokens.
 
-                    _ = switch (leadingMarkType) {
-                        .comment => try self.create_comment_text_token(textStart, textEnd),
-                        .media => try self.create_plain_text_token(textStart, textEnd),
-                        else => unreachable,
-                    };
+                    std.debug.assert(leadingMarkType == .comment);
 
-                    break :parse_tokens textEnd;
+                    const commentLineParser = self.docParser.commentLineParser;
+                    commentLineParser.on_new_atom_block(self.blockSession.atomBlock);
+                    commentLineParser.set_currnet_line(self.lineSession.currentLine, textStart);
+                    break :parse_tokens try commentLineParser.parse_line_tokens(false);
                 }
             }
 
@@ -1262,7 +1266,7 @@ const ContentParser = struct {
 
         std.debug.assert(lineScanner.lineEnd != null);
 
-        if (lineScanner.lineEnd != .void) {
+        if (self.isCommentLineParser()) {} else if (lineScanner.lineEnd != .void) {
             self.try_to_determine_line_end_render_manner();
         } else if (self.blockSession.lineWithPendingLineEndRenderManner) |line| {
             line.treatEndAsSpace = false;
@@ -1703,7 +1707,7 @@ const ContentParser = struct {
 
         fn doForLinkDefinition(self: @This(), linkDef: *LinkForTree) void {
             const linkInfo = linkDef.info();
-            std.debug.assert(linkInfo.inDirective());
+            std.debug.assert(linkInfo.inComment());
 
             const urlSource = linkInfo.info.urlSourceText.?;
             const confirmed = linkInfo.urlConfirmed();
@@ -1811,7 +1815,7 @@ const ContentParser = struct {
                     // handle the last text token
                     {
                         const str = trim_blanks(self.tokenAsString(lastToken));
-                        if (linkInfo.inDirective()) {
+                        if (linkInfo.inComment()) {
                             if (copyLinkText(DummyLinkText{}, 0, str) == 0) {
                                 // This link definition will be ignored.
 
@@ -1872,7 +1876,7 @@ const ContentParser = struct {
 
                         // handle the last text token
                         const str = trim_blanks(self.tokenAsString(lastToken));
-                        if (linkInfo.inDirective()) {
+                        if (linkInfo.inComment()) {
                             std.debug.assert(linkTextLen2 == linkTextLen);
 
                             //std.debug.print("    222 linkText = {s}\n", .{revisedLinkText.asString()});
@@ -1897,7 +1901,7 @@ const ContentParser = struct {
                         }
                     };
 
-                    std.debug.assert(linkInfo.inDirective());
+                    std.debug.assert(linkInfo.inComment());
 
                     linkInfo.setSourceOfURL(lastToken, confirmed);
                     matcher.doForLinkDefinition(linkForTree);
@@ -1918,7 +1922,7 @@ const ContentParser = struct {
             while (element) |theElement| {
                 const linkForTree = &theElement.value;
                 const theLinkInfo = linkForTree.info();
-                if (theLinkInfo.inDirective()) {
+                if (theLinkInfo.inComment()) {
                     std.debug.assert(theLinkInfo.info == .urlSourceText);
                     matcher.doForLinkDefinition(linkForTree);
                 } else if (theLinkInfo.info != .urlSourceText) {
@@ -2206,6 +2210,7 @@ const DocParser = struct {
     tmdDoc: *tmd.Doc,
     numBlocks: u32 = 0,
 
+    commentLineParser: *ContentParser = undefined,
     lineScanner: LineScanner,
 
     nextElementAttributes: ?tmd.ElementAttibutes = null,
@@ -2345,11 +2350,16 @@ const DocParser = struct {
         var blockArranger = BlockArranger.start(rootBlockInfo, parser.tmdDoc);
         defer blockArranger.end();
 
-        const lineScanner = &parser.lineScanner;
+        var commentLineParser = ContentParser.make(parser);
+        commentLineParser.init();
+        defer commentLineParser.deinit(); // ToDo: needed?
+        parser.commentLineParser = &commentLineParser;
 
         var contentParser = ContentParser.make(parser);
         contentParser.init();
         defer contentParser.deinit(); // ToDo: needed?
+
+        const lineScanner = &parser.lineScanner;
 
         var listCount: u32 = 0;
 

@@ -1225,7 +1225,7 @@ const TmdRender = struct {
                                 .lineBreak => {
                                     _ = try w.write("<br/>");
                                 },
-                                .comment => {},
+                                .comment => break,
                                 .media => blk: {
                                     if (tracker.activeLinkInfo) |_| {
                                         tracker.firstPlainTextInLink = false;

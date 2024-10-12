@@ -887,7 +887,7 @@ pub const TokenType = union(enum) {
         // The value should be the same as the end of line.
         end: u32,
 
-        inDirective: bool,
+        inDirective: bool, // ToDo: don't use commentText tokens for directive lines.
     },
     evenBackticks: struct {
         start: u32,
@@ -912,7 +912,7 @@ pub const TokenType = union(enum) {
         markLen: u8, // without the secondary char
         blankSpan: bool, // enclose no texts (plainTexts or treatEndAsSpace)
 
-        inDirective: bool, // for .linkInfo
+        inComment: bool, // for .linkInfo
         urlConfirmed: bool = false, // for .linkInfo
         isFootnote: bool = false, // for .linkInfo
 
@@ -948,8 +948,8 @@ pub const TokenType = union(enum) {
             self.followingOpenLinkSpanMark().isFootnote = is;
         }
 
-        pub fn inDirective(self: *const @This()) bool {
-            return self.followingOpenLinkSpanMark().inDirective;
+        pub fn inComment(self: *const @This()) bool {
+            return self.followingOpenLinkSpanMark().inComment;
         }
 
         pub fn urlConfirmed(self: *const @This()) bool {
