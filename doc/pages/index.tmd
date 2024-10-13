@@ -42,7 +42,7 @@ $$subscript$$ and ^$$superscript$$.
 
 This is __a self-defined link``https://go101.org__,
 this is __a broken link__,
-and this is ^__underlined text__.
+and this is ^__an underlined text__.
 
 This is a code span: ` var ok = x && y `.
 
@@ -265,7 +265,7 @@ The below is a horizontal line.
 
 @@@ This is a directive block. The texts here must be
 @@@ of certain formats to be meaningful.
-@@@ We can specify IDs and classes for the next block.
+@@@ We can specify ID and classes for the next block here.
 
 @@@ #code-snippet-1
 . ### code-snippet-1.zig

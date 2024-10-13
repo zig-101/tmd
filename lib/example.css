@@ -242,10 +242,20 @@ body {
 
 .tmd-marked {
   background: yellow;
+  padding: 0;
+}
+
+.tmd-marked::selection {
+  background: #aae;
 }
 
 .tmd-marked-2 {
   background: #faa;
+  padding: 0;
+}
+
+.tmd-marked-2::selection {
+  background: #aea;
 }
 
 .tmd-underlined {
