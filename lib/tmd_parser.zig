@@ -2815,7 +2815,7 @@ const DocParser = struct {
                                 },
                             };
 
-                            const playloadRange = customBlockInfo.blockType.code.startPlayloadRange();
+                            const playloadRange = customBlockInfo.blockType.custom.startPlayloadRange();
                             const playload = parser.tmdDoc.rangeData(playloadRange);
                             const attrs = parse_custom_block_open_playload(playload);
                             if (!std.meta.eql(attrs, .{})) {

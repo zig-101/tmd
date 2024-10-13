@@ -588,7 +588,7 @@ const TmdRender = struct {
             const blockInfo = &headerElement.value;
 
             _ = try w.write("<div");
-            try writeBlockAttributes(w, "tmd-note-header", blockInfo.attributes);
+            try writeBlockAttributes(w, "tmd-notice-header", blockInfo.attributes);
             _ = try w.write(">\n");
             try self.writeUsualContentBlockLines(w, blockInfo, false);
             _ = try w.write("</div>");
@@ -596,7 +596,7 @@ const TmdRender = struct {
             break :blk headerElement;
         } else parentElement;
 
-        _ = try w.write("\n<div class=\"tmd-note-content\">\n");
+        _ = try w.write("\n<div class=\"tmd-notice-content\">\n");
 
         const element = self.renderNextBlocks(w, parentElement.value.nestingDepth, afterElement, atMostCount);
         _ = try w.write("\n</div>\n");
@@ -857,7 +857,7 @@ const TmdRender = struct {
                     },
                     .notice => {
                         _ = try w.write("\n<div");
-                        try writeBlockAttributes(w, "tmd-note", blockInfo.attributes);
+                        try writeBlockAttributes(w, "tmd-notice", blockInfo.attributes);
                         _ = try w.write(">\n");
                         element = try self.renderBlockChildrenForNoteBlock(w, element, 0);
                         _ = try w.write("\n</div>\n");
@@ -1257,7 +1257,7 @@ const TmdRender = struct {
                                         if (isInline) {
                                             _ = try w.write("\" class=\"tmd-inline-media\"/>");
                                         } else {
-                                            _ = try w.write("\"/>");
+                                            _ = try w.write("\" class=\"tmd-media\"/>");
                                         }
                                     }
 

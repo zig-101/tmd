@@ -3,12 +3,8 @@ body {
   padding: 0px 20px;
 }
 
-img {
-  vertical-align:middle;
-}
-
 .tmd-doc {
-  font-size: 16px;
+  font-size: 1.125em;
   line-height: 1.5;
 }
 
@@ -101,7 +97,6 @@ img {
 .tmd-quotation > .tmd-footer {
   color: #666;
   font-style: italic;
-  font-size: 1em;
   position: relative;
   margin-left: 1em;
 }
@@ -137,18 +132,18 @@ img {
 
 
 
-.tmd-note {
+.tmd-notice {
   border: solid 1px #000;
   margin: 3px 32px;
   padding: 0px;
 }
 
-.tmd-note-header {
+.tmd-notice-header {
   background: #ccc;
   padding: 0 5px;
 }
 
-.tmd-note-content {
+.tmd-notice-content {
   padding: 5px;
 }
 
@@ -281,10 +276,11 @@ img {
 
 .tmd-inline-media {
   height: 1em;
-  vertical-align:middle;
+  vertical-align: middle;
 }
 
-
+.tmd-media {
+}
 
 ol.tmd-footnotes {
   font-size: smaller;
@@ -297,6 +293,11 @@ ol.tmd-footnotes > li::marker {
 
 table.tmd-table {
   border-collapse: collapse;
+  font-size:1em;
+}
+
+table.tmd-table th {
+  background: #ccc;
 }
 
 table.tmd-table th,td {

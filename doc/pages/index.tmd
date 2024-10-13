@@ -5,20 +5,20 @@ Tapir's Markdown (TMD) is a distinct evolution of traditional markdown __#note-1
 offering both increased specificity and enhanced power
 while preserving the familiar readability of its predecessor.
 
-##-
+###-
 
 @@@ #section-demos
-##======= Demos
+###======= Demos
 
 @@@ #section-demo-1
-##+++++++++++++++++++++++++++++++++++++++++
+###+++++++++++++++++++++++++++++++++++++++++
 	Demo 1 (span styles)
 
-. ### TMD source of demo 1
+# ### TMD source
+  ### Render result
+--------------------------
 '''''
 ''''' << #demo-1
-
-! ### **Render result of demo 1
 @@@ #demo-1
 {
 **bold text** and ^**dimmed text**.
@@ -50,14 +50,14 @@ This is a code span: ` var ok = x && y `.
 }
 
 @@@ #section-demo-2
-##+++++++++++++++++++++++++++++++++++++++++
+###+++++++++++++++++++++++++++++++++++++++++
 	Demo 2 (line leading marks)
 
-. ### TMD source of demo 2
+# ### TMD source
+  ### Render result
+--------------------------
 '''''
 ''''' << #demo-2
-
-! ### **Render result of demo 2
 @@@ #demo-2
 {
 A comment line is between the following two words: foo
@@ -74,17 +74,17 @@ This block
 }
 
 @@@ #section-demo-3
-##+++++++++++++++++++++++++++++++++++++++++
+###+++++++++++++++++++++++++++++++++++++++++
 	Demo 3 (link definitions)
 
-. ### TMD source of demo 3
+# ### TMD source
+  ### Render result
+--------------------------
 '''''
 ''''' << #demo-3
-
-! ### **Render result of demo 3
 @@@ #demo-3
 {
-@@@__Go 101 website ` https://go101.org
+// __Go 101 website ` https://go101.org
 
 Visit __Go 101 website__ (the link is defined above) __#note-2__.
 
@@ -92,33 +92,48 @@ Go 1.22 broke backwards compatibility. More information
 is on __`for` Loop Semantic Changes in Go 1.22:
 Be Aware of the Impact__ (the link is defined below).
 
-@@@__for Loop... :: https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+// __for Loop... :: https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
 
 __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 (the link is defined below).
 
-@@@__...in Go ~~ https://go101.org/blog/2022-10-01-three-way-string-comparison.html
+// __...in Go ~~ https://go101.org/blog/2022-10-01-three-way-string-comparison.html
 }
 
 @@@ #section-demo-4
-##+++++++++++++++++++++++++++++++++++++++++
+###+++++++++++++++++++++++++++++++++++++++++
 	Demo 4 (built-in containers)
 
-. ### TMD source of demo 4
+# ### TMD source
+  ### Render result
+--------------------------
 '''''
 ''''' << #demo-4
-
-! ### **Render result of demo 4
 @@@ #demo-4
 {
-* This is a 1st-level list item.
-  -. This is a 2nd-level list item (ordered).
-  -. This is another 2nd-level list item (ordered).
-* This is another 1st-level list item.
-  - This is a 2nd-level list item (unordered).
-  - This is another 2nd-level list item (unordered).
+*. This is a 1st-level list item (ordered)..
+  {
+  - This is a 2nd-level list item
+  - This is another 2nd-level list item.
+  }
+  This is still in the 1st-level list item.
+
+*. This is another 1st-level list item (ordered).
+  The following is a definition list:
+  : ### Term 1
+    ;;; Explanations of term 1.
+  : ### Term 2
+    ;;; Explanations of term 2.
 
 . // force ending of a container
+  
+Another definition list:
+:. ### Term 3
+  ;;; Explanations of term 3.
+:. ### Term 4
+  ;;; Explanations of term 4.
+
+.
 
 * ### Tab 1
   -. This is a 2nd-level list item (ordered).
@@ -126,6 +141,8 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 * ### Tab 2
   - This is a 2nd-level list item (unordered).
   - This is another 2nd-level list item (unordered).
+
+.
 
 : This is an intended block.
 
@@ -157,27 +174,97 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
   }
 }
 
-@@@ #section-demo-5
-##+++++++++++++++++++++++++++++++++++++++++
-	Demo 5 (atom blocks)
 
-. ### TMD source of demo 5
+
+@@@ #section-demo-5
+###+++++++++++++++++++++++++++++++++++++++++
+	Demo 5 (table)
+
+# ### TMD source
+  ### Render result
+--------------------------
 '''''
 ''''' << #demo-5
-
-! ### **Render result of demo 5
 @@@ #demo-5
 {
-####### Header 1
+A table (row-oriented):
 
-##====== Header 2
+# ;;; 11
+  {..2:2
+  22
+  }
+  {..2:1
+  21
+  }
+  -----
+  ;;; 11
+  {:3
+  13
+  }
+  ;;; 11
+  ---------
+  {..4
+  31
+  }
+  {..1:2
+  12
+  }
+  ---------
+  ;;; 11
+  ;;; 11
+  ;;; 11
 
-##++++++ Header 3
+Another table (column-oriented):
 
-##------ Header 4
+#
+  ;;; 11
+  {..2:2
+  22
+  }
+  {..2:1
+  21
+  }
+  -----
+  ;;; 11
+  {:3
+  13
+  }
+  ;;; 11
+  ---------
+  {..4
+  31
+  }
+  {..1:2
+  12
+  }
+  ---------
+  ;;; 11
+  ;;; 11
+  ;;; 11
+}
+
+@@@ #section-demo-6
+###+++++++++++++++++++++++++++++++++++++++++
+	Demo 6 (atom blocks)
+
+# ### TMD source
+  ### Render result
+--------------------------
+'''''
+''''' << #demo-6
+@@@ #demo-6
+{
+####### Header 1 (for titles generally)
+
+###====== Header 2
+
+###++++++ Header 3
+
+###------ Header 4
 
 This is a usual block. Nothing special.
 
+;;; This is also a usual block.
 The below is a horizontal line.
 
 ---
@@ -189,24 +276,24 @@ The below is a horizontal line.
 @@@ #code-snippet-1
 . ### code-snippet-1.zig
 '''zig
-	const std = @import("std");
-	
-	pub fn main() void {
-		std.log.info("TMD, yes!", .{});
-	}
+  const std = @import("std");
+
+  pub fn main() void {
+    std.log.info("TMD, yes!", .{});
+  }
 '''
 }
 
-@@@ #section-demo-6
-##+++++++++++++++++++++++++++++++++++++++++
-	Demo 6 (line spacing)
+@@@ #section-demo-7
+###+++++++++++++++++++++++++++++++++++++++++
+	Demo 7 (line spacing)
 
-. ### TMD source of demo 6
+# ### TMD source
+  ### Render result
+--------------------------
 '''
-''' << #demo-6
-
-! ### **Render result of demo 6
-@@@ #demo-6
+''' << #demo-7
+@@@ #demo-7
 {
 
 hello
@@ -234,16 +321,16 @@ hello
 world
 }
 
-@@@ #section-demo-7
-##+++++++++++++++++++++++++++++++++++++++++
-	Demo 7 (character escaping)
+@@@ #section-demo-8
+###+++++++++++++++++++++++++++++++++++++++++
+	Demo 8 (character escaping)
 
-. ### TMD source of demo 7
+# ### TMD source
+  ### Render result
+--------------------------
 '''''
-''''' << #demo-7
-
-! ### **Render result of demo 7
-@@@ #demo-7
+''''' << #demo-8
+@@@ #demo-8
 {
 !! ** all marks %% are escaped ** `` !!!. !!
 
