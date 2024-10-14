@@ -1044,10 +1044,11 @@ const TmdRender = struct {
         _ = try w.write("<pre");
         try writeBlockAttributes(w, "tmd-code", blockInfo.attributes);
         if (attrs.language.len > 0) {
-            _ = try w.write("\"><code class=\"language-");
+            _ = try w.write("><code class=\"language-");
             try writeHtmlAttributeValue(w, attrs.language);
+            _ = try w.write("\"");
         }
-        _ = try w.write("\">");
+        _ = try w.write(">");
 
         const endLine = blockInfo.getEndLine();
         const startLine = blockInfo.getStartLine();
