@@ -1310,9 +1310,9 @@ const TmdRender = struct {
                     try writeCloseMarks(w, markElement);
 
                     if (linkInfo.urlConfirmed()) {
-                        _ = try w.write("</a></sup>");
+                        _ = try w.write("</a>");
                     } else {
-                        _ = try w.write("</span></sup>");
+                        _ = try w.write("</span>");
                     }
 
                     try writeOpenMarks(w, markElement);

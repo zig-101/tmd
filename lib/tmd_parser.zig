@@ -3270,7 +3270,7 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
 
     var it = mem.splitAny(u8, playload, " \t");
     var item = it.first();
-    while (true) {
+    parse: while (true) {
         if (item.len != 0) {
             switch (item[0]) {
                 '#' => {
@@ -3278,7 +3278,7 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
                     if (item.len == 1) break;
                     if (item[1] >= 128 or charIdLevels[item[1]] != 6) break;
                     for (item[2..]) |c| {
-                        if (c >= 128 or charIdLevels[c] < 2) break;
+                        if (c >= 128 or charIdLevels[c] < 2) break :parse;
                     }
                     attrs.id = item[1..];
                     lastOrder = id;
@@ -3332,7 +3332,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
 
     var it = mem.splitAny(u8, playload, " \t");
     var item = it.first();
-    while (true) {
+    parse: while (true) {
         if (item.len != 0) {
             switch (item[0]) {
                 '/' => {
@@ -3341,7 +3341,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
 
                     if (item.len == 1) break;
                     for (item[1..]) |c| {
-                        if (c != '/') break;
+                        if (c != '/') break :parse;
                     }
                     attrs.commentedOut = true;
                 },
@@ -3419,14 +3419,14 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
 
     var it = mem.splitAny(u8, playload, " \t");
     var item = it.first();
-    while (true) {
-        if (item.len != 0) handle: {
+    parse: while (true) {
+        if (item.len != 0) {
             switch (item[0]) {
                 '/' => {
-                    if (lastOrder >= commentedOut) break :handle;
-                    if (item.len == 1) break :handle;
+                    if (lastOrder >= commentedOut) break;
+                    if (item.len == 1) break;
                     for (item[1..]) |c| {
-                        if (c != '/') break :handle;
+                        if (c != '/') break :parse;
                     }
                     attrs.commentedOut = true;
                     //lastOrder = commentedOut;
@@ -3489,14 +3489,14 @@ pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAtt
 
     var it = mem.splitAny(u8, playload, " \t");
     var item = it.first();
-    while (true) {
-        if (item.len != 0) handle: {
+    parse: while (true) {
+        if (item.len != 0) {
             switch (item[0]) {
                 '/' => {
-                    if (lastOrder >= commentedOut) break :handle;
-                    if (item.len == 1) break :handle;
+                    if (lastOrder >= commentedOut) break;
+                    if (item.len == 1) break;
                     for (item[1..]) |c| {
-                        if (c != '/') break :handle;
+                        if (c != '/') break :parse;
                     }
                     attrs.commentedOut = true;
                     //lastOrder = commentedOut;
@@ -3520,9 +3520,9 @@ pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAtt
 }
 
 pub fn isValidURL(text: []const u8) bool {
-    // ToDo: more precisely.
+    // ToDo: more precisely and performant.
 
-    return mem.startsWith(u8, text, "#") or mem.startsWith(u8, text, "http") or mem.endsWith(u8, text, ".htm") or mem.endsWith(u8, text, ".html");
+    return mem.startsWith(u8, text, "#") or mem.startsWith(u8, text, "http") or mem.indexOf(u8, text, ".htm") != null or mem.indexOf(u8, text, ".html") != null;
 }
 
 pub fn trim_blanks(str: []const u8) []const u8 {
