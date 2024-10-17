@@ -969,6 +969,12 @@ const ContentParser = struct {
                 }
             }
 
+            if (lineScanner.lineEnd != null) {
+                std.debug.assert(lineScanner.cursor > textStart);
+                _ = try self.create_plain_text_token(textStart, lineScanner.cursor);
+                break :parse_tokens lineScanner.cursor;
+            }
+
             const escapedSpanStatus = self.escapedSpanStatus;
             const codeSpanStatus = self.codeSpanStatus;
 
