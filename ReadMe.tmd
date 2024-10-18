@@ -2,7 +2,7 @@
 ### Tapir's markdown (TMD) format
 
 Run `zig build` to build the `tmd` command.
-Now it only supports the folloiwng commands:
+Now it only supports the following commands:
 * `tmd render foo.tmd bar.tmd`
 * `tmd render --full-html foo.tmd bar.tmd`
 
