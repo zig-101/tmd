@@ -75,6 +75,7 @@ const BlockArranger = struct {
 
     const BaseContext = struct {
         nestingDepth: tmd.BlockNestingDepthType,
+        commentedOut: bool,
 
         // !!! here, u6 must be larger than tmd.ListBulletTypeIndex.
         openingListNestingDepths: [tmd.MaxListNestingDepthPerBase]u6 = [_]u6{0} ** tmd.MaxListNestingDepthPerBase,
@@ -94,6 +95,7 @@ const BlockArranger = struct {
         s.stackedBlocks[0] = root;
         s.openingBaseBlocks[0] = BaseContext{
             .nestingDepth = 0,
+            .commentedOut = false,
         };
         s.stackedBlocks[s.count_1] = root; // fake first child (for implementation convenience)
         return s;
@@ -116,7 +118,7 @@ const BlockArranger = struct {
         return self.baseCount_1 > 0;
     }
 
-    fn openBaseBlock(self: *BlockArranger, newBaseBlock: *tmd.BlockInfo, firstInContainer: bool) !void {
+    fn openBaseBlock(self: *BlockArranger, newBaseBlock: *tmd.BlockInfo, firstInContainer: bool, commentedOut: bool) !void {
         std.debug.assert(newBaseBlock.blockType == .base);
 
         if (!self.canOpenBaseBlock()) return error.NestingDepthTooLarge;
@@ -138,9 +140,11 @@ const BlockArranger = struct {
             }
         }
 
+        const newCommentedOut = commentedOut or self.openingBaseBlocks[self.baseCount_1].commentedOut;
         self.baseCount_1 += 1;
         self.openingBaseBlocks[self.baseCount_1] = BaseContext{
             .nestingDepth = self.count_1,
+            .commentedOut = newCommentedOut,
         };
 
         self.count_1 += 1;
@@ -198,8 +202,8 @@ const BlockArranger = struct {
         self.stackedBlocks[self.count_1] = blockInfo;
     }
 
-    fn hasNotActiveBuiltinContainers(self: *BlockArranger) bool {
-        return self.stackedBlocks[self.count_1].nestingDepth - 1 == self.baseCount_1;
+    fn shouldHeaderChildBeInTOC(self: *BlockArranger) bool {
+        return self.stackedBlocks[self.count_1].nestingDepth - 1 == self.baseCount_1 and !self.openingBaseBlocks[self.baseCount_1].commentedOut;
     }
 
     fn stackContainerBlock(self: *BlockArranger, blockInfo: *tmd.BlockInfo) !void {
@@ -969,7 +973,7 @@ const ContentParser = struct {
                 }
             }
 
-            if (lineScanner.lineEnd != null) {
+            if (lineScanner.lineEnd != null) { // the line only contains one leading mark
                 std.debug.assert(lineScanner.cursor > textStart);
                 _ = try self.create_plain_text_token(textStart, lineScanner.cursor);
                 break :parse_tokens lineScanner.cursor;
@@ -2723,11 +2727,6 @@ const DocParser = struct {
                                     .openLine = lineInfo,
                                 },
                             };
-                            try blockArranger.openBaseBlock(baseBlockInfo, lineInfo.containerMark != null);
-
-                            try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                            currentAtomBlockInfo = baseBlockInfo;
-                            atomBlockCount += 1;
 
                             const playloadRange = baseBlockInfo.blockType.base.openPlayloadRange();
                             const playload = parser.tmdDoc.rangeData(playloadRange);
@@ -2738,6 +2737,12 @@ const DocParser = struct {
                                 baseBlockAttibutesElement.value = attrs;
                                 baseBlockInfo.blockType.base.openLine.lineType.baseBlockOpen.attrs = &baseBlockAttibutesElement.value;
                             }
+
+                            try blockArranger.openBaseBlock(baseBlockInfo, lineInfo.containerMark != null, attrs.commentedOut);
+
+                            try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+                            currentAtomBlockInfo = baseBlockInfo;
+                            atomBlockCount += 1;
                         } else {
                             lineInfo.lineType = .{ .baseBlockClose = .{
                                 .markLen = markLen,
@@ -2898,7 +2903,7 @@ const DocParser = struct {
                         currentAtomBlockInfo = headerBlockInfo;
                         atomBlockCount += 1;
 
-                        if (blockArranger.hasNotActiveBuiltinContainers()) {
+                        if (blockArranger.shouldHeaderChildBeInTOC()) {
                             // Will use the info in setEndLineForAtomBlock.
                             // Note: whether or not headerBlockInfo is empty can't be determined now.
                             parser.pendingTocHeaderBlock = headerBlockInfo;
@@ -3256,8 +3261,8 @@ const charIdLevels = blk: {
     for ('0'..'9') |i| table[i] = 5;
     table['_'] = 4;
     table['-'] = 3;
-    table['.'] = 2;
-    table[':'] = 1;
+    table[':'] = 2;
+    table['.'] = 1;
     break :blk table;
 };
 
@@ -3266,10 +3271,10 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
 
     const id = std.meta.fieldIndex(tmd.ElementAttibutes, "id").?;
     const classes = std.meta.fieldIndex(tmd.ElementAttibutes, "classes").?;
-    //const kvs = std.meta.fieldIndex(tmd.ElementAttibutes, "kvs").?;
+    const kvs = std.meta.fieldIndex(tmd.ElementAttibutes, "kvs").?;
 
     var lastOrder: isize = -1;
-    var kvs: ?struct {
+    var kvList: ?struct {
         first: []const u8,
         last: []const u8,
     } = null;
@@ -3284,30 +3289,48 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
                     if (item.len == 1) break;
                     if (item[1] >= 128 or charIdLevels[item[1]] != 6) break;
                     for (item[2..]) |c| {
-                        if (c >= 128 or charIdLevels[c] < 2) break :parse;
+                        if (c >= 128 or charIdLevels[c] < 1) break :parse;
                     }
                     attrs.id = item[1..];
                     lastOrder = id;
                 },
                 '.' => {
+                    // classes can't contain periods, but can contain colons.
+                    // (This is TMD specific. HTML4 allows periods in classes).
+
+                    // classes are seperated by semicolons.
+
+                    // ToDo: support .class1 .class2?
+
                     if (lastOrder >= classes) break;
                     if (item.len == 1) break;
-                    // ToDo: write a more precise implementation.
-                    //       and support .class1 .class2.
-                    //       classes can't contain periods.
+                    if (item[1] >= 128 or charIdLevels[item[1]] != 6) break;
+                    for (item[2..]) |c| {
+                        if (c == ';') continue; // seperators (TMD specific)
+                        if (c >= 128 or charIdLevels[c] < 2) break :parse;
+                    }
+
                     attrs.classes = item[1..];
                     lastOrder = classes;
                 },
                 else => {
-                    if (item.len < 2) break;
+                    // key-value pairs are seperated by SPACE or TAB chars.
+                    // Key parsing is the same as ID parsing.
+                    // Values containing SPACE and TAB chars must be quoted in `...` (the Go literal string form).
+
+                    if (lastOrder > kvs) break;
+
+                    if (item.len < 3) break;
 
                     // ToDo: write a more pricise implementation.
 
                     if (std.mem.indexOfScalar(u8, item, '=')) |i| {
                         if (0 < i and i < item.len - 1) {
-                            if (kvs == null) kvs = .{ .first = item, .last = item } else kvs.?.last = item;
+                            if (kvList == null) kvList = .{ .first = item, .last = item } else kvList.?.last = item;
                         } else break;
                     } else break;
+
+                    lastOrder = kvs;
                 },
             }
         }
@@ -3317,7 +3340,7 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
         } else break;
     }
 
-    if (kvs) |v| {
+    if (kvList) |v| {
         const start = @intFromPtr(v.first.ptr);
         const end = @intFromPtr(v.last.ptr + v.last.len);
         attrs.kvs = v.first.ptr[0 .. end - start];
