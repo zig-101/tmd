@@ -128,9 +128,9 @@ pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
             // otherwise it means duplication is found (so the insertion is not made).
             pub fn insert(t: *Tree, z: *Node) *Node {
                 // Done in the following while loop.
-                //if (builtin.mode == .Debug) {
-                //	std.debug.assert(t.search(z.value) != z);
-                //}
+                // if (builtin.mode == .Debug) {
+                //   std.debug.assert(t.search(z.value) != z);
+                // }
 
                 t._redNode.fillNode(z);
 

@@ -1004,7 +1004,7 @@ pub const SpanMarkType = enum(u8) {
     code,
     escaped, // must be the last one
 
-    pub const MarkCount = @typeInfo(@This()).Enum.fields.len;
+    pub const MarkCount = @typeInfo(@This()).@"enum".fields.len;
 
     pub fn asInt(self: @This()) u8 {
         return @intFromEnum(self);

@@ -25,17 +25,17 @@ pub fn read_last_rune(p: []const u8) u21 {
 
     start -= 1;
     std.debug.assert(start + 2 == p.len);
-    if (is_rune_start(p[start])) return unicode.utf8Decode2(p[start..]) catch BadRune;
+    if (is_rune_start(p[start])) return unicode.utf8Decode2(p[start..][0..2].*) catch BadRune;
     if (start == 0) return BadRune;
 
     start -= 1;
     std.debug.assert(start + 3 == p.len);
-    if (is_rune_start(p[start])) return unicode.utf8Decode3(p[start..]) catch BadRune;
+    if (is_rune_start(p[start])) return unicode.utf8Decode3(p[start..][0..3].*) catch BadRune;
     if (start == 0) return BadRune;
 
     start -= 1;
     std.debug.assert(start + 4 == p.len);
-    if (is_rune_start(p[start])) return unicode.utf8Decode4(p[start..]) catch BadRune;
+    if (is_rune_start(p[start])) return unicode.utf8Decode4(p[start..][0..4].*) catch BadRune;
     return BadRune;
 }
 
@@ -48,9 +48,9 @@ pub fn read_rune(p: []const u8) u21 {
 
     const data = p[0..len];
     return switch (len) {
-        2 => unicode.utf8Decode2(data) catch BadRune,
-        3 => unicode.utf8Decode3(data) catch BadRune,
-        4 => unicode.utf8Decode4(data) catch BadRune,
+        2 => unicode.utf8Decode2(data[0..2].*) catch BadRune,
+        3 => unicode.utf8Decode3(data[0..3].*) catch BadRune,
+        4 => unicode.utf8Decode4(data[0..4].*) catch BadRune,
         else => unreachable,
     };
 }
