@@ -2517,24 +2517,21 @@ const DocParser = struct {
                     break :parse_line;
                 }
 
+                const lineStart = lineScanner.cursor;
                 // try to parse leading container mark.
                 switch (lineScanner.peekCursor()) {
                     '*', '+', '-', '~', ':' => |mark| handle: {
-                        const lastMark = if (lineScanner.peekNext() == '.') blk: {
+                        if (lineScanner.peekNext() == '.') {
                             lineScanner.advance(1);
-                            break :blk '.';
                         } else if (mark == '-' and lineScanner.peekNext() == '-') {
                             break :handle;
-                        } else mark;
+                        }
 
                         lineScanner.advance(1);
                         const markEnd = lineScanner.cursor;
                         const numSpaces = lineScanner.readUntilNotBlank();
                         if (numSpaces == 0 and lineScanner.lineEnd == null) { // not list item
-                            // Is "**" (etc) or ".." possible?
-                            if (lineScanner.cursor == markEnd and lineScanner.peekCursor() == lastMark) {
-                                lineScanner.setCursor(markEnd - 1);
-                            }
+                            lineScanner.setCursor(lineStart);
                             lineInfo.containerMark = null;
                             break :handle;
                         }
@@ -2583,10 +2580,7 @@ const DocParser = struct {
                         const markEnd = lineScanner.cursor;
                         const numSpaces = lineScanner.readUntilNotBlank();
                         if (numSpaces == 0 and lineScanner.lineEnd == null) { // not container
-                            // Is "??" (etc) possible?
-                            if (lineScanner.cursor == markEnd and lineScanner.peekCursor() == mark) {
-                                lineScanner.setCursor(markEnd - 1);
-                            }
+                            lineScanner.setCursor(lineStart);
                             lineInfo.containerMark = null;
                             break :handle;
                         }
@@ -2652,7 +2646,7 @@ const DocParser = struct {
                     },
                 }
 
-                const contentStart: u32 = lineScanner.cursor;
+                const contentStart = lineScanner.cursor;
 
                 // try to parse atom block mark.
                 if (lineScanner.lineEnd != null) {
