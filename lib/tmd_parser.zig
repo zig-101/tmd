@@ -756,12 +756,12 @@ const ContentParser = struct {
                 .info = &tokenInfo.tokenType.linkInfo,
             };
 
-            if (self.docParser.nextElementAttributes) |as| {
-                link.attrs = as;
-                tokenInfo.tokenType.linkInfo.attrs = &link.attrs;
-
-                self.docParser.nextElementAttributes = null;
-            }
+            //if (self.docParser.nextElementAttributes) |as| {
+            //    link.attrs = as;
+            //    tokenInfo.tokenType.linkInfo.attrs = &link.attrs;
+            //
+            //    self.docParser.nextElementAttributes = null;
+            //}
         }
 
         // Create the open mark.

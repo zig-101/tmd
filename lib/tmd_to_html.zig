@@ -610,7 +610,7 @@ const TmdRender = struct {
             const blockInfo = &headerElement.value;
 
             _ = try w.write("<summary");
-            try writeBlockAttributes(w, "", blockInfo.attributes);
+            try writeBlockAttributes(w, "tmd-reveal-header", blockInfo.attributes);
             _ = try w.write(">\n");
             try self.writeUsualContentBlockLines(w, blockInfo, false);
             _ = try w.write("</summary>\n");

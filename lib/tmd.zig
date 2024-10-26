@@ -137,7 +137,10 @@ pub const ElementAttibutes = struct {
 };
 
 pub const Link = struct {
-    attrs: ElementAttibutes = .{}, // ToDo: use pointer? Memory will be more fragmental.
+    // ToDo: use pointer? Memory will be more fragmental.
+    // ToDo: now this field is never set.
+    // attrs: ElementAttibutes = .{},
+
     info: *LinkInfo,
 };
 
