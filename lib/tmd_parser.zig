@@ -54,7 +54,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     };
     try docParser.parseAll(tmdData);
 
-    if (false and builtin.mode == .Debug) {
+    if (true and builtin.mode == .Debug) {
         dumpTmdDoc(&tmdDoc);
     }
 
@@ -216,40 +216,46 @@ const BlockArranger = struct {
     fn assertBaseOpeningListCount(self: *BlockArranger) void {
         if (builtin.mode == .Debug) {
             var baseContext = &self.openingBaseBlocks[self.baseCount_1];
-            if (baseContext.openingListCount > 0) {
-                //std.debug.print("assertBaseOpeningListCount {}, {} - {} - 1\n", .{ baseContext.openingListCount, self.count_1, baseContext.nestingDepth });
-                std.debug.assert(self.count_1 == baseContext.nestingDepth + baseContext.openingListCount + 1);
-            }
+
             var count: @TypeOf(baseContext.openingListCount) = 0;
             for (&baseContext.openingListNestingDepths) |d| {
                 if (d != 0) count += 1;
             }
             //std.debug.print("==== {} : {}\n", .{ count, baseContext.openingListCount });
             std.debug.assert(count == baseContext.openingListCount);
+
+            if (baseContext.openingListCount > 0) {
+                //std.debug.print("assertBaseOpeningListCount {}, {} + {} + 1\n", .{ self.count_1, baseContext.nestingDepth, baseContext.openingListCount });
+
+                std.debug.assert(self.count_1 == baseContext.nestingDepth + baseContext.openingListCount + 1);
+            }
         }
     }
 
     // Returns whether or not a new list should be created.
-    fn toCreateNewListItem(self: *BlockArranger, markTypeIndex: tmd.ListBulletTypeIndex) !bool {
+    fn shouldCreateNewList(self: *BlockArranger, markTypeIndex: tmd.ListBulletTypeIndex) bool {
         const baseContext = &self.openingBaseBlocks[self.baseCount_1];
         std.debug.assert(self.count_1 > baseContext.nestingDepth);
 
-        return if (baseContext.openingListCount == 0) blk: {
-            if (baseContext.nestingDepth >= tmd.MaxBlockNestingDepth - 1) {
-                return error.NestingDepthTooLarge;
-            }
-            const last = self.stackedBlocks[self.count_1];
-            self.count_1 = baseContext.nestingDepth + 1;
-            if (last.blockType == .blank) {
-                // Ensure the nestingDepth of the blank block.
-                last.nestingDepth = self.count_1;
-            }
+        //return if (baseContext.openingListCount == 0) blk: {
+        //    if (baseContext.nestingDepth >= tmd.MaxBlockNestingDepth - 1) {
+        //        return error.NestingDepthTooLarge;
+        //    }
+        //    const last = self.stackedBlocks[self.count_1];
+        //    self.count_1 = baseContext.nestingDepth + 1;
+        //    if (last.blockType == .blank) {
+        //        // Ensure the nestingDepth of the blank block.
+        //        last.nestingDepth = self.count_1;
+        //    }
+        //
+        //    break :blk true;
+        //} else if (baseContext.openingListNestingDepths[markTypeIndex] != 0) blk: {
+        //    //const last = self.stackedBlocks[self.count_1];
+        //    //break :blk last.blockType == .directive;
+        //    break :blk false;
+        //} else true;
 
-            break :blk true;
-        } else if (baseContext.openingListNestingDepths[markTypeIndex] != 0) blk: {
-            const last = self.stackedBlocks[self.count_1];
-            break :blk last.blockType == .directive;
-        } else true;
+        return baseContext.openingListCount == 0 or baseContext.openingListNestingDepths[markTypeIndex] == 0;
     }
 
     // listBlock != null means this is the first item in list.
@@ -266,30 +272,43 @@ const BlockArranger = struct {
         if (listBlock) |theListBlock| {
             std.debug.assert(theListBlock.blockType.list._bulletTypeIndex == markTypeIndex);
 
-            if (baseContext.openingListNestingDepths[markTypeIndex] != 0) {
-                // ToDo: now there are 3 alike such code pieces, unify them?
-
-                var deltaCount: @TypeOf(baseContext.openingListCount) = 0;
-                var depth = self.count_1 - 1;
-                while (depth > baseContext.nestingDepth) : (depth -= 1) {
-                    std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
-                    std.debug.assert(self.stackedBlocks[depth].blockType == .item);
-                    var item = &self.stackedBlocks[depth].blockType.item;
-
-                    //item.isLast = true;
-                    item.list.blockType.list.lastBullet = item.ownerBlockInfo();
-                    item.list.blockType.list._lastBulletConfirmed = true;
-                    baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
-                    deltaCount += 1;
-
-                    if (item.list.blockType.list._bulletTypeIndex == markTypeIndex) {
-                        break;
-                    }
-                }
-
-                baseContext.openingListCount -= deltaCount;
-                self.count_1 = depth;
+            if (baseContext.nestingDepth >= tmd.MaxBlockNestingDepth - 1) {
+                return error.NestingDepthTooLarge;
             }
+
+            if (baseContext.openingListCount == 0) { // start list context
+                const last = self.stackedBlocks[self.count_1];
+                self.count_1 = baseContext.nestingDepth + 1;
+                if (last.blockType == .blank) {
+                    // Ensure the nestingDepth of the blank block.
+                    last.nestingDepth = self.count_1;
+                }
+            } else std.debug.assert(baseContext.openingListNestingDepths[markTypeIndex] == 0);
+
+            //if (baseContext.openingListNestingDepths[markTypeIndex] != 0) {
+            //    // ToDo: now there are 3 alike such code pieces, unify them?
+            //
+            //    var deltaCount: @TypeOf(baseContext.openingListCount) = 0;
+            //    var depth = self.count_1 - 1;
+            //    while (depth > baseContext.nestingDepth) : (depth -= 1) {
+            //        std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
+            //        std.debug.assert(self.stackedBlocks[depth].blockType == .item);
+            //        var item = &self.stackedBlocks[depth].blockType.item;
+            //
+            //        //item.isLast = true;
+            //        item.list.blockType.list.lastBullet = item.ownerBlockInfo();
+            //        item.list.blockType.list._lastBulletConfirmed = true;
+            //        baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
+            //        deltaCount += 1;
+            //
+            //        if (item.list.blockType.list._bulletTypeIndex == markTypeIndex) {
+            //            break;
+            //        }
+            //    }
+            //
+            //    baseContext.openingListCount -= deltaCount;
+            //    self.count_1 = depth;
+            //}
 
             //newListItem.isFirst = true;
             //newListItem.firstItem = listItemBlock;
@@ -303,6 +322,8 @@ const BlockArranger = struct {
             baseContext.openingListNestingDepths[markTypeIndex] = self.count_1;
             baseContext.openingListCount += 1;
         } else {
+            std.debug.assert(baseContext.openingListNestingDepths[markTypeIndex] != 0);
+
             const last = self.stackedBlocks[self.count_1];
             std.debug.assert(last.blockType == .root or last.nestingDepth == self.count_1);
             std.debug.assert(last.blockType != .item);
@@ -336,6 +357,9 @@ const BlockArranger = struct {
                 if (last.blockType == .blank) {
                     // Ensure the nestingDepth of the blank block.
                     last.nestingDepth = depth + 1;
+
+                    const lastBulletOfDeeperList = self.stackedBlocks[last.nestingDepth];
+                    lastBulletOfDeeperList.setNextSibling(last);
                 }
             } else {
                 std.debug.assert(last.nestingDepth == depth + 1);
@@ -361,6 +385,7 @@ const BlockArranger = struct {
         defer {
             self.count_1 = baseContext.nestingDepth + 1;
             if (last.blockType == .blank and last.nestingDepth != self.count_1) {
+                // prevOfLast might be the last item in a just closed list.
                 const prevOfLast = self.stackedBlocks[self.count_1];
                 std.debug.assert(prevOfLast.blockType == .root or prevOfLast.nestingDepth == self.count_1);
                 if (prevOfLast.blockType != .root) prevOfLast.setNextSibling(last);
@@ -2549,7 +2574,7 @@ const DocParser = struct {
                         std.debug.assert(markEnd - leadingBlankEnd == 1 or markEnd - leadingBlankEnd == 2);
                         const markStr = tmdData[leadingBlankEnd..markEnd];
                         const markTypeIndex = tmd.listBulletTypeIndex(markStr);
-                        const createNewList = try blockArranger.toCreateNewListItem(markTypeIndex);
+                        const createNewList = blockArranger.shouldCreateNewList(markTypeIndex);
                         const listBlockInfo: ?*tmd.BlockInfo = if (createNewList) blk: {
                             const listBlockInfo = try parser.createAndPushBlockInfoElement();
                             listBlockInfo.blockType = .{
@@ -3108,7 +3133,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
         std.debug.print("+{}: #{} {s}", .{ blockInfo.nestingDepth, blockInfo.index, blockInfo.typeName() });
         switch (blockInfo.blockType) {
             .list => |itemList| {
-                std.debug.print(" (index: {}, type: {s}), second mode: {}", .{ itemList.index, itemList.typeName(), itemList.secondMode });
+                std.debug.print(" (index: {}, type: {s}, 2nd mode: {})", .{ itemList.index, itemList.typeName(), itemList.secondMode });
             },
             .item => |*listItem| {
                 std.debug.print(" (@list#{})", .{listItem.list.blockType.list.index});

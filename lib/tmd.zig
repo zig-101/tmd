@@ -324,8 +324,8 @@ pub const BlockInfo = struct {
             },
             .list => |itemList| {
                 std.debug.assert(itemList._lastBulletConfirmed);
-                itemList.lastBullet.blockType.item.nextSibling = sibling;
-                unreachable;
+                //itemList.lastBullet.blockType.item.nextSibling = sibling;
+                unreachable; // .list.nextSibling is always set through its .lastItem.
             },
             inline .item, .table, .quotation, .notice, .reveal, .unstyled => |*container| {
                 container.nextSibling = sibling;
