@@ -2327,7 +2327,8 @@ const DocParser = struct {
         }
     }
 
-    fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo, forBulletContainer: bool) !void {
+    //fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo, forBulletContainer: bool) !void {
+    fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void {
         std.debug.assert(lineInfo.lineType == .attributes);
         const tokens = lineInfo.lineType.attributes.tokens;
         const headElement = tokens.head() orelse return;
@@ -2337,14 +2338,14 @@ const DocParser = struct {
         const comment = parser.tmdDoc.data[commentToken.start()..commentToken.end()];
         const attrs = parse_element_attributes(comment);
 
-        if (forBulletContainer) {
-            std.debug.assert(parser.nextElementAttributes == null);
-            const attributesElement = parser.tmdDoc.blocks.tail() orelse unreachable;
-            std.debug.assert(attributesElement.value.blockType == .attributes);
-            const bulletElement = attributesElement.prev orelse unreachable;
-            std.debug.assert(bulletElement.value.blockType == .item);
-            return try parser.setBlockAttributes(&bulletElement.value, attrs);
-        }
+        //if (forBulletContainer) {
+        //    std.debug.assert(parser.nextElementAttributes == null);
+        //    const attributesElement = parser.tmdDoc.blocks.tail() orelse unreachable;
+        //    std.debug.assert(attributesElement.value.blockType == .attributes);
+        //    const bulletElement = attributesElement.prev orelse unreachable;
+        //    std.debug.assert(bulletElement.value.blockType == .item);
+        //    return try parser.setBlockAttributes(&bulletElement.value, attrs);
+        //}
 
         if (attrs.id.len > 0) {
             if (parser.nextElementAttributes) |*as| {
@@ -2400,10 +2401,11 @@ const DocParser = struct {
     }
 
     fn onParseEnd(parser: *DocParser) !void {
-        if (parser.tmdDoc.blocks.tail()) |tail| {
-            try parser.onLastBlockInfoChanged(&tail.value);
-        } else unreachable;
+        // ...
+        std.debug.assert(parser.lastBlockInfo == &parser.tmdDoc.blocks.tail().?.value);
+        try parser.onLastBlockInfoChanged(parser.lastBlockInfo);
 
+        // ...
         const from = for (&parser.tmdDoc._headerLevelNeedAdjusted, 0..) |has, level| {
             if (!has) break level + 1;
         } else return;
@@ -3035,17 +3037,17 @@ const DocParser = struct {
                             break :handle;
                         }
 
-                        var forBulletContainer = false;
+                        //var forBulletContainer = false;
                         var playloadStart = lineScanner.cursor;
                         if (lineScanner.lineEnd) |_| {
                             lineInfo.rangeTrimmed.end = playloadStart;
                         } else {
-                            if (lineInfo.containerMark) |m| {
-                                if (m == .item and lineScanner.peekCursor() == '<') {
-                                    lineScanner.advance(1);
-                                    forBulletContainer = true;
-                                }
-                            }
+                            //if (lineInfo.containerMark) |m| {
+                            //    if (m == .item and lineScanner.peekCursor() == '<') {
+                            //        lineScanner.advance(1);
+                            //        forBulletContainer = true;
+                            //    }
+                            //}
 
                             _ = lineScanner.readUntilNotBlank();
                             if (lineScanner.lineEnd) |_| {
@@ -3061,6 +3063,10 @@ const DocParser = struct {
                         } };
 
                         if (lineInfo.containerMark != null or currentAtomBlockInfo.blockType != .attributes) {
+                            // There might be some new blocks created in the current iteration.
+                            const realOldLast = parser.lastBlockInfo;
+
+                            // ...
                             const commentBlockInfo = try parser.createAndPushBlockInfoElement();
                             commentBlockInfo.blockType = .{
                                 .attributes = .{
@@ -3075,8 +3081,7 @@ const DocParser = struct {
                             atomBlockCount += 1;
 
                             // !! important
-                            std.debug.assert(oldLastBlockInfo != parser.lastBlockInfo);
-                            try parser.onLastBlockInfoChanged(oldLastBlockInfo);
+                            try parser.onLastBlockInfoChanged(realOldLast);
                             oldLastBlockInfo = parser.lastBlockInfo;
                         }
 
@@ -3094,7 +3099,8 @@ const DocParser = struct {
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
 
-                        try parser.onNewAttributesLine(lineInfo, forBulletContainer);
+                        //try parser.onNewAttributesLine(lineInfo, forBulletContainer);
+                        try parser.onNewAttributesLine(lineInfo);
                     },
                     else => {},
                 }
