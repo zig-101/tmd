@@ -77,7 +77,7 @@ const BlockArranger = struct {
         nestingDepth: tmd.BlockNestingDepthType,
         commentedOut: bool,
 
-        // !!! here, u6 must be larger than tmd.ListBulletTypeIndex.
+        // !!! here, u6 must be larger than tmd.ListItemTypeIndex.
         openingListNestingDepths: [tmd.MaxListNestingDepthPerBase]u6 = [_]u6{0} ** tmd.MaxListNestingDepthPerBase,
         openingListCount: tmd.ListNestingDepthType = 0,
     };
@@ -233,7 +233,7 @@ const BlockArranger = struct {
     }
 
     // Returns whether or not a new list should be created.
-    fn shouldCreateNewList(self: *BlockArranger, markTypeIndex: tmd.ListBulletTypeIndex) bool {
+    fn shouldCreateNewList(self: *BlockArranger, markTypeIndex: tmd.ListItemTypeIndex) bool {
         const baseContext = &self.openingBaseBlocks[self.baseCount_1];
         std.debug.assert(self.count_1 > baseContext.nestingDepth);
 
@@ -259,7 +259,7 @@ const BlockArranger = struct {
     }
 
     // listBlock != null means this is the first item in list.
-    fn stackListItemBlock(self: *BlockArranger, listItemBlock: *tmd.BlockInfo, markTypeIndex: tmd.ListBulletTypeIndex, listBlock: ?*tmd.BlockInfo) !void {
+    fn stackListItemBlock(self: *BlockArranger, listItemBlock: *tmd.BlockInfo, markTypeIndex: tmd.ListItemTypeIndex, listBlock: ?*tmd.BlockInfo) !void {
         std.debug.assert(listItemBlock.blockType == .item);
 
         self.assertBaseOpeningListCount();
@@ -270,7 +270,7 @@ const BlockArranger = struct {
         const newListItem = &listItemBlock.blockType.item;
 
         if (listBlock) |theListBlock| {
-            std.debug.assert(theListBlock.blockType.list._bulletTypeIndex == markTypeIndex);
+            std.debug.assert(theListBlock.blockType.list._itemTypeIndex == markTypeIndex);
 
             if (baseContext.nestingDepth >= tmd.MaxBlockNestingDepth - 1) {
                 return error.NestingDepthTooLarge;
@@ -297,11 +297,11 @@ const BlockArranger = struct {
             //
             //        //item.isLast = true;
             //        item.list.blockType.list.lastBullet = item.ownerBlockInfo();
-            //        item.list.blockType.list._lastBulletConfirmed = true;
-            //        baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
+            //        item.list.blockType.list._lastItemConfirmed = true;
+            //        baseContext.openingListNestingDepths[item.list.blockType.list._itemTypeIndex] = 0;
             //        deltaCount += 1;
             //
-            //        if (item.list.blockType.list._bulletTypeIndex == markTypeIndex) {
+            //        if (item.list.blockType.list._itemTypeIndex == markTypeIndex) {
             //            break;
             //        }
             //    }
@@ -335,7 +335,7 @@ const BlockArranger = struct {
                 std.debug.assert(self.stackedBlocks[depth].blockType == .item);
                 var itemBlock = self.stackedBlocks[depth];
                 var item = &itemBlock.blockType.item;
-                if (item.list.blockType.list._bulletTypeIndex == markTypeIndex) {
+                if (item.list.blockType.list._itemTypeIndex == markTypeIndex) {
                     //newListItem.firstItem = item.firstItem;
                     itemBlock.setNextSibling(listItemBlock);
                     newListItem.list = item.list;
@@ -343,8 +343,8 @@ const BlockArranger = struct {
                 }
                 //item.isLast = true;
                 item.list.blockType.list.lastBullet = item.ownerBlockInfo();
-                item.list.blockType.list._lastBulletConfirmed = true;
-                baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
+                item.list.blockType.list._lastItemConfirmed = true;
+                baseContext.openingListNestingDepths[item.list.blockType.list._itemTypeIndex] = 0;
                 deltaCount += 1;
             }
 
@@ -411,8 +411,8 @@ const BlockArranger = struct {
                 var item = &self.stackedBlocks[depth].blockType.item;
                 //item.isLast = true;
                 item.list.blockType.list.lastBullet = item.ownerBlockInfo();
-                item.list.blockType.list._lastBulletConfirmed = true;
-                baseContext.openingListNestingDepths[item.list.blockType.list._bulletTypeIndex] = 0;
+                item.list.blockType.list._lastItemConfirmed = true;
+                baseContext.openingListNestingDepths[item.list.blockType.list._itemTypeIndex] = 0;
                 deltaCount += 1;
             }
 
@@ -2573,13 +2573,13 @@ const DocParser = struct {
 
                         std.debug.assert(markEnd - leadingBlankEnd == 1 or markEnd - leadingBlankEnd == 2);
                         const markStr = tmdData[leadingBlankEnd..markEnd];
-                        const markTypeIndex = tmd.listBulletTypeIndex(markStr);
+                        const markTypeIndex = tmd.listItemTypeIndex(markStr);
                         const createNewList = blockArranger.shouldCreateNewList(markTypeIndex);
                         const listBlockInfo: ?*tmd.BlockInfo = if (createNewList) blk: {
                             const listBlockInfo = try parser.createAndPushBlockInfoElement();
                             listBlockInfo.blockType = .{
                                 .list = .{
-                                    ._bulletTypeIndex = markTypeIndex,
+                                    ._itemTypeIndex = markTypeIndex,
                                     .listType = tmd.listType(markStr), // if .bullets, might be adjusted to .tabs later
                                     .secondMode = markStr.len == 2,
                                     .index = listCount,
@@ -2774,6 +2774,8 @@ const DocParser = struct {
                             try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = baseBlockInfo;
                             atomBlockCount += 1;
+
+                            parser.nextElementAttributes = null;
                         }
                     },
                     '\'', '"' => |mark| handle: {

@@ -85,13 +85,13 @@ pub const MaxSpanMarkLength = 8; // not inclusive. And not include ^.
 
 // Note: the two should be consistent.
 pub const MaxListNestingDepthPerBase = 11;
-pub const ListBulletTypeIndex = u4;
+pub const ListItemTypeIndex = u4;
 pub const ListNestingDepthType = u8; // in fact, u4 is enough now
 
-pub fn listBulletTypeIndex(bulletMark: []const u8) ListBulletTypeIndex {
-    switch (bulletMark.len) {
+pub fn listItemTypeIndex(itemMark: []const u8) ListItemTypeIndex {
+    switch (itemMark.len) {
         1, 2 => {
-            var index: ListBulletTypeIndex = switch (bulletMark[0]) {
+            var index: ListItemTypeIndex = switch (itemMark[0]) {
                 '+' => 0,
                 '-' => 1,
                 '*' => 2,
@@ -101,11 +101,11 @@ pub fn listBulletTypeIndex(bulletMark: []const u8) ListBulletTypeIndex {
                 else => unreachable,
             };
 
-            if (bulletMark.len == 1) {
+            if (itemMark.len == 1) {
                 return index;
             }
 
-            if (bulletMark[1] != '.') unreachable;
+            if (itemMark[1] != '.') unreachable;
             index += 6;
 
             return index;
@@ -115,9 +115,9 @@ pub fn listBulletTypeIndex(bulletMark: []const u8) ListBulletTypeIndex {
 }
 
 // When this function is called, .tabs is still unable to be determined.
-pub fn listType(bulletMark: []const u8) ListType {
-    switch (bulletMark.len) {
-        1, 2 => return switch (bulletMark[0]) {
+pub fn listType(itemMark: []const u8) ListType {
+    switch (itemMark.len) {
+        1, 2 => return switch (itemMark[0]) {
             '+', '-', '*', '~' => .bullets,
             ':' => .definitions,
             else => unreachable,
@@ -293,7 +293,7 @@ pub const BlockInfo = struct {
                 break :blk if (nextBlock.nestingDepth == self.nestingDepth) nextBlock else null;
             },
             .list => |itemList| blk: {
-                std.debug.assert(itemList._lastBulletConfirmed);
+                std.debug.assert(itemList._lastItemConfirmed);
                 break :blk itemList.lastBullet.blockType.item.nextSibling;
             },
             .item => |*item| if (item.ownerBlockInfo() == item.list.blockType.list.lastBullet) null else item.nextSibling,
@@ -323,7 +323,7 @@ pub const BlockInfo = struct {
                     closeLine.lineType.baseBlockClose.baseNextSibling = sibling;
             },
             .list => |itemList| {
-                std.debug.assert(itemList._lastBulletConfirmed);
+                std.debug.assert(itemList._lastItemConfirmed);
                 //itemList.lastBullet.blockType.item.nextSibling = sibling;
                 unreachable; // .list.nextSibling is always set through its .lastItem.
             },
@@ -373,8 +373,8 @@ pub const BlockType = union(enum) {
     },
 
     list: struct { // lists are implicitly formed.
-        _lastBulletConfirmed: bool = false, // for debug
-        _bulletTypeIndex: ListBulletTypeIndex, // ToDo: can be saved, just need a little more computitation.
+        _lastItemConfirmed: bool = false, // for debug
+        _itemTypeIndex: ListItemTypeIndex, // ToDo: can be saved, just need a little more computitation.
 
         listType: ListType,
         secondMode: bool, // for .bullets: unordered/ordered, for .definitions, one-line or not
@@ -392,7 +392,7 @@ pub const BlockType = union(enum) {
         }
 
         //pub fn bulletType(self: @This()) BulletType {
-        //    if (self._bulletTypeIndex & 0b100 != 0) return .ordered;
+        //    if (self._itemTypeIndex & 0b100 != 0) return .ordered;
         //    return .unordered;
         //}
     },
