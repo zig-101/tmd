@@ -493,7 +493,7 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
-    directive: struct {
+    attributes: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
 
@@ -602,9 +602,9 @@ pub const LineInfo = struct {
         return @tagName(self.endType);
     }
 
-    pub fn isDirective(self: @This()) bool {
+    pub fn isAttributes(self: @This()) bool {
         return switch (self.lineType) {
-            .directive => true,
+            .attributes => true,
             else => false,
         };
     }
@@ -776,7 +776,7 @@ pub const LineType = union(enum) {
     },
     data: struct {},
 
-    directive: struct {
+    attributes: struct {
         markLen: u32,
         markEndWithSpaces: u32,
         tokens: list.List(TokenInfo) = .{},
@@ -890,7 +890,7 @@ pub const TokenType = union(enum) {
         // The value should be the same as the end of line.
         end: u32,
 
-        inDirective: bool, // ToDo: don't use commentText tokens for directive lines.
+        inAttributesLine: bool, // ToDo: don't use commentText tokens for attributes lines.
     },
     evenBackticks: struct {
         start: u32,

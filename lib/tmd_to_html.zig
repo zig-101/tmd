@@ -231,7 +231,7 @@ const TmdRender = struct {
         while (afterElement.next) |element| {
             const blockInfo = &element.value;
             switch (blockInfo.blockType) {
-                .directive => afterElement = element,
+                .attributes => afterElement = element,
                 .header => if (blockInfo.blockType.header.level(self.doc.data) == 1) {
                     return element;
                 } else break,
@@ -303,7 +303,7 @@ const TmdRender = struct {
             check: {
                 switch (child.blockType) {
                     .blank => unreachable,
-                    .directive => break :check,
+                    .attributes => break :check,
                     .line => break :check,
                     .base => |base| if (base.attributes().commentedOut) break :check,
                     else => std.debug.assert(child.isAtom()),
@@ -334,7 +334,7 @@ const TmdRender = struct {
         while (true) {
             handle: {
                 const rowSpan: u32, const colSpan: u32 = switch (child.blockType) {
-                    .directive => break :handle,
+                    .attributes => break :handle,
                     .line => {
                         toChangeRow = true;
                         break :handle;
@@ -913,7 +913,7 @@ const TmdRender = struct {
 
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
-                    .directive => {
+                    .attributes => {
                         //_ = try w.write("\n<div></div>\n");
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
@@ -1110,7 +1110,7 @@ const TmdRender = struct {
 
             // Just to check all possible types. Don't remove.
             switch (lineInfo.lineType) {
-                .blank, .usual, .header, .line, .directive, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customBlockStart, .customBlockEnd, .data => {},
+                .blank, .usual, .header, .line, .attributes, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customBlockStart, .customBlockEnd, .data => {},
             }
 
             {
@@ -1625,7 +1625,7 @@ const TmdRender = struct {
 
                     // atom
 
-                    .line, .header, .usual, .directive, .blank, .code, .custom => {
+                    .line, .header, .usual, .attributes, .blank, .code, .custom => {
                         try self.renderTmdCodeForAtomBlock(w, blockInfo, false);
 
                         element = element.next orelse &self.nullBlockInfoElement;

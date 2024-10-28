@@ -101,6 +101,7 @@ const BlockArranger = struct {
         return s;
     }
 
+    // This function should not be callsed deferredly.
     fn end(self: *BlockArranger) void {
         while (self.tryToCloseCurrentBaseBlock()) |_| {}
     }
@@ -251,7 +252,7 @@ const BlockArranger = struct {
         //    break :blk true;
         //} else if (baseContext.openingListNestingDepths[markTypeIndex] != 0) blk: {
         //    //const last = self.stackedBlocks[self.count_1];
-        //    //break :blk last.blockType == .directive;
+        //    //break :blk last.blockType == .attributes;
         //    break :blk false;
         //} else true;
 
@@ -482,7 +483,7 @@ const BlockArranger = struct {
             const last = self.stackedBlocks[self.count_1];
             std.debug.assert(last.nestingDepth == self.count_1 or last.blockType == .base or last.blockType == .root);
             std.debug.assert(!last.isContainer());
-            if (last.blockType == .directive) {
+            if (last.blockType == .attributes) {
                 const container = self.stackedBlocks[self.count_1 - 1];
                 switch (container.blockType) {
                     .item => |listItem| {
@@ -567,6 +568,11 @@ const ContentParser = struct {
 
     fn deinit(_: *ContentParser) void {
         // ToDo: looks nothing needs to do here.
+
+        // Note: here should only release resource (memory).
+        //       If there are other jobs to do,
+        //       they should be put in another function
+        //       and that function should not be called deferredly.
     }
 
     fn init(self: *ContentParser) void {
@@ -688,13 +694,13 @@ const ContentParser = struct {
         return &tokenInfoElement.value;
     }
 
-    fn create_comment_text_token(self: *ContentParser, start: u32, end: u32, inDirective: bool) !*tmd.TokenInfo {
+    fn create_comment_text_token(self: *ContentParser, start: u32, end: u32, inAttributesLine: bool) !*tmd.TokenInfo {
         var tokenInfo = try self.create_token();
         tokenInfo.tokenType = .{
             .commentText = .{
                 .start = start,
                 .end = end,
-                .inDirective = inDirective, // self.lineSession.currentLine.isDirective(),
+                .inAttributesLine = inAttributesLine, // self.lineSession.currentLine.isAttributes(),
             },
         };
         return tokenInfo;
@@ -892,7 +898,7 @@ const ContentParser = struct {
         }
     }
 
-    fn parse_directive_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32) !u32 {
+    fn parse_attributes_line_tokens(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u32) !u32 {
         self.set_currnet_line(lineInfo, lineStart);
 
         const lineScanner = &self.docParser.lineScanner;
@@ -2249,6 +2255,7 @@ const DocParser = struct {
     lineScanner: LineScanner,
 
     nextElementAttributes: ?tmd.ElementAttibutes = null,
+    lastBlockInfo: *tmd.BlockInfo = undefined,
 
     pendingTocHeaderBlock: ?*tmd.BlockInfo = null,
 
@@ -2256,18 +2263,40 @@ const DocParser = struct {
         var blockInfoElement = try list.createListElement(tmd.BlockInfo, parser.allocator);
         parser.tmdDoc.blocks.push(blockInfoElement);
         const blockInfo = &blockInfoElement.value;
-
+        blockInfo.attributes = null; // !important
         parser.numBlocks += 1;
         blockInfo.index = parser.numBlocks;
 
-        if (parser.nextElementAttributes) |as| {
-            try parser.setBlockAttributes(blockInfo, as);
-            parser.nextElementAttributes = null;
-        } else {
-            blockInfo.attributes = null; // !important
-        }
+        parser.lastBlockInfo = blockInfo;
 
         return blockInfo;
+    }
+
+    fn onLastBlockInfoChanged(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !void {
+        // std.debug.assert(oldLastBlockInfo != parser.lastBlockInfo); // possible equal in the end
+
+        if (oldLastBlockInfo.blockType != .attributes) {
+            if (parser.nextElementAttributes) |as| {
+                var block = oldLastBlockInfo;
+                const attributesBlock = while (block.ownerListElement().prev) |prevElement| {
+                    const prevBlock = &prevElement.value;
+                    switch (prevBlock.blockType) {
+                        .attributes => break prevBlock,
+                        else => block = prevBlock,
+                    }
+                } else unreachable;
+
+                std.debug.assert(block.blockType != .attributes);
+
+                if (attributesBlock.getNextSibling() == block) {
+                    try parser.setBlockAttributes(block, as);
+                }
+
+                parser.nextElementAttributes = null;
+            }
+        }
+
+        // oldLastBlockInfo.attributes = null; // moved to createAndPushBlockInfoElement
     }
 
     fn setBlockAttributes(parser: *DocParser, blockInfo: *tmd.BlockInfo, as: tmd.ElementAttibutes) !void {
@@ -2298,9 +2327,9 @@ const DocParser = struct {
         }
     }
 
-    fn onNewDirectiveLine(parser: *DocParser, lineInfo: *const tmd.LineInfo, forBulletContainer: bool) !void {
-        std.debug.assert(lineInfo.lineType == .directive);
-        const tokens = lineInfo.lineType.directive.tokens;
+    fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo, forBulletContainer: bool) !void {
+        std.debug.assert(lineInfo.lineType == .attributes);
+        const tokens = lineInfo.lineType.attributes.tokens;
         const headElement = tokens.head() orelse return;
         if (headElement.value.tokenType != .commentText) return;
         std.debug.assert(headElement.next == null);
@@ -2310,9 +2339,9 @@ const DocParser = struct {
 
         if (forBulletContainer) {
             std.debug.assert(parser.nextElementAttributes == null);
-            const directiveElement = parser.tmdDoc.blocks.tail() orelse unreachable;
-            std.debug.assert(directiveElement.value.blockType == .directive);
-            const bulletElement = directiveElement.prev orelse unreachable;
+            const attributesElement = parser.tmdDoc.blocks.tail() orelse unreachable;
+            std.debug.assert(attributesElement.value.blockType == .attributes);
+            const bulletElement = attributesElement.prev orelse unreachable;
             std.debug.assert(bulletElement.value.blockType == .item);
             return try parser.setBlockAttributes(&bulletElement.value, attrs);
         }
@@ -2370,7 +2399,11 @@ const DocParser = struct {
         parser.pendingTocHeaderBlock = null;
     }
 
-    fn onParseEnd(parser: *DocParser) void {
+    fn onParseEnd(parser: *DocParser) !void {
+        if (parser.tmdDoc.blocks.tail()) |tail| {
+            try parser.onLastBlockInfoChanged(&tail.value);
+        } else unreachable;
+
         const from = for (&parser.tmdDoc._headerLevelNeedAdjusted, 0..) |has, level| {
             if (!has) break level + 1;
         } else return;
@@ -2383,7 +2416,7 @@ const DocParser = struct {
     fn parseAll(parser: *DocParser, tmdData: []const u8) !void {
         const rootBlockInfo = try parser.createAndPushBlockInfoElement();
         var blockArranger = BlockArranger.start(rootBlockInfo, parser.tmdDoc);
-        defer blockArranger.end();
+        // defer blockArranger.end(); // should not be called deferredly. Put in the end of the function now.
 
         var commentLineParser = ContentParser.make(parser);
         commentLineParser.init();
@@ -2421,6 +2454,8 @@ const DocParser = struct {
         var atomBlockCount: u32 = 0;
 
         while (lineScanner.proceedToNextLine()) {
+            var oldLastBlockInfo = parser.lastBlockInfo;
+
             var lineInfoElement = try list.createListElement(tmd.LineInfo, parser.allocator);
             var lineInfo = &lineInfoElement.value;
             lineInfo.containerMark = null;
@@ -3020,15 +3055,15 @@ const DocParser = struct {
                             }
                         }
 
-                        lineInfo.lineType = .{ .directive = .{
+                        lineInfo.lineType = .{ .attributes = .{
                             .markLen = markLen,
                             .markEndWithSpaces = playloadStart,
                         } };
 
-                        if (lineInfo.containerMark != null or currentAtomBlockInfo.blockType != .directive) {
+                        if (lineInfo.containerMark != null or currentAtomBlockInfo.blockType != .attributes) {
                             const commentBlockInfo = try parser.createAndPushBlockInfoElement();
                             commentBlockInfo.blockType = .{
-                                .directive = .{
+                                .attributes = .{
                                     .startLine = lineInfo,
                                 },
                             };
@@ -3038,6 +3073,11 @@ const DocParser = struct {
                             try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = commentBlockInfo;
                             atomBlockCount += 1;
+
+                            // !! important
+                            std.debug.assert(oldLastBlockInfo != parser.lastBlockInfo);
+                            try parser.onLastBlockInfoChanged(oldLastBlockInfo);
+                            oldLastBlockInfo = parser.lastBlockInfo;
                         }
 
                         contentParser.on_new_atom_block(currentAtomBlockInfo);
@@ -3049,12 +3089,12 @@ const DocParser = struct {
                             break :handle;
                         }
 
-                        const contentEnd = try contentParser.parse_directive_line_tokens(lineInfo, lineScanner.cursor);
+                        const contentEnd = try contentParser.parse_attributes_line_tokens(lineInfo, lineScanner.cursor);
 
                         lineInfo.rangeTrimmed.end = contentEnd;
                         std.debug.assert(lineScanner.lineEnd != null);
 
-                        try parser.onNewDirectiveLine(lineInfo, forBulletContainer);
+                        try parser.onNewAttributesLine(lineInfo, forBulletContainer);
                     },
                     else => {},
                 }
@@ -3107,6 +3147,10 @@ const DocParser = struct {
             lineInfo.index = lineScanner.cursorLineIndex;
 
             parser.tmdDoc.lines.push(lineInfoElement);
+
+            if (oldLastBlockInfo != parser.lastBlockInfo) {
+                try parser.onLastBlockInfoChanged(oldLastBlockInfo);
+            }
         }
 
         // Meaningful only for code snippet block (and popential later custom app block).
@@ -3117,7 +3161,9 @@ const DocParser = struct {
 
         try contentParser.matchLinks(); // ToDo: same effect when being put in the above else-block.
 
-        parser.onParseEnd();
+        blockArranger.end();
+
+        try parser.onParseEnd();
     }
 };
 
