@@ -2811,8 +2811,6 @@ const DocParser = struct {
                             try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
                             currentAtomBlockInfo = baseBlockInfo;
                             atomBlockCount += 1;
-
-                            parser.nextElementAttributes = null;
                         }
                     },
                     '\'', '"' => |mark| handle: {
@@ -3038,6 +3036,10 @@ const DocParser = struct {
                         }
 
                         //var forBulletContainer = false;
+                        // NOTE: if items can be specified IDS again in the future,
+                        //       remember handle the cases they are used as footnotes.
+                        //       (render their childrens as the footnotes).
+
                         var playloadStart = lineScanner.cursor;
                         if (lineScanner.lineEnd) |_| {
                             lineInfo.rangeTrimmed.end = playloadStart;
