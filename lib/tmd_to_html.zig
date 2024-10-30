@@ -662,6 +662,14 @@ const TmdRender = struct {
                         return element;
                     }
                 }
+
+                const isFooter = if (blockInfo.getFooterSibling()) |footer| blk: {
+                    _ = try w.write("\n<footer");
+                    try writeBlockAttributes(w, "tmd-footer", footer.attributes);
+                    _ = try w.write(">\n");
+                    break :blk true;
+                } else false;
+
                 switch (blockInfo.blockType) {
                     .root => unreachable,
                     .base => |base| handle: {
@@ -672,13 +680,14 @@ const TmdRender = struct {
                             break :handle;
                         }
 
-                        if (attrs.isFooter) _ = try w.write("\n<footer") else _ = try w.write("\n<div");
+                        //if (attrs.isFooter) _ = try w.write("\n<footer") else
+                        _ = try w.write("\n<div");
 
-                        if (attrs.isFooter) {
-                            try writeBlockAttributes(w, "tmd-base tmd-footer", blockInfo.attributes);
-                        } else {
-                            try writeBlockAttributes(w, "tmd-base", blockInfo.attributes);
-                        }
+                        //if (attrs.isFooter) {
+                        //    try writeBlockAttributes(w, "tmd-base tmd-footer", blockInfo.attributes);
+                        //} else {
+                        try writeBlockAttributes(w, "tmd-base", blockInfo.attributes);
+                        //}
 
                         switch (attrs.horizontalAlign) {
                             .none => {},
@@ -689,11 +698,11 @@ const TmdRender = struct {
                         }
                         _ = try w.write(">");
                         element = try self.renderBlockChildren(w, element, 0);
-                        if (attrs.isFooter) {
-                            _ = try w.write("\n</footer>\n");
-                        } else {
-                            _ = try w.write("\n</div>\n");
-                        }
+                        //if (attrs.isFooter) {
+                        //    _ = try w.write("\n</footer>\n");
+                        //} else {
+                        _ = try w.write("\n</div>\n");
+                        //}
                     },
 
                     // containers
@@ -962,6 +971,10 @@ const TmdRender = struct {
 
                         element = element.next orelse &self.nullBlockInfoElement;
                     },
+                }
+
+                if (isFooter) {
+                    _ = try w.write("\n</footer>\n");
                 }
             }
         }

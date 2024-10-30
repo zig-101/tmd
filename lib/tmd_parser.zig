@@ -2272,7 +2272,7 @@ const DocParser = struct {
         return blockInfo;
     }
 
-    fn onLastBlockInfoChanged(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !void {
+    fn tryToAttributeBlock(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !void {
         // std.debug.assert(oldLastBlockInfo != parser.lastBlockInfo); // possible equal in the end
 
         if (oldLastBlockInfo.blockType != .attributes) {
@@ -2290,6 +2290,8 @@ const DocParser = struct {
 
                 if (attributesBlock.getNextSibling() == block) {
                     try parser.setBlockAttributes(block, as);
+                } else {
+                    try parser.setBlockAttributes(attributesBlock, as); // a footer attributes
                 }
 
                 parser.nextElementAttributes = null;
@@ -2297,6 +2299,16 @@ const DocParser = struct {
         }
 
         // oldLastBlockInfo.attributes = null; // moved to createAndPushBlockInfoElement
+    }
+
+    fn tryToAttributeTheLastBlock(parser: *DocParser) !void {
+        std.debug.assert(parser.lastBlockInfo == &parser.tmdDoc.blocks.tail().?.value);
+        switch (parser.lastBlockInfo.blockType) {
+            .attributes => if (parser.nextElementAttributes) |as| {
+                try parser.setBlockAttributes(parser.lastBlockInfo, as); // a footer attributes
+            },
+            else => try parser.tryToAttributeBlock(parser.lastBlockInfo),
+        }
     }
 
     fn setBlockAttributes(parser: *DocParser, blockInfo: *tmd.BlockInfo, as: tmd.ElementAttibutes) !void {
@@ -2402,8 +2414,7 @@ const DocParser = struct {
 
     fn onParseEnd(parser: *DocParser) !void {
         // ...
-        std.debug.assert(parser.lastBlockInfo == &parser.tmdDoc.blocks.tail().?.value);
-        try parser.onLastBlockInfoChanged(parser.lastBlockInfo);
+        try parser.tryToAttributeTheLastBlock();
 
         // ...
         const from = for (&parser.tmdDoc._headerLevelNeedAdjusted, 0..) |has, level| {
@@ -3083,7 +3094,7 @@ const DocParser = struct {
                             atomBlockCount += 1;
 
                             // !! important
-                            try parser.onLastBlockInfoChanged(realOldLast);
+                            try parser.tryToAttributeBlock(realOldLast);
                             oldLastBlockInfo = parser.lastBlockInfo;
                         }
 
@@ -3157,7 +3168,7 @@ const DocParser = struct {
             parser.tmdDoc.lines.push(lineInfoElement);
 
             if (oldLastBlockInfo != parser.lastBlockInfo) {
-                try parser.onLastBlockInfoChanged(oldLastBlockInfo);
+                try parser.tryToAttributeBlock(oldLastBlockInfo);
             }
         }
 
@@ -3205,7 +3216,15 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
         }
         if (blockInfo.getNextSibling()) |sibling| {
             std.debug.print(" (next sibling: #{} {s})", .{ sibling.index, sibling.typeName() });
-        } else std.debug.print(" (next sibling: <null>)", .{});
+        } else {
+            std.debug.print(" (next sibling: <null>)", .{});
+        }
+        if (blockInfo.attributes) |attrs| {
+            if (attrs.id.len > 0) {
+                std.debug.print(" (id={s})", .{attrs.id});
+            }
+        }
+
         std.debug.print("\n", .{});
 
         if (blockInfo.isAtom()) {
@@ -3428,7 +3447,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
     var attrs = tmd.BaseBlockAttibutes{};
 
     const commentedOut = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "commentedOut").?;
-    const isFooter = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "isFooter").?;
+    //const isFooter = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "isFooter").?;
     const horizontalAlign = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "horizontalAlign").?;
     const cellSpans = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "cellSpans").?;
 
@@ -3449,14 +3468,14 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
                     }
                     attrs.commentedOut = true;
                 },
-                '&' => {
-                    if (lastOrder >= isFooter) break;
-                    defer lastOrder = horizontalAlign;
-
-                    if (item.len != 2) break;
-                    if (item[1] != '&') break;
-                    attrs.isFooter = true;
-                },
+                //'&' => {
+                //    if (lastOrder >= isFooter) break;
+                //    defer lastOrder = horizontalAlign;
+                //
+                //    if (item.len != 2) break;
+                //    if (item[1] != '&') break;
+                //    attrs.isFooter = true;
+                //},
                 '>', '<' => {
                     if (lastOrder >= horizontalAlign) break;
                     defer lastOrder = horizontalAlign;

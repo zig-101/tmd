@@ -146,7 +146,7 @@ pub const Link = struct {
 
 pub const BaseBlockAttibutes = struct {
     commentedOut: bool = false, // ToDo: use Range
-    isFooter: bool = false, // ToDo: use Range
+    //isFooter: bool = false, // Now, use @@@ footer
     horizontalAlign: enum {
         none,
         left,
@@ -274,11 +274,27 @@ pub const BlockInfo = struct {
         };
     }
 
+    // Only atom blocks and base blocks can call this method.
+    pub fn getFooterSibling(self: *const @This()) ?*BlockInfo {
+        //if (self.isContainer()) unreachable;
+        if (self.isContainer()) return null;
+
+        if (self.getNextSibling()) |sibling| {
+            if (sibling.blockType == .attributes) {
+                if (sibling.getNextSibling() == null)
+                    return sibling;
+            }
+        }
+
+        return null;
+    }
+
     pub fn ownerListElement(self: *const @This()) *list.Element(@This()) {
         return @alignCast(@fieldParentPtr("value", @constCast(self)));
     }
 
     // ToDo: make ownerListElement private by using this one instead.
+    //       [update]: next solely is not enough to remove ownerListElement.
     pub fn next(self: *const @This()) ?*BlockInfo {
         return &(self.ownerListElement().next orelse return null).value;
     }
