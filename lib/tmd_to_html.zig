@@ -1325,6 +1325,9 @@ const TmdRender = struct {
 
                     if (linkInfo.urlConfirmed()) {
                         _ = try w.write("</a>");
+                        if (linkInfo.isFootnote()) {
+                            _ = try w.write("</sup>");
+                        }
                     } else {
                         _ = try w.write("</span>");
                     }
