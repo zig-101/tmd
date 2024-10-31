@@ -1000,7 +1000,7 @@ pub const TokenType = union(enum) {
             return @tagName(self.markType);
         }
     },
-    // ToDo: following a .media LineSpanMarkType.
+    // ToDo: follow a .media LineSpanMarkType.
     //       Noneistance for nothing.
     //mediaInfo: struct {
     //    attrs: *MediaAttributes,
@@ -1038,4 +1038,5 @@ pub const LineSpanMarkType = enum(u8) {
     lineBreak, // \\
     comment, // //
     media, // @@
+    escape, // !!
 };

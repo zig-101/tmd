@@ -1240,6 +1240,7 @@ const TmdRender = struct {
                                 .lineBreak => {
                                     _ = try w.write("<br/>");
                                 },
+                                .escape => {},
                                 .comment => break,
                                 .media => blk: {
                                     if (tracker.activeLinkInfo) |_| {

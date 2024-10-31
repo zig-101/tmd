@@ -982,6 +982,13 @@ const ContentParser = struct {
 
                             // jump out of the swith block
                         },
+                        .escape => {
+                            const numBlanks = lineScanner.readUntilLineEnd();
+                            const textEnd = lineScanner.cursor - numBlanks;
+                            std.debug.assert(textEnd > textStart);
+                            _ = try self.create_plain_text_token(textStart, textEnd);
+                            break :parse_tokens textEnd;
+                        },
                         .media => {
                             const numBlanks = lineScanner.readUntilLineEnd();
                             const textEnd = lineScanner.cursor - numBlanks;
@@ -1901,6 +1908,7 @@ const LineScanner = struct {
         table['\\'] = .lineBreak;
         table['/'] = .comment;
         table['&'] = .media;
+        table['!'] = .escape;
         break :blk table;
     };
 
