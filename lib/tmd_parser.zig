@@ -1008,12 +1008,15 @@ const ContentParser = struct {
                 break :parse_tokens lineScanner.cursor;
             }
 
+            const codeMark = LineScanner.spanMarksTable['`'].?;
             const codeSpanStatus = self.codeSpanStatus;
 
             parse_span_marks: while (true) {
                 std.debug.assert(lineScanner.lineEnd == null);
 
-                const numBlanks = lineScanner.readUntilSpanMarkChar(0);
+                const precedence = if (codeSpanStatus.openMark) |_| codeMark.precedence else 0;
+                const numBlanks = lineScanner.readUntilSpanMarkChar(precedence);
+
                 if (lineScanner.lineEnd != null) {
                     const textEnd = lineScanner.cursor - numBlanks;
                     if (textEnd > textStart) {
