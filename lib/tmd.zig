@@ -1020,8 +1020,7 @@ pub const SpanMarkType = enum(u8) {
     deleted,
     marked,
     supsub,
-    code,
-    escaped, // must be the last one
+    code, // must be the last one (why? forget the reason)
 
     pub const MarkCount = @typeInfo(@This()).@"enum".fields.len;
 

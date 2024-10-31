@@ -54,7 +54,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     };
     try docParser.parseAll(tmdData);
 
-    if (true and builtin.mode == .Debug) {
+    if (false and builtin.mode == .Debug) {
         dumpTmdDoc(&tmdDoc);
     }
 
@@ -504,7 +504,6 @@ const BlockArranger = struct {
 const ContentParser = struct {
     docParser: *DocParser,
 
-    escapedSpanStatus: *SpanStatus = undefined,
     codeSpanStatus: *SpanStatus = undefined,
     linkSpanStatus: *SpanStatus = undefined,
 
@@ -576,7 +575,6 @@ const ContentParser = struct {
     }
 
     fn init(self: *ContentParser) void {
-        self.escapedSpanStatus = self.span_status(.escaped);
         self.codeSpanStatus = self.span_status(.code);
         self.linkSpanStatus = self.span_status(.link);
     }
@@ -871,7 +869,7 @@ const ContentParser = struct {
         return &tokenInfo.tokenType.spanMark;
     }
 
-    fn create_dummy_code_span(self: *ContentParser, markStart: u32, pairCount: u32, isSecondary: bool) !*tmd.DummyCodeSpans {
+    fn create_even_backticks_span(self: *ContentParser, markStart: u32, pairCount: u32, isSecondary: bool) !*tmd.DummyCodeSpans {
         std.debug.assert(markStart >= self.lineSession.contentStart);
 
         // Create the dummy code spans mark.
@@ -1010,115 +1008,36 @@ const ContentParser = struct {
                 break :parse_tokens lineScanner.cursor;
             }
 
-            const escapedSpanStatus = self.escapedSpanStatus;
             const codeSpanStatus = self.codeSpanStatus;
 
-            search_marks: while (true) {
+            parse_span_marks: while (true) {
                 std.debug.assert(lineScanner.lineEnd == null);
 
-                if (escapedSpanStatus.openMark) |openMark| escape_context: {
-                    std.debug.assert(openMark.markType == .escaped);
+                const numBlanks = lineScanner.readUntilSpanMarkChar(0);
+                if (lineScanner.lineEnd != null) {
+                    const textEnd = lineScanner.cursor - numBlanks;
+                    if (textEnd > textStart) {
+                        _ = try self.create_plain_text_token(textStart, textEnd);
+                    } else std.debug.assert(textEnd == textStart);
 
-                    const mark = LineScanner.spanMarksTable['!'].?;
-                    std.debug.assert(mark.markType == .escaped);
-                    while (true) {
-                        var numBlanks = lineScanner.readUntilSpanMarkChar(mark.precedence);
-                        if (lineScanner.lineEnd != null) {
-                            const textEnd = lineScanner.cursor - numBlanks;
-                            if (textEnd > textStart) {
-                                _ = try self.create_plain_text_token(textStart, textEnd);
-                                break :parse_tokens textEnd;
-                            }
-                        }
+                    break :parse_tokens textEnd;
+                }
 
-                        std.debug.assert(lineScanner.peekCursor() == '!');
+                const c = lineScanner.peekCursor();
 
-                        const markStart = lineScanner.cursor;
-                        lineScanner.advance(1);
-                        const markLen = lineScanner.readUntilNotChar('!') + 1;
-                        if (markLen == escapedSpanStatus.markLen) {
-                            const markEnd = lineScanner.cursor;
-                            std.debug.assert(markEnd == markStart + markLen);
+                const markStart = lineScanner.cursor;
+                lineScanner.advance(1);
+                const markLen = lineScanner.readUntilNotChar(c) + 1;
+                const markEnd = lineScanner.cursor;
+                std.debug.assert(markEnd == markStart + markLen);
 
-                            const textEnd = if (openMark.secondary) blk: {
-                                numBlanks = 0;
-                                break :blk markStart;
-                            } else markStart - numBlanks;
+                const mark = LineScanner.spanMarksTable[c].?;
 
-                            if (textEnd > textStart) {
-                                _ = try self.create_plain_text_token(textStart, textEnd);
-                            } else std.debug.assert(textEnd == textStart);
-
-                            const closeEscapeMark = try self.close_span(.escaped, textEnd, markLen, openMark);
-                            closeEscapeMark.blankLen = numBlanks;
-
-                            if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
-
-                            textStart = markEnd;
-                            break :escape_context;
-                        } else if (lineScanner.lineEnd != null) {
-                            const markEnd = lineScanner.cursor;
-                            std.debug.assert(markEnd == markStart + markLen);
-
-                            const textEnd = if (openMark.secondary) blk: {
-                                numBlanks = 0;
-                                break :blk markStart;
-                            } else markStart - numBlanks;
-
-                            if (textEnd > textStart) {
-                                _ = try self.create_plain_text_token(textStart, textEnd);
-                            } else std.debug.assert(textEnd == textStart);
-
-                            break :parse_tokens markEnd;
-                        }
-
-                        // keep textStart unchanged and continue looking for escape close mark.
-
-                    } // while (true)
-                } // escape_context
-
-                // To avoid code complexity, this block is cancelled.
-                //if (codeSpanStatus.openMark) |openMark| code_span: {
-                //    std.debug.assert(openMark.markType == .code);
-                //    const codeMark = LineScanner.spanMarksTable['!'].?;
-                //    std.debug.assert(codeMark.markType == .code);
-                //}
-
-                non_escape_context: while (true) {
-                    std.debug.assert(lineScanner.lineEnd == null);
-
-                    const numBlanks = lineScanner.readUntilSpanMarkChar(0);
-                    if (lineScanner.lineEnd != null) {
-                        const textEnd = lineScanner.cursor - numBlanks;
-                        if (textEnd > textStart) {
-                            _ = try self.create_plain_text_token(textStart, textEnd);
-                        } else std.debug.assert(textEnd == textStart);
-
-                        break :parse_tokens textEnd;
-                    }
-
-                    const c = lineScanner.peekCursor();
-
-                    const markStart = lineScanner.cursor;
-                    lineScanner.advance(1);
-                    const markLen = lineScanner.readUntilNotChar(c) + 1;
-                    const markEnd = lineScanner.cursor;
-                    std.debug.assert(markEnd == markStart + markLen);
-
-                    const mark = LineScanner.spanMarksTable[c].?;
-
-                    switch (mark.markType) {
-                        .escaped => {
-                            if (markLen < 2 or markLen >= tmd.MaxSpanMarkLength) {
-                                if (lineScanner.lineEnd == null) continue :non_escape_context;
-
-                                std.debug.assert(markEnd > textStart);
-                                _ = try self.create_plain_text_token(textStart, markEnd);
-
-                                break :parse_tokens markEnd;
-                            }
-
+                switch (mark.markType) {
+                    .code => {
+                        const codeMarkStart = if (markLen > 1) blk: {
                             const isSecondary = markStart > lineStart and lineScanner.data[markStart - 1] == '^';
+
                             const textEnd = if (isSecondary) markStart - 1 else markStart;
                             std.debug.assert(textEnd - textStart >= numBlanks);
 
@@ -1126,34 +1045,46 @@ const ContentParser = struct {
                                 _ = try self.create_plain_text_token(textStart, textEnd);
                             } else std.debug.assert(textEnd == textStart);
 
-                            const openEscapeMark = try self.open_span(.escaped, textEnd, markLen, isSecondary);
+                            _ = try self.create_even_backticks_span(textEnd, markLen >> 1, isSecondary);
+
+                            if (markLen & 1 == 0) {
+                                if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
+
+                                textStart = markEnd;
+                                continue :parse_span_marks;
+                            }
+
+                            std.debug.assert(markEnd - 1 == markStart + markLen - (markLen & 1));
+
+                            break :blk markEnd - 1;
+                        } else blk: {
+                            std.debug.assert(markLen == 1);
+                            break :blk markStart;
+                        };
+
+                        std.debug.assert(markLen & 1 == 1);
+
+                        if (codeSpanStatus.openMark) |openMark| {
+                            if (codeMarkStart == markStart) { // no dummmyCodeSpan
+                                const textEnd = markStart - numBlanks;
+                                if (textEnd > textStart) {
+                                    _ = try self.create_plain_text_token(textStart, textEnd);
+                                } else std.debug.assert(textEnd == textStart);
+
+                                const closeCodeSpanMark = try self.close_span(.code, textEnd, 1, openMark);
+                                closeCodeSpanMark.blankLen = numBlanks;
+                            } else {
+                                const closeCodeSpanMark = try self.close_span(.code, codeMarkStart, 1, openMark);
+                                closeCodeSpanMark.blankLen = 0;
+                            }
+
+                            if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
 
                             std.debug.assert(markEnd == lineScanner.cursor);
-
-                            if (lineScanner.lineEnd != null) {
-                                openEscapeMark.blankLen = 0;
-                                break :parse_tokens markEnd;
-                            }
-
-                            if (isSecondary) {
-                                openEscapeMark.blankLen = 0;
-                                textStart = markEnd;
-                                continue :search_marks;
-                            }
-
-                            _ = lineScanner.readUntilNotBlank();
-                            if (lineScanner.lineEnd != null) {
-                                openEscapeMark.blankLen = 0;
-                                break :parse_tokens markEnd;
-                            }
-
-                            openEscapeMark.blankLen = lineScanner.cursor - markEnd;
-
-                            textStart = lineScanner.cursor;
-                            continue :search_marks;
-                        },
-                        .code => {
-                            const codeMarkStart = if (markLen > 1) blk: {
+                            textStart = markEnd;
+                            continue :parse_span_marks;
+                        } else {
+                            const openCodeSpanMark = if (codeMarkStart == markStart) blk: { // no dummmyCodeSpan
                                 const isSecondary = markStart > lineStart and lineScanner.data[markStart - 1] == '^';
 
                                 const textEnd = if (isSecondary) markStart - 1 else markStart;
@@ -1163,138 +1094,87 @@ const ContentParser = struct {
                                     _ = try self.create_plain_text_token(textStart, textEnd);
                                 } else std.debug.assert(textEnd == textStart);
 
-                                const dummyCodeSpan = try self.create_dummy_code_span(textEnd, markLen >> 1, isSecondary);
-                                _ = dummyCodeSpan;
+                                break :blk try self.open_span(.code, textEnd, 1, isSecondary);
+                            } else try self.open_span(.code, codeMarkStart, 1, false);
 
-                                if (markLen & 1 == 0) {
-                                    if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
+                            openCodeSpanMark.blankLen = 0; // might be modified below
 
-                                    textStart = markEnd;
-                                    continue :non_escape_context;
-                                }
+                            if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
 
-                                std.debug.assert(markEnd - 1 == markStart + markLen - (markLen & 1));
+                            _ = lineScanner.readUntilNotBlank();
+                            if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
 
-                                break :blk markEnd - 1;
-                            } else blk: {
-                                std.debug.assert(markLen == 1);
-                                break :blk markStart;
-                            };
+                            openCodeSpanMark.blankLen = lineScanner.cursor - markEnd;
 
-                            std.debug.assert(markLen & 1 == 1);
+                            textStart = lineScanner.cursor;
+                            continue :parse_span_marks;
+                        }
+                    },
+                    else => |spanMarkType| {
+                        create_mark_token: {
+                            if (codeSpanStatus.openMark) |_| break :create_mark_token;
+                            if (markLen < 2 or markLen >= tmd.MaxSpanMarkLength) break :create_mark_token;
 
-                            if (codeSpanStatus.openMark) |openMark| {
-                                if (codeMarkStart == markStart) { // no dummmyCodeSpan
-                                    const textEnd = markStart - numBlanks;
-                                    if (textEnd > textStart) {
-                                        _ = try self.create_plain_text_token(textStart, textEnd);
-                                    } else std.debug.assert(textEnd == textStart);
+                            const markStatus = self.span_status(spanMarkType);
 
-                                    const closeCodeSpanMark = try self.close_span(.code, textEnd, 1, openMark);
-                                    closeCodeSpanMark.blankLen = numBlanks;
-                                } else {
-                                    const closeCodeSpanMark = try self.close_span(.code, codeMarkStart, 1, openMark);
-                                    closeCodeSpanMark.blankLen = 0;
-                                }
+                            if (markStatus.openMark) |openMark| {
+                                if (markLen != markStatus.markLen) break :create_mark_token;
+
+                                const textEnd = markStart - numBlanks;
+                                if (textEnd > textStart) {
+                                    _ = try self.create_plain_text_token(textStart, textEnd);
+                                } else std.debug.assert(textEnd == textStart);
+
+                                const closeMark = try self.close_span(spanMarkType, textEnd, markLen, openMark);
+                                closeMark.blankLen = numBlanks;
 
                                 if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
+
+                                textStart = markEnd;
+                                continue :parse_span_marks;
+                            } else {
+                                const isSecondary = markStart > lineStart and lineScanner.data[markStart - 1] == '^';
+
+                                const textEnd = if (isSecondary) markStart - 1 else markStart;
+                                std.debug.assert(textEnd - textStart >= numBlanks);
+
+                                if (textEnd > textStart) {
+                                    _ = try self.create_plain_text_token(textStart, textEnd);
+                                } else std.debug.assert(textEnd == textStart);
+
+                                const openMark = try self.open_span(spanMarkType, textEnd, markLen, isSecondary);
 
                                 std.debug.assert(markEnd == lineScanner.cursor);
-                                textStart = markEnd;
-                                continue :non_escape_context;
-                            } else {
-                                const openCodeSpanMark = if (codeMarkStart == markStart) blk: { // no dummmyCodeSpan
-                                    const isSecondary = markStart > lineStart and lineScanner.data[markStart - 1] == '^';
 
-                                    const textEnd = if (isSecondary) markStart - 1 else markStart;
-                                    std.debug.assert(textEnd - textStart >= numBlanks);
-
-                                    if (textEnd > textStart) {
-                                        _ = try self.create_plain_text_token(textStart, textEnd);
-                                    } else std.debug.assert(textEnd == textStart);
-
-                                    break :blk try self.open_span(.code, textEnd, 1, isSecondary);
-                                } else try self.open_span(.code, codeMarkStart, 1, false);
-
-                                openCodeSpanMark.blankLen = 0; // might be modified below
-
-                                if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
+                                if (lineScanner.lineEnd != null) {
+                                    openMark.blankLen = 0;
+                                    break :parse_tokens markEnd;
+                                }
 
                                 _ = lineScanner.readUntilNotBlank();
-                                if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
+                                if (lineScanner.lineEnd != null) {
+                                    openMark.blankLen = 0;
+                                    break :parse_tokens markEnd;
+                                }
 
-                                openCodeSpanMark.blankLen = lineScanner.cursor - markEnd;
+                                openMark.blankLen = lineScanner.cursor - markEnd;
 
                                 textStart = lineScanner.cursor;
-                                continue :non_escape_context;
+                                continue :parse_span_marks;
                             }
-                        },
-                        else => |spanMarkType| {
-                            create_mark_token: {
-                                if (codeSpanStatus.openMark) |_| break :create_mark_token;
-                                if (markLen < 2 or markLen >= tmd.MaxSpanMarkLength) break :create_mark_token;
+                        }
 
-                                const markStatus = self.span_status(spanMarkType);
+                        if (lineScanner.lineEnd != null) {
+                            std.debug.assert(markEnd > textStart);
+                            _ = try self.create_plain_text_token(textStart, markEnd);
+                            break :parse_tokens markEnd;
+                        }
 
-                                if (markStatus.openMark) |openMark| {
-                                    if (markLen != markStatus.markLen) break :create_mark_token;
-
-                                    const textEnd = markStart - numBlanks;
-                                    if (textEnd > textStart) {
-                                        _ = try self.create_plain_text_token(textStart, textEnd);
-                                    } else std.debug.assert(textEnd == textStart);
-
-                                    const closeMark = try self.close_span(spanMarkType, textEnd, markLen, openMark);
-                                    closeMark.blankLen = numBlanks;
-
-                                    if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
-
-                                    textStart = markEnd;
-                                    continue :non_escape_context;
-                                } else {
-                                    const isSecondary = markStart > lineStart and lineScanner.data[markStart - 1] == '^';
-
-                                    const textEnd = if (isSecondary) markStart - 1 else markStart;
-                                    std.debug.assert(textEnd - textStart >= numBlanks);
-
-                                    if (textEnd > textStart) {
-                                        _ = try self.create_plain_text_token(textStart, textEnd);
-                                    } else std.debug.assert(textEnd == textStart);
-
-                                    const openMark = try self.open_span(spanMarkType, textEnd, markLen, isSecondary);
-
-                                    std.debug.assert(markEnd == lineScanner.cursor);
-
-                                    if (lineScanner.lineEnd != null) {
-                                        openMark.blankLen = 0;
-                                        break :parse_tokens markEnd;
-                                    }
-
-                                    _ = lineScanner.readUntilNotBlank();
-                                    if (lineScanner.lineEnd != null) {
-                                        openMark.blankLen = 0;
-                                        break :parse_tokens markEnd;
-                                    }
-
-                                    openMark.blankLen = lineScanner.cursor - markEnd;
-
-                                    textStart = lineScanner.cursor;
-                                    continue :non_escape_context;
-                                }
-                            }
-
-                            if (lineScanner.lineEnd != null) {
-                                std.debug.assert(markEnd > textStart);
-                                _ = try self.create_plain_text_token(textStart, markEnd);
-                                break :parse_tokens markEnd;
-                            }
-
-                            // keep textStart unchanged.
-                            continue :non_escape_context;
-                        },
-                    }
-                } // non_escape_context
-            } // while search_marks
+                        // keep textStart unchanged.
+                        continue :parse_span_marks;
+                    },
+                }
+            } // parse_span_marks
         }; // parse_tokens
 
         if (self.lineSession.tokens.head()) |head| blk: {
@@ -2033,7 +1913,7 @@ const LineScanner = struct {
             table['_'] = .{ .markType = .link, .precedence = 1, .minLen = 2 };
             table['$'] = .{ .markType = .supsub, .precedence = 1, .minLen = 2 };
             table['`'] = .{ .markType = .code, .precedence = 2, .minLen = 1 };
-            table['!'] = .{ .markType = .escaped, .precedence = 3, .minLen = 2 };
+            //table['!'] = .{ .markType = .escaped, .precedence = 3, .minLen = 2 };
             return table;
         }
     }.run();

@@ -1340,7 +1340,7 @@ const TmdRender = struct {
 
                     break :done;
                 },
-                .code, .escaped => {
+                .code => {
                     if (tracker.marksStack.pop()) |tail| {
                         std.debug.assert(tail == markElement);
                     } else unreachable;
@@ -1443,11 +1443,6 @@ const TmdRender = struct {
                     _ = try w.write("<code class=\"tmd-code-span\">");
                 }
             },
-            .escaped => {
-                if (spanMark.secondary) {
-                    _ = try w.write("<span class=\"tmd-keep-whitespaces\">");
-                }
-            },
         }
     }
 
@@ -1469,11 +1464,6 @@ const TmdRender = struct {
             },
             .code => {
                 _ = try w.write("</code>");
-            },
-            .escaped => {
-                if (spanMark.secondary) {
-                    _ = try w.write("</span>");
-                }
             },
         }
     }
