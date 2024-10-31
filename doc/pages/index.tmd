@@ -327,13 +327,19 @@ world
 ''''' << #demo-8
 @@@ #demo-8
 {
-!! ** all marks %% are escaped ** `` !!!. !!
+*``* all marks %``% are escaped *``* ^```` !``!``!.
 
-Backticks in code span: `!!`code`!!`
+!! ** all marks %% are escaped ** `` !!!.
 
-`` ! This is not a note box.
+Backticks in code span: ` ^``code^```
 
-`` // This is not a comment line.
+Backticks in code span: `
+!! `code`
+`
+
+`` ! This is not a **note box**.
+
+`` // This is not a %%comment line%%.
 }
 
 ---

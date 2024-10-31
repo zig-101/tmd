@@ -32,7 +32,7 @@ pub fn main() !void {
     if (args.len <= 1 or !std.mem.eql(u8, args[1], "render")) {
         try stdout.print(
             \\Usage:
-            \\  tmd render [--full-html] TMD-FILES...
+            \\  tmd render [--full-html] TMD-files...
             \\
         , .{});
         std.process.exit(1);

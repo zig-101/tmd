@@ -112,7 +112,7 @@ body {
 .tmd-quotation-large {
   margin-left: 6px;
   padding-left: 6px;
-  font-size: xx-large;
+  font-size: 1.95em;
   padding: 0.3em 2em;
 }
 
@@ -121,7 +121,7 @@ body {
   font-style: italic;
   position: relative;
   margin-left: 1em;
-  font-size: large;
+  font-size: 1.25em;
 }
 
 .tmd-quotation-large > .tmd-footer:first-of-type:before {

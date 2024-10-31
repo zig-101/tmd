@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-	// lib
+    // lib
     const tmdLib = b.addStaticLibrary(.{
         .name = "tmd",
         .root_source_file = b.path("lib/tmd.zig"),
@@ -13,7 +13,18 @@ pub fn build(b: *std.Build) !void {
     });
     b.installArtifact(tmdLib);
 
-	// cmd
+    // test
+    const unitTest = b.addTest(.{
+        .name = "unit_test",
+        .root_source_file = b.path("lib/tmd.zig"),
+        .target = b.host,
+    });
+    b.installArtifact(unitTest);
+    const runtTests = b.addRunArtifact(unitTest);
+    const testStep = b.step("test", "Run unit tests");
+    testStep.dependOn(&runtTests.step);
+
+    // cmd
     const tmdLibModule = b.addModule("tmd", .{
         .root_source_file = b.path("lib/tmd.zig"),
         .target = target,
