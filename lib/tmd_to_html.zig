@@ -1342,13 +1342,15 @@ const TmdRender = struct {
                     break :done;
                 },
                 .code => {
-                    if (tracker.marksStack.pop()) |tail| {
-                        std.debug.assert(tail == markElement);
-                    } else unreachable;
+                    if (!markElement.value.mark.?.secondary) {
+                        if (tracker.marksStack.pop()) |tail| {
+                            std.debug.assert(tail == markElement);
+                        } else unreachable;
 
-                    try writeCloseMark(w, markElement.value.mark.?);
+                        try writeCloseMark(w, markElement.value.mark.?);
 
-                    break :done;
+                        break :done;
+                    }
                 },
                 else => {},
             }

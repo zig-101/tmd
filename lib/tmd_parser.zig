@@ -1021,7 +1021,10 @@ const ContentParser = struct {
             parse_span_marks: while (true) {
                 std.debug.assert(lineScanner.lineEnd == null);
 
-                const precedence = if (codeSpanStatus.openMark) |_| codeMark.precedence else 0;
+                const inPrimaryCodeSpan = if (codeSpanStatus.openMark) |m| blk: {
+                    break :blk if (m.secondary) false else true;
+                } else false;
+                const precedence = if (inPrimaryCodeSpan) codeMark.precedence else 0;
                 const numBlanks = lineScanner.readUntilSpanMarkChar(precedence);
 
                 if (lineScanner.lineEnd != null) {
@@ -1122,7 +1125,8 @@ const ContentParser = struct {
                     },
                     else => |spanMarkType| {
                         create_mark_token: {
-                            if (codeSpanStatus.openMark) |_| break :create_mark_token;
+                            // if (codeSpanStatus.openMark) |_| break :create_mark_token;
+                            if (inPrimaryCodeSpan) break :create_mark_token;
                             if (markLen < 2 or markLen >= tmd.MaxSpanMarkLength) break :create_mark_token;
 
                             const markStatus = self.span_status(spanMarkType);
@@ -3179,8 +3183,8 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                             .spanMark => |m| {
                                 var open: []const u8 = "<";
                                 var close: []const u8 = ">";
-                                if (m.open) close = "" else open = " ";
                                 var secondary: []const u8 = "";
+                                if (m.open) close = "" else open = " ";
                                 if (m.secondary) secondary = "^";
                                 std.debug.print("|{}-{}: {s}{s}{s}:{s}{s}", .{
                                     tokenInfo.start() - lineInfo.range.start + 1,

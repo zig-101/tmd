@@ -4,6 +4,7 @@ body {
 }
 
 .tmd-doc {
+  font-family: Arial, Helvetica, sans-serif;
   color: #2f2f2f;
   font-size: 1.125em;
   line-height: 1.5;
@@ -279,11 +280,10 @@ body {
 }
 
 .tmd-mono-font {
-  border: 0px;
   background: inherit;
   color: inherit;
-  padding: inherit;
-  white-space: break-spaces;
+  padding: 0px;
+  border: 0px;
 }
 
 .tmd-keep-whitespaces {

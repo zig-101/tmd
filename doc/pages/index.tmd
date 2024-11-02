@@ -14,8 +14,8 @@ while preserving the familiar readability of its predecessor.
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 1 (span styles)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''''
 ''''' << #demo-1
@@ -44,17 +44,17 @@ This is __a self-defined link``https://go101.org__,
 this is __a broken link__,
 and this is ^__an underlined text__.
 
-This is a code span: ` var ok = x && y `.
-
-^`text with mono font`.
+This is a code span: ` var z = foo::x || bar::y `.
+and this is a mono font text span:
+^` var z = x$$ 2 $$ + y^$$ n $$`.
 }
 
 @@@ #section-demo-2
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 2 (line leading marks)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''''
 ''''' << #demo-2
@@ -77,8 +77,8 @@ This block
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 3 (link definitions)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''''
 ''''' << #demo-3
@@ -104,8 +104,8 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 4 (built-in containers)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''''
 ''''' << #demo-4
@@ -133,9 +133,11 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
     
   Another definition list:
   :. ### Zig
-    ;;; A programming language for extreme great performance.
+    ;;; A programming language optimized for performance 
+        and featuring a robust metaprogramming system.
   :. ### Go
-    ;;; A programming language for super easy memory management.
+    ;;; A statically-typed programming language with
+        dynamic language flexibility and moderate performance.
   }
 * ### Tab 2
   ;;; Content of tab 2.
@@ -165,7 +167,8 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 
 ? ### Why TapirMD?
   {
-  Because traditional markdown formats have many ambiguities and not powerful enough.
+  Because traditional markdown formats
+  have many ambiguities and not powerful enough.
   }
 }
 
@@ -175,8 +178,8 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 5 (table)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''''
 ''''' << #demo-5
@@ -242,8 +245,8 @@ Another table (column-oriented):
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 6 (atom blocks)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''''
 ''''' << #demo-6
@@ -264,9 +267,11 @@ The below is a horizontal line.
 
 ---
 
-@@@ This is an attributes block. The texts here must be
-@@@ of certain formats to be meaningful.
-@@@ We can specify ID and classes for the next sibling block here.
+@@@ This is an attributes block. 
+@@@ The texts here must be of 
+@@@ certain formats to be meaningful.
+@@@ We can specify ID and classes
+@@@ for the next sibling block here.
 
 @@@ #code-snippet-1
 . ### code-snippet-1.zig
@@ -283,8 +288,8 @@ The below is a horizontal line.
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 7 (line spacing)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''
 ''' << #demo-7
@@ -320,8 +325,8 @@ world
 ###+++++++++++++++++++++++++++++++++++++++++
 	Demo 8 (character escaping)
 
-# ### TapirMD source
-  ### Render result
+# ### TapirMD Source
+  ### Render Result
 --------------------------
 '''''
 ''''' << #demo-8
