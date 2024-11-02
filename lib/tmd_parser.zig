@@ -882,6 +882,10 @@ const ContentParser = struct {
             },
         };
 
+        if (isSecondary or pairCount > 1) {
+            self.blockSession.currentTextNumber += 1;
+        }
+
         self.lineSession.activePlainText = null;
 
         return &tokenInfo.tokenType.evenBackticks;

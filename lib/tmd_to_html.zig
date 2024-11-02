@@ -1170,6 +1170,8 @@ const TmdRender = struct {
                                 for (0..m.pairCount) |_| {
                                     _ = try w.write("`");
                                 }
+                            } else for (1..m.pairCount) |_| {
+                                _ = try w.write("&nbsp");
                             }
                         },
                         .spanMark => |*m| {
