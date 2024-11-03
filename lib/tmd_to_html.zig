@@ -305,7 +305,7 @@ const TmdRender = struct {
                 switch (child.blockType) {
                     .blank => unreachable,
                     .attributes => break :check,
-                    .line => break :check,
+                    .seperator => break :check,
                     .base => |base| if (base.attributes().commentedOut) break :check,
                     else => std.debug.assert(child.isAtom()),
                 }
@@ -336,7 +336,7 @@ const TmdRender = struct {
             handle: {
                 const rowSpan: u32, const colSpan: u32 = switch (child.blockType) {
                     .attributes => break :handle,
-                    .line => {
+                    .seperator => {
                         toChangeRow = true;
                         break :handle;
                     },
@@ -889,7 +889,7 @@ const TmdRender = struct {
 
                     // atom
 
-                    .line => |_| {
+                    .seperator => |_| {
                         _ = try w.print("<hr class=\"tmd-line\"/>\n", .{});
 
                         element = element.next orelse &self.nullBlockInfoElement;
@@ -1124,7 +1124,7 @@ const TmdRender = struct {
 
             // Just to check all possible types. Don't remove.
             switch (lineInfo.lineType) {
-                .blank, .usual, .header, .line, .attributes, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customBlockStart, .customBlockEnd, .data => {},
+                .blank, .usual, .header, .seperator, .attributes, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customBlockStart, .customBlockEnd, .data => {},
             }
 
             {
@@ -1637,7 +1637,7 @@ const TmdRender = struct {
 
                     // atom
 
-                    .line, .header, .usual, .attributes, .blank, .code, .custom => {
+                    .seperator, .header, .usual, .attributes, .blank, .code, .custom => {
                         try self.renderTmdCodeForAtomBlock(w, blockInfo, false);
 
                         element = element.next orelse &self.nullBlockInfoElement;

@@ -2638,13 +2638,13 @@ const DocParser = struct {
                             if (lineScanner.lineEnd == null) break :handle;
                         }
 
-                        lineInfo.lineType = .{ .line = .{
+                        lineInfo.lineType = .{ .seperator = .{
                             .markLen = markLen,
                         } };
 
                         const lineBlockInfo = try parser.createAndPushBlockInfoElement();
                         lineBlockInfo.blockType = .{
-                            .line = .{
+                            .seperator = .{
                                 .startLine = lineInfo,
                             },
                         };

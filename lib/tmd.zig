@@ -468,7 +468,7 @@ pub const BlockType = union(enum) {
         const Atom = void;
     },
 
-    line: struct {
+    seperator: struct {
         startLine: *LineInfo = undefined,
         endLine: *LineInfo = undefined,
 
@@ -749,7 +749,7 @@ pub const LineType = union(enum) {
         markEndWithSpaces: u32,
         tokens: list.List(TokenInfo) = .{},
     },
-    line: struct {
+    seperator: struct {
         markLen: u32,
     },
 
