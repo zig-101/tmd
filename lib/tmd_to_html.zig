@@ -296,7 +296,7 @@ const TmdRender = struct {
         }
     };
 
-    fn collectTableCells(self: *TmdRender, firstTableChild: *tmd.BlockInfo) ![]TableCell {
+    fn collectTableCells(self: *TmdRender, firstTableChild: *tmd.BlockInfo, blockFollowingTable: *?*tmd.BlockInfo) ![]TableCell {
         var numCells: usize = 0;
         var firstNonLineChild: ?*tmd.BlockInfo = null;
         var child = firstTableChild;
@@ -314,8 +314,13 @@ const TmdRender = struct {
                 if (firstNonLineChild == null) firstNonLineChild = child;
             }
 
-            child = child.getNextSibling() orelse break;
-            std.debug.assert(child.nestingDepth == firstTableChild.nestingDepth);
+            if (child.getNextSibling()) |sibling| {
+                child = sibling;
+                std.debug.assert(child.nestingDepth == firstTableChild.nestingDepth);
+            } else {
+                blockFollowingTable.* = if (child.ownerListElement().next) |next| &next.value else null;
+                break;
+            }
         }
 
         if (numCells == 0) return &.{};
@@ -473,8 +478,12 @@ const TmdRender = struct {
     }
 
     fn renderTableBlock_RowOriented(self: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo, firstChild: *tmd.BlockInfo) !?*tmd.BlockInfo {
-        const cells = try self.collectTableCells(firstChild);
-        if (cells.len == 0) return try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+        var blockFollowingTable: ?*tmd.BlockInfo = undefined;
+        const cells = try self.collectTableCells(firstChild, &blockFollowingTable);
+        if (cells.len == 0) {
+            try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+            return blockFollowingTable;
+        }
         defer self.allocator.free(cells);
 
         _ = try w.write("\n<table");
@@ -497,12 +506,17 @@ const TmdRender = struct {
         _ = try w.write("</tr>\n");
         _ = try w.write("</table>\n");
 
-        return tableBlockInfo.getNextSibling();
+        //return tableBlockInfo.getNextSibling();
+        return blockFollowingTable;
     }
 
     fn renderTableBlock_ColumnOriented(self: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo, firstChild: *tmd.BlockInfo) !?*tmd.BlockInfo {
-        const cells = try self.collectTableCells(firstChild);
-        if (cells.len == 0) return try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+        var blockFollowingTable: ?*tmd.BlockInfo = undefined;
+        const cells = try self.collectTableCells(firstChild, &blockFollowingTable);
+        if (cells.len == 0) {
+            try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+            return blockFollowingTable;
+        }
         defer self.allocator.free(cells);
 
         std.sort.pdq(TableCell, cells, {}, TableCell.compare);
@@ -527,15 +541,16 @@ const TmdRender = struct {
         _ = try w.write("</tr>\n");
         _ = try w.write("</table>\n");
 
-        return tableBlockInfo.getNextSibling();
+        //return tableBlockInfo.getNextSibling();
+        return blockFollowingTable;
     }
 
-    fn renderTableBlocks_WithoutCells(_: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo) !?*tmd.BlockInfo {
+    fn renderTableBlocks_WithoutCells(_: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo) !void {
         _ = try w.write("\n<div");
         try writeBlockAttributes(w, "tmd-table-no-cells", tableBlockInfo.attributes);
         _ = try w.write("></div>\n");
 
-        return tableBlockInfo.getNextSibling();
+        //return tableBlockInfo.getNextSibling();
     }
 
     fn renderTableBlock(self: *TmdRender, w: anytype, tableBlockInfo: *tmd.BlockInfo) !*BlockInfoElement {
@@ -550,17 +565,20 @@ const TmdRender = struct {
 
         const nextBlock = if (columnOriented) blk: {
             if (child.getNextSibling()) |sibling|
-                break :blk try self.renderTableBlock_ColumnOriented(w, tableBlockInfo, sibling);
-
-            break :blk try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+                break :blk try self.renderTableBlock_ColumnOriented(w, tableBlockInfo, sibling)
+            else {
+                try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+                break :blk if (child.ownerListElement().next) |next| &next.value else null;
+            }
         } else try self.renderTableBlock_RowOriented(w, tableBlockInfo, child);
 
         if (false and builtin.mode == .Debug) {
             if (columnOriented) {
                 if (child.getNextSibling()) |sibling|
-                    _ = try self.renderTableBlock_RowOriented(w, tableBlockInfo, sibling);
-
-                _ = try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+                    _ = try self.renderTableBlock_RowOriented(w, tableBlockInfo, sibling)
+                else {
+                    try self.renderTableBlocks_WithoutCells(w, tableBlockInfo);
+                }
             } else _ = try self.renderTableBlock_ColumnOriented(w, tableBlockInfo, child);
         }
 
@@ -703,6 +721,7 @@ const TmdRender = struct {
                         //} else {
                         _ = try w.write("\n</div>\n");
                         //}
+
                     },
 
                     // containers
