@@ -13,7 +13,6 @@ cursorLineIndex: u32 = 0, // for debug
 // That means, for a .rn line end, cursor is the index of '\r'.
 lineEnd: ?tmd.LineEndType = null,
 
-// ToDo: try to make @sizeOf(byteProperties) == 1.
 pub const bytesKindTable = blk: {
     var table = [1]union(enum) {
         others: void,
@@ -25,8 +24,10 @@ pub const bytesKindTable = blk: {
 
         const ByteKind = @This();
 
+        // ToDo: Now, for zig design limitaiton: https://ziggit.dev/t/6726,
+        //       The best effort is make @sizeOf(ByteKind) == 2.
         test "assure size of ByteKind" {
-            std.debug.assert(@sizeOf(ByteKind) == 1);
+            std.debug.assert(@sizeOf(ByteKind) <= 2);
         }
 
         pub fn isSpace(k: ByteKind) bool {
