@@ -146,7 +146,6 @@ pub const Link = struct {
 
 pub const BaseBlockAttibutes = struct {
     commentedOut: bool = false, // ToDo: use Range
-    //isFooter: bool = false, // Now, use @@@ footer
     horizontalAlign: enum {
         none,
         left,

@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) !void {
     // test
     const unitTest = b.addTest(.{
         .name = "unit_test",
-        .root_source_file = b.path("lib/tmd.zig"),
+        .root_source_file = b.path("lib/tests.zig"),
         .target = b.host,
     });
     b.installArtifact(unitTest);

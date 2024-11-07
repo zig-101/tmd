@@ -164,7 +164,6 @@ body {
 }
 
 .tmd-unstyled-header {
-  font-weight: bold;
   font-style: italic;
   background: #fcdba5;
   padding-left: 6px;
@@ -173,7 +172,9 @@ body {
 .tmd-code {
   margin-top: 0px;
   margin-bottom: 0px;
-  background: #ddd;
+  background: #efefef;
+  border: solid 1px #c8c8c8;
+  border-radius: 6px;
   padding: 3px 6px;
 }
 
@@ -272,8 +273,7 @@ body {
 }
 
 .tmd-code-span {
-  background: #ddd;
-  border: solid 1px #666;
+  background: #efefef;
   padding: 1px 2px;
   border-radius: 3px;
   white-space: break-spaces;

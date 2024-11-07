@@ -252,7 +252,7 @@ Another table (column-oriented):
 ''''' << #demo-6
 @@@ #demo-6
 {
-####### Header 1 (for titles generally)
+####### Header 1 %%::(for titles generally)
 
 ###====== Header 2
 

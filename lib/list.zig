@@ -103,10 +103,10 @@ pub fn List(comptime Value: type) type {
         pub fn iterate(self: *Self, comptime f: fn (Value) void) void {
             if (self.info) |info| {
                 var element = info.head;
-                while (element) |e| {
-                    const next = e.next;
-                    f(e.value);
-                    element = next;
+                while (true) {
+                    const next = element.next;
+                    f(element.value);
+                    if (next) |n| element = n else break;
                 }
             }
         }
