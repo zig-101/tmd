@@ -55,7 +55,7 @@ fn tryToAttributeBlock(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !vo
 
             std.debug.assert(block.blockType != .attributes);
 
-            if (attributesBlock.getNextSibling() == block) {
+            if (attributesBlock.nextSibling() == block) {
                 try parser.setBlockAttributes(block, as);
             } else {
                 try parser.setBlockAttributes(attributesBlock, as); // a footer attributes

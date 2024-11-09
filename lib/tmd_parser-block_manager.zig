@@ -180,24 +180,6 @@ pub fn shouldCreateNewList(self: *BlockArranger, markTypeIndex: tmd.ListItemType
     const baseContext = &self.openingBaseBlocks[self.baseCount_1];
     std.debug.assert(self.count_1 > baseContext.nestingDepth);
 
-    //return if (baseContext.openingListCount == 0) blk: {
-    //    if (baseContext.nestingDepth >= tmd.MaxBlockNestingDepth - 1) {
-    //        return error.NestingDepthTooLarge;
-    //    }
-    //    const last = self.stackedBlocks[self.count_1];
-    //    self.count_1 = baseContext.nestingDepth + 1;
-    //    if (last.blockType == .blank) {
-    //        // Ensure the nestingDepth of the blank block.
-    //        last.nestingDepth = self.count_1;
-    //    }
-    //
-    //    break :blk true;
-    //} else if (baseContext.openingListNestingDepths[markTypeIndex] != 0) blk: {
-    //    //const last = self.stackedBlocks[self.count_1];
-    //    //break :blk last.blockType == .attributes;
-    //    break :blk false;
-    //} else true;
-
     return baseContext.openingListCount == 0 or baseContext.openingListNestingDepths[markTypeIndex] == 0;
 }
 
@@ -222,36 +204,13 @@ pub fn stackListItemBlock(self: *BlockArranger, listItemBlock: *tmd.BlockInfo, m
         if (baseContext.openingListCount == 0) { // start list context
             const last = self.stackedBlocks[self.count_1];
             self.count_1 = baseContext.nestingDepth + 1;
-            if (last.blockType == .blank) {
+            if (last.blockType == .blank and last.nestingDepth != self.count_1) {
+                const prevSibling = self.stackedBlocks[self.count_1];
+                prevSibling.setNextSibling(last);
                 // Ensure the nestingDepth of the blank block.
                 last.nestingDepth = self.count_1;
             }
         } else std.debug.assert(baseContext.openingListNestingDepths[markTypeIndex] == 0);
-
-        //if (baseContext.openingListNestingDepths[markTypeIndex] != 0) {
-        //    // ToDo: now there are 3 alike such code pieces, unify them?
-        //
-        //    var deltaCount: @TypeOf(baseContext.openingListCount) = 0;
-        //    var depth = self.count_1 - 1;
-        //    while (depth > baseContext.nestingDepth) : (depth -= 1) {
-        //        std.debug.assert(self.stackedBlocks[depth].nestingDepth == depth);
-        //        std.debug.assert(self.stackedBlocks[depth].blockType == .item);
-        //        var item = &self.stackedBlocks[depth].blockType.item;
-        //
-        //        //item.isLast = true;
-        //        item.list.blockType.list.lastBullet = item.ownerBlockInfo();
-        //        item.list.blockType.list._lastItemConfirmed = true;
-        //        baseContext.openingListNestingDepths[item.list.blockType.list._itemTypeIndex] = 0;
-        //        deltaCount += 1;
-        //
-        //        if (item.list.blockType.list._itemTypeIndex == markTypeIndex) {
-        //            break;
-        //        }
-        //    }
-        //
-        //    baseContext.openingListCount -= deltaCount;
-        //    self.count_1 = depth;
-        //}
 
         //newListItem.isFirst = true;
         //newListItem.firstItem = listItemBlock;
@@ -413,7 +372,7 @@ pub fn stackFirstLevelHeaderBlock(self: *BlockArranger, blockInfo: *tmd.BlockInf
         std.debug.assert(last.isContainer());
         std.debug.assert(last.nestingDepth == self.count_1);
         switch (last.blockType) {
-            .item => |listItem| {
+            .item => |*listItem| {
                 // listItem.confirmTabItem();
                 //listItem.list.blockType.list.isTab = true;
                 if (listItem.list.blockType.list.listType == .bullets)
@@ -428,7 +387,7 @@ pub fn stackFirstLevelHeaderBlock(self: *BlockArranger, blockInfo: *tmd.BlockInf
         if (last.blockType == .attributes) {
             const container = self.stackedBlocks[self.count_1 - 1];
             switch (container.blockType) {
-                .item => |listItem| {
+                .item => |*listItem| {
                     // listItem.confirmTabItem();
                     //listItem.list.blockType.list.isTab = true;
                     if (listItem.list.blockType.list.listType == .bullets)

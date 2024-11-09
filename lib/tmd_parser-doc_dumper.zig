@@ -31,7 +31,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
             },
             else => {},
         }
-        if (blockInfo.getNextSibling()) |sibling| {
+        if (blockInfo.nextSibling()) |sibling| {
             std.debug.print(" (next sibling: #{} {s})", .{ sibling.index, sibling.typeName() });
         } else {
             std.debug.print(" (next sibling: <null>)", .{});

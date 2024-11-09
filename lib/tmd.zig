@@ -197,7 +197,7 @@ pub const BlockInfo = struct {
 
     hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual? ToDo: not only)
 
-    pub fn typeName(self: *@This()) []const u8 {
+    pub fn typeName(self: *const @This()) []const u8 {
         return @tagName(self.blockType);
     }
 
@@ -278,9 +278,9 @@ pub const BlockInfo = struct {
         //if (self.isContainer()) unreachable;
         if (self.isContainer()) return null;
 
-        if (self.getNextSibling()) |sibling| {
+        if (self.nextSibling()) |sibling| {
             if (sibling.blockType == .attributes) {
-                if (sibling.getNextSibling() == null)
+                if (sibling.nextSibling() == null)
                     return sibling;
             }
         }
@@ -293,12 +293,29 @@ pub const BlockInfo = struct {
     }
 
     // ToDo: make ownerListElement private by using this one instead.
-    //       [update]: next solely is not enough to remove ownerListElement.
+    //       [update]: looks not feasible.
     pub fn next(self: *const @This()) ?*BlockInfo {
         return &(self.ownerListElement().next orelse return null).value;
     }
 
-    pub fn getNextSibling(self: *const @This()) ?*BlockInfo {
+    pub fn prev(self: *const @This()) ?*BlockInfo {
+        return &(self.ownerListElement().prev orelse return null).value;
+    }
+
+    pub fn firstChild(self: *const @This()) ?*const BlockInfo {
+        switch (self.blockType) {
+            .root, .base => if (self.next()) |nextBlock| {
+                if (nextBlock != self.nextSibling()) return nextBlock;
+            },
+            else => {
+                if (self.isContainer()) return self.next().?;
+            },
+        }
+
+        return null;
+    }
+
+    pub fn nextSibling(self: *const @This()) ?*BlockInfo {
         return switch (self.blockType) {
             .root => null,
             .base => |base| blk: {
@@ -351,6 +368,21 @@ pub const BlockInfo = struct {
             },
         };
     }
+
+    pub fn getSpecialHeaderChild(self: *const @This(), tmdData: []const u8) ?*const BlockInfo {
+        std.debug.assert(self.isContainer() or self.blockType == .base);
+
+        var child = self.firstChild() orelse return null;
+        while (true) {
+            switch (child.blockType) {
+                .attributes => continue,
+                .header => |header| if (header.level(tmdData) == 1) return child else break,
+                else => break,
+            }
+            child = if (self.next()) |nextBlock| nextBlock else break;
+        }
+        return null;
+    }
 };
 
 pub const ListType = enum {
@@ -373,11 +405,11 @@ pub const BlockType = union(enum) {
 
         const Container = void;
 
-        pub fn isFirst(self: *@This()) bool {
+        pub fn isFirst(self: *const @This()) bool {
             return self.list.ownerListElement().next.? == self.ownerBlockInfo().ownerListElement();
         }
 
-        pub fn isLast(self: *@This()) bool {
+        pub fn isLast(self: *const @This()) bool {
             return self.list.blockType.list.lastBullet == self.ownerBlockInfo();
         }
 
@@ -602,6 +634,7 @@ pub const LineInfo = struct {
     //   containing plainText tokens starts with a CJK char.
     treatEndAsSpace: bool = false,
 
+    // ...
     containerMark: ?ContainerLeadingMark, // !!! remember init it after alloc
     lineType: LineType, // ToDo: renamed to lineType
 

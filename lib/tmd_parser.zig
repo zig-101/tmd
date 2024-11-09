@@ -59,7 +59,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     };
     try docParser.parseAll();
 
-    if (false and builtin.mode == .Debug) {
+    if (true and builtin.mode == .Debug) {
         DocDumper.dumpTmdDoc(&tmdDoc);
     }
 

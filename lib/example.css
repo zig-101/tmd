@@ -169,6 +169,33 @@ body {
   padding-left: 6px;
 }
 
+table.tmd-table {
+  border-collapse: collapse;
+  font-size:1em;
+}
+
+table.tmd-table th {
+  background: #ccc;
+}
+
+table.tmd-table th,td {
+  border: solid 1px #888;
+  padding: 6px;
+}
+
+table.tmd-table th,td > .tmd-usual {
+  text-align: center;
+}
+
+ol.tmd-footnotes {
+  font-size: smaller;
+  opacity: 0.75;
+}
+
+ol.tmd-footnotes > li::marker {
+  content: "[" counter(list-item) "]: ";
+}
+
 .tmd-code {
   margin-top: 0px;
   margin-bottom: 0px;
@@ -298,36 +325,25 @@ body {
 .tmd-media {
 }
 
-ol.tmd-footnotes {
-  font-size: smaller;
-  opacity: 0.75;
+.tmd-align-left {
+  text-align: left;
 }
 
-ol.tmd-footnotes > li::marker {
-  content: "[" counter(list-item) "]: ";
+.tmd-align-right {
+  text-align: right;
 }
 
-table.tmd-table {
-  border-collapse: collapse;
-  font-size:1em;
-}
-
-table.tmd-table th {
-  background: #ccc;
-}
-
-table.tmd-table th,td {
-  border: solid 1px #888;
-  padding: 6px;
-}
-
-table.tmd-table th,td > .tmd-usual {
+.tmd-align-center {
   text-align: center;
 }
 
+.tmd-align-justify {
+  text-align: justify;
+}
 
-
-
+.tmd-hidden {
+  display: none;
+}
 
 
 
