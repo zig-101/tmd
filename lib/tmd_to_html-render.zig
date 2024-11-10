@@ -206,7 +206,7 @@ pub const TmdRender = struct {
                             try fns.writeCloseTag(w, tag, true);
 
                             break :blk headerBlock.nextSibling();
-                        } else blockInfo;
+                        } else blockInfo.firstChild();
 
                         const tag = "dd";
                         const classes = "";
