@@ -1,6 +1,8 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) !void {
+    const config = collectConfig(b);
+
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -30,6 +32,10 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
+
+    const libOptions = b.addOptions();
+    libOptions.addOption(bool, "dump_ast", config.dumpAST);
+    tmdLibModule.addOptions("config", libOptions);
 
     const tmdCommand = b.addExecutable(.{
         .name = "tmd",
@@ -69,4 +75,17 @@ pub fn build(b: *std.Build) !void {
 
     const buildDoc = b.step("doc", "Build doc");
     buildDoc.dependOn(&buildWebsiteCommand.step);
+}
+
+const Config = struct {
+    dumpAST: bool = false,
+};
+
+fn collectConfig(b: *std.Build) Config {
+    var c = Config{};
+
+    if (b.option(bool, "dump_ast", "dump doc AST")) |dump|
+        c.dumpAST = dump;
+    
+    return c;
 }
