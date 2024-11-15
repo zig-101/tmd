@@ -26,7 +26,7 @@ pub const bytesKindTable = blk: {
 
         // ToDo: Now, for zig design limitaiton: https://ziggit.dev/t/6726,
         //       The best effort is make @sizeOf(ByteKind) == 2.
-        test "assure size of ByteKind" {
+        comptime {
             std.debug.assert(@sizeOf(ByteKind) <= 2);
         }
 
@@ -44,6 +44,7 @@ pub const bytesKindTable = blk: {
 
     for (0..'\n') |i| table[i] = .{ .blank = .{ .isSpace = false } };
     for ('\n' + 1..33) |i| table[i] = .{ .blank = .{ .isSpace = false } };
+    table[127] = .{ .blank = .{ .isSpace = false } };
     table[' '] = .{ .blank = .{ .isSpace = true } };
     table['\t'] = .{ .blank = .{ .isSpace = true } };
 

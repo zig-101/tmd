@@ -156,11 +156,11 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
   }
   @@@
 
-! This is a note box without header.
+! This is a notice box without header.
 
 ! ### WARNING!
   {
-  This is a note box with header.
+  This is a notice box with header.
   }
 
 ? This is a reveal box without summary.
@@ -350,8 +350,8 @@ Backticks in code span: `
 ---
 
 {//
-@@@ #note-1
+@@@ #note-markdown
 Traditional markdown is known for it is limited and not well specified.
-@@@ #note-2
+@@@ #note-spec-source
 The **%% Go 101 %%** website is an up-to-date knowledge base for Go programming self learning.
 }

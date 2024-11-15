@@ -110,6 +110,8 @@ pub const TmdRender = struct {
         } else "";
 
         handle: switch (blockInfo.blockType) {
+            // base blocks
+
             .root => {
                 const tag = "div";
                 const classes = "tmd-doc";
@@ -136,6 +138,8 @@ pub const TmdRender = struct {
                 try self.renderBlockChildren(w, blockInfo.firstChild());
                 try fns.writeCloseTag(w, tag, true);
             },
+
+            // built-in blocks
 
             .list => |*itemList| {
                 switch (itemList.listType) {
@@ -412,7 +416,16 @@ pub const TmdRender = struct {
                     _ = try w.print("</h{}>\n", .{realLevel});
                 }
             },
-            .usual => {
+            .usual => |usual| {
+                const usualLine = usual.startLine.lineType.usual;
+                const writeBlank = usualLine.markLen > 0 and usualLine.tokens.empty();
+                if (writeBlank) {
+                    const blankTag = "p";
+                    const blankClasses = "";
+
+                    try fns.writeBareTag(w, blankTag, blankClasses, null, true);
+                }
+
                 const tag = "div";
                 const classes = "tmd-usual";
 
@@ -774,32 +787,28 @@ pub const TmdRender = struct {
 
         if (attrs.app.len == 0) {
             _ = try w.write("[...]");
-        } else if (std.ascii.eqlIgnoreCase(attrs.app, "html")) {
+        } else if (std.ascii.eqlIgnoreCase(attrs.app, "html")) blk: {
             const endLine = blockInfo.getEndLine();
             const startLine = blockInfo.getStartLine();
             std.debug.assert(startLine.lineType == .customBlockStart);
 
-            var lineInfoElement = startLine.ownerListElement();
-            if (startLine != endLine) {
-                lineInfoElement = lineInfoElement.next.?;
-                while (true) {
-                    const lineInfo = &lineInfoElement.value;
-                    switch (lineInfo.lineType) {
-                        .customBlockEnd => break,
-                        .data => {
-                            const r = lineInfo.range;
-                            _ = try w.write(self.doc.data[r.start..r.end]);
-                        },
-                        else => unreachable,
-                    }
-
-                    std.debug.assert(!lineInfo.treatEndAsSpace);
-                    if (lineInfo == endLine) break;
-                    _ = try w.write("\n");
-                    if (lineInfoElement.next) |next| {
-                        lineInfoElement = next;
-                    } else unreachable;
+            var lineInfo = startLine.next() orelse break :blk;
+            while (true) {
+                switch (lineInfo.lineType) {
+                    .customBlockEnd => break,
+                    .data => {
+                        const r = lineInfo.range;
+                        _ = try w.write(self.doc.data[r.start..r.end]);
+                    },
+                    else => unreachable,
                 }
+
+                std.debug.assert(!lineInfo.treatEndAsSpace);
+                _ = try w.write("\n");
+
+                if (lineInfo == endLine) break;
+
+                lineInfo = lineInfo.next() orelse unreachable;
             }
         } else {
             _ = try w.print("[{s} ...]", .{attrs.app}); // ToDo
@@ -838,11 +847,9 @@ pub const TmdRender = struct {
         const startLine = blockInfo.getStartLine();
         std.debug.assert(startLine.lineType == .codeBlockStart);
 
-        var lineInfoElement = startLine.ownerListElement();
-        if (startLine != endLine) {
-            lineInfoElement = lineInfoElement.next.?;
+        if (startLine.next()) |firstLine| {
+            var lineInfo = firstLine;
             while (true) {
-                const lineInfo = &lineInfoElement.value;
                 switch (lineInfo.lineType) {
                     .codeBlockEnd => break,
                     .code => {
@@ -853,11 +860,11 @@ pub const TmdRender = struct {
                 }
 
                 std.debug.assert(!lineInfo.treatEndAsSpace);
-                if (lineInfo == endLine) break;
                 _ = try w.write("\n");
-                if (lineInfoElement.next) |next| {
-                    lineInfoElement = next;
-                } else unreachable;
+
+                if (lineInfo == endLine) break;
+
+                lineInfo = lineInfo.next() orelse unreachable;
             }
         }
 
@@ -881,67 +888,48 @@ pub const TmdRender = struct {
         try fns.writeCloseTag(w, tag, true);
     }
 
-    fn renderTmdCode(self: *TmdRender, w: anytype, blockInfo: *tmd.BlockInfo) !void {
-        if (blockInfo.isAtom()) {
-            try self.renderTmdCodeForAtomBlock(w, blockInfo, true);
-        } else {
-            _ = try self.renderTmdCodeForBlockChildren(w, blockInfo);
+    fn renderTmdCode(self: *TmdRender, w: anytype, blockInfo: *const tmd.BlockInfo) anyerror!void {
+        switch (blockInfo.blockType) {
+            .root => unreachable,
+            .base => |base| {
+                try self.renderTmdCodeOfLine(w, base.openLine);
+                try self.renderTmdCodeForBlockChildren(w, blockInfo);
+                if (base.closeLine) |closeLine| try self.renderTmdCodeOfLine(w, closeLine);
+            },
+
+            // containers
+
+            .list, .item, .table, .quotation, .notice, .reveal, .unstyled => {
+                try self.renderTmdCodeForBlockChildren(w, blockInfo);
+            },
+
+            // atom
+            .seperator, .header, .usual, .attributes, .blank, .code, .custom => try self.renderTmdCodeForAtomBlock(w, blockInfo),
         }
     }
 
-    fn renderTmdCodeForBlockChildren(self: *TmdRender, w: anytype, parentBlockInfo: *tmd.BlockInfo) !?*list.Element(tmd.BlockInfo) {
-        const parentElement = parentBlockInfo.ownerListElement();
-        var element = parentElement.next orelse return null;
-
-        const parentNestingDepth = parentElement.value.nestingDepth;
+    fn renderTmdCodeForBlockChildren(self: *TmdRender, w: anytype, parentBlockInfo: *const tmd.BlockInfo) !void {
+        var child = parentBlockInfo.firstChild() orelse return;
         while (true) {
-            const blockInfo = &element.value;
-            if (blockInfo.nestingDepth <= parentNestingDepth) return element;
-
-            switch (blockInfo.blockType) {
-                .root => unreachable,
-                .base => |base| {
-                    try self.renderTmdCodeOfLine(w, base.openLine, false);
-                    element = try self.renderTmdCodeForBlockChildren(w, &element.value) orelse break;
-                    if (base.closeLine) |closeLine| try self.renderTmdCodeOfLine(w, closeLine, false); // or trimContainerMark, no matter
-                },
-
-                // containers
-
-                .list, .item, .table, .quotation, .notice, .reveal, .unstyled => {
-                    element = try self.renderTmdCodeForBlockChildren(w, &element.value) orelse break;
-                },
-
-                // atom
-
-                .seperator, .header, .usual, .attributes, .blank, .code, .custom => {
-                    try self.renderTmdCodeForAtomBlock(w, blockInfo, false);
-
-                    element = element.next orelse break;
-                },
-            }
+            try self.renderTmdCode(w, child);
+            child = if (child.nextSibling()) |sibling| sibling else break;
         }
-
-        return null;
     }
 
-    fn renderTmdCodeForAtomBlock(self: *TmdRender, w: anytype, atomBlock: *tmd.BlockInfo, trimContainerMark: bool) !void {
+    fn renderTmdCodeForAtomBlock(self: *TmdRender, w: anytype, atomBlock: *const tmd.BlockInfo) !void {
         var lineInfo = atomBlock.getStartLine();
-        try self.renderTmdCodeOfLine(w, lineInfo, trimContainerMark);
+        try self.renderTmdCodeOfLine(w, lineInfo);
 
         const endLine = atomBlock.getEndLine();
         while (lineInfo != endLine) {
-            const lineElement: *list.Element(tmd.LineInfo) = @alignCast(@fieldParentPtr("value", lineInfo));
-            if (lineElement.next) |next| {
-                lineInfo = &next.value;
-            } else break;
+            lineInfo = lineInfo.next() orelse break;
 
-            try self.renderTmdCodeOfLine(w, lineInfo, false);
+            try self.renderTmdCodeOfLine(w, lineInfo);
         }
     }
 
-    fn renderTmdCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *tmd.LineInfo, trimContainerMark: bool) !void {
-        const start = lineInfo.start(trimContainerMark, false);
+    fn renderTmdCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *const tmd.LineInfo) !void {
+        const start = lineInfo.start(false, false);
         const end = lineInfo.end(false);
         try fns.writeHtmlContentText(w, self.doc.data[start..end]);
         _ = try w.write("\n");
@@ -973,183 +961,180 @@ pub const TmdRender = struct {
         var tracker: MarkStatusesTracker = .{};
 
         const endLine = blockInfo.getEndLine();
-        var lineInfoElement = blockInfo.getStartLine().ownerListElement();
+        var lineInfo = blockInfo.getStartLine();
+
+        // Just to check all possible types. Don't remove.
+        switch (lineInfo.lineType) {
+            .blank, .usual, .header, .seperator, .attributes, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customBlockStart, .customBlockEnd, .data => {},
+        }
+
         while (true) {
-            const lineInfo = &lineInfoElement.value;
+            var element = lineInfo.tokens().?.head();
+            while (element) |tokenInfoElement| {
+                const token = &tokenInfoElement.value;
+                switch (token.tokenType) {
+                    .commentText => {},
+                    .plainText => blk: {
+                        if (tracker.activeLinkInfo) |linkInfo| {
+                            if (!tracker.firstPlainTextInLink) {
+                                std.debug.assert(!linkInfo.isFootnote());
 
-            // Just to check all possible types. Don't remove.
-            switch (lineInfo.lineType) {
-                .blank, .usual, .header, .seperator, .attributes, .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .code, .customBlockStart, .customBlockEnd, .data => {},
-            }
+                                switch (linkInfo.info) {
+                                    .urlSourceText => |sourceText| {
+                                        if (sourceText == token) break :blk;
+                                    },
+                                    else => {},
+                                }
+                            } else {
+                                tracker.firstPlainTextInLink = false;
 
-            {
-                var element = lineInfo.tokens().?.head();
-                while (element) |tokenInfoElement| {
-                    const token = &tokenInfoElement.value;
-                    switch (token.tokenType) {
-                        .commentText => {},
-                        .plainText => blk: {
-                            if (tracker.activeLinkInfo) |linkInfo| {
-                                if (!tracker.firstPlainTextInLink) {
-                                    std.debug.assert(!linkInfo.isFootnote());
-
-                                    switch (linkInfo.info) {
-                                        .urlSourceText => |sourceText| {
-                                            if (sourceText == token) break :blk;
-                                        },
-                                        else => {},
+                                if (linkInfo.isFootnote()) {
+                                    if (tracker.linkFootnote.block) |_| {
+                                        _ = try w.print("[{}]", .{tracker.linkFootnote.orderIndex});
+                                    } else {
+                                        _ = try w.print("[{}]?", .{tracker.linkFootnote.orderIndex});
                                     }
-                                } else {
-                                    tracker.firstPlainTextInLink = false;
-
-                                    if (linkInfo.isFootnote()) {
-                                        if (tracker.linkFootnote.block) |_| {
-                                            _ = try w.print("[{}]", .{tracker.linkFootnote.orderIndex});
-                                        } else {
-                                            _ = try w.print("[{}]?", .{tracker.linkFootnote.orderIndex});
-                                        }
-                                        break :blk;
-                                    }
+                                    break :blk;
                                 }
                             }
-                            const text = self.doc.data[token.start()..token.end()];
-                            _ = try fns.writeHtmlContentText(w, text);
-                        },
-                        .linkInfo => |*l| {
-                            tracker.onLinkInfo(l);
-                        },
-                        .evenBackticks => |m| {
-                            if (m.secondary) {
-                                //_ = try w.write("&ZeroWidthSpace;"); // ToDo: write the code utf value instead
+                        }
+                        const text = self.doc.data[token.start()..token.end()];
+                        _ = try fns.writeHtmlContentText(w, text);
+                    },
+                    .linkInfo => |*l| {
+                        tracker.onLinkInfo(l);
+                    },
+                    .evenBackticks => |m| {
+                        if (m.secondary) {
+                            //_ = try w.write("&ZeroWidthSpace;"); // ToDo: write the code utf value instead
 
-                                for (0..m.pairCount) |_| {
-                                    _ = try w.write("`");
-                                }
-                            } else for (1..m.pairCount) |_| {
-                                _ = try w.write("&nbsp");
+                            for (0..m.pairCount) |_| {
+                                _ = try w.write("`");
                             }
-                        },
-                        .spanMark => |*m| {
-                            if (m.blankSpan) {
-                                // skipped
-                            } else if (m.open) {
-                                const markElement = &tracker.markStatusElements[m.markType.asInt()];
-                                std.debug.assert(markElement.value.mark == null);
+                        } else for (1..m.pairCount) |_| {
+                            _ = try w.write("&nbsp");
+                        }
+                    },
+                    .spanMark => |*m| {
+                        if (m.blankSpan) {
+                            // skipped
+                        } else if (m.open) {
+                            const markElement = &tracker.markStatusElements[m.markType.asInt()];
+                            std.debug.assert(markElement.value.mark == null);
 
-                                markElement.value.mark = m;
-                                if (m.markType == .link and !m.secondary) {
-                                    std.debug.assert(tracker.activeLinkInfo != null);
+                            markElement.value.mark = m;
+                            if (m.markType == .link and !m.secondary) {
+                                std.debug.assert(tracker.activeLinkInfo != null);
 
-                                    tracker.marksStack.pushHead(markElement);
-                                    try writeCloseMarks(w, markElement);
+                                tracker.marksStack.pushHead(markElement);
+                                try writeCloseMarks(w, markElement);
 
-                                    var linkURL: []const u8 = undefined;
+                                var linkURL: []const u8 = undefined;
 
-                                    const linkInfo = tracker.activeLinkInfo orelse unreachable;
-                                    blk: {
-                                        if (linkInfo.urlConfirmed()) {
-                                            std.debug.assert(linkInfo.urlConfirmed());
-                                            std.debug.assert(linkInfo.info.urlSourceText != null);
+                                const linkInfo = tracker.activeLinkInfo orelse unreachable;
+                                blk: {
+                                    if (linkInfo.urlConfirmed()) {
+                                        std.debug.assert(linkInfo.urlConfirmed());
+                                        std.debug.assert(linkInfo.info.urlSourceText != null);
 
-                                            const t = linkInfo.info.urlSourceText.?;
-                                            linkURL = LineScanner.trim_blanks(self.doc.data[t.start()..t.end()]);
+                                        const t = linkInfo.info.urlSourceText.?;
+                                        linkURL = LineScanner.trim_blanks(self.doc.data[t.start()..t.end()]);
 
-                                            if (linkInfo.isFootnote()) {
-                                                const footnote_id = linkURL[1..];
-                                                const footnote = try self.onFootnoteReference(footnote_id);
-                                                tracker.linkFootnote = footnote;
+                                        if (linkInfo.isFootnote()) {
+                                            const footnote_id = linkURL[1..];
+                                            const footnote = try self.onFootnoteReference(footnote_id);
+                                            tracker.linkFootnote = footnote;
 
-                                                _ = try w.print("<sup><a id=\"fn:{s}:ref-{}\" href=\"#fn:{s}\"", .{ footnote_id, footnote.refCount, footnote_id });
-                                                break :blk;
-                                            }
-                                        } else {
-                                            std.debug.assert(!linkInfo.urlConfirmed());
-                                            std.debug.assert(!linkInfo.isFootnote());
-
-                                            // ToDo: call custom callback to try to generate a url.
-
-                                            _ = try w.write("<span class=\"tmd-broken-link\"");
-
+                                            _ = try w.print("<sup><a id=\"fn:{s}:ref-{}\" href=\"#fn:{s}\"", .{ footnote_id, footnote.refCount, footnote_id });
                                             break :blk;
                                         }
-
-                                        _ = try w.write("<a");
-                                        _ = try w.write(" href=\"");
-                                        _ = try w.write(linkURL);
-                                        _ = try w.write("\"");
-                                    }
-
-                                    if (tracker.activeLinkInfo.?.attrs) |attrs| {
+                                    } else {
+                                        std.debug.assert(!linkInfo.urlConfirmed());
                                         std.debug.assert(!linkInfo.isFootnote());
-                                        try fns.writeBlockAttributes(w, "", attrs);
-                                    }
-                                    _ = try w.write(">");
 
-                                    try writeOpenMarks(w, markElement);
-                                } else {
-                                    tracker.marksStack.push(markElement);
-                                    try writeOpenMark(w, markElement.value.mark.?);
-                                }
-                            } else try closeMark(w, m, &tracker);
-                        },
-                        .leadingMark => |m| {
-                            switch (m.markType) {
-                                .lineBreak => {
-                                    _ = try w.write("<br/>");
-                                },
-                                .escape => {},
-                                .comment => break,
-                                .media => blk: {
-                                    if (tracker.activeLinkInfo) |_| {
-                                        tracker.firstPlainTextInLink = false;
-                                    }
-                                    if (m.isBare) {
-                                        _ = try w.write(" ");
+                                        // ToDo: call custom callback to try to generate a url.
+
+                                        _ = try w.write("<span class=\"tmd-broken-link\"");
+
                                         break :blk;
                                     }
 
-                                    const mediaInfoElement = tokenInfoElement.next.?;
-                                    const isInline = inHeader or blockInfo.hasNonMediaTokens;
+                                    _ = try w.write("<a");
+                                    _ = try w.write(" href=\"");
+                                    _ = try w.write(linkURL);
+                                    _ = try w.write("\"");
+                                }
 
-                                    writeMedia: {
-                                        const mediaInfoToken = mediaInfoElement.value;
-                                        std.debug.assert(mediaInfoToken.tokenType == .plainText);
+                                if (tracker.activeLinkInfo.?.attrs) |attrs| {
+                                    std.debug.assert(!linkInfo.isFootnote());
+                                    try fns.writeBlockAttributes(w, "", attrs);
+                                }
+                                _ = try w.write(">");
 
-                                        const mediaInfo = self.doc.data[mediaInfoToken.start()..mediaInfoToken.end()];
-                                        var it = mem.splitAny(u8, mediaInfo, " \t");
-                                        const src = it.first();
-                                        if (!std.mem.startsWith(u8, src, "./") and !std.mem.startsWith(u8, src, "../") and !std.mem.startsWith(u8, src, "https://") and !std.mem.startsWith(u8, src, "http://")) break :writeMedia;
-                                        if (!std.mem.endsWith(u8, src, ".png") and !std.mem.endsWith(u8, src, ".gif") and !std.mem.endsWith(u8, src, ".jpg") and !std.mem.endsWith(u8, src, ".jpeg")) break :writeMedia;
-
-                                        // ToDo: read more arguments.
-
-                                        // ToDo: need do more for url validation.
-
-                                        _ = try w.write("<img src=\"");
-                                        try fns.writeHtmlAttributeValue(w, src);
-                                        if (isInline) {
-                                            _ = try w.write("\" class=\"tmd-inline-media\"/>");
-                                        } else {
-                                            _ = try w.write("\" class=\"tmd-media\"/>");
-                                        }
-                                    }
-
-                                    element = mediaInfoElement.next;
-                                    continue;
-                                },
+                                try writeOpenMarks(w, markElement);
+                            } else {
+                                tracker.marksStack.push(markElement);
+                                try writeOpenMark(w, markElement.value.mark.?);
                             }
-                        },
-                    }
+                        } else try closeMark(w, m, &tracker);
+                    },
+                    .leadingMark => |m| {
+                        switch (m.markType) {
+                            .lineBreak => {
+                                _ = try w.write("<br/>");
+                            },
+                            .escape => {},
+                            .comment => break,
+                            .media => blk: {
+                                if (tracker.activeLinkInfo) |_| {
+                                    tracker.firstPlainTextInLink = false;
+                                }
+                                if (m.isBare) {
+                                    _ = try w.write(" ");
+                                    break :blk;
+                                }
 
-                    element = tokenInfoElement.next;
+                                const mediaInfoElement = tokenInfoElement.next.?;
+                                const isInline = inHeader or blockInfo.hasNonMediaTokens;
+
+                                writeMedia: {
+                                    const mediaInfoToken = mediaInfoElement.value;
+                                    std.debug.assert(mediaInfoToken.tokenType == .plainText);
+
+                                    const mediaInfo = self.doc.data[mediaInfoToken.start()..mediaInfoToken.end()];
+                                    var it = mem.splitAny(u8, mediaInfo, " \t");
+                                    const src = it.first();
+                                    if (!std.mem.startsWith(u8, src, "./") and !std.mem.startsWith(u8, src, "../") and !std.mem.startsWith(u8, src, "https://") and !std.mem.startsWith(u8, src, "http://")) break :writeMedia;
+                                    if (!std.mem.endsWith(u8, src, ".png") and !std.mem.endsWith(u8, src, ".gif") and !std.mem.endsWith(u8, src, ".jpg") and !std.mem.endsWith(u8, src, ".jpeg")) break :writeMedia;
+
+                                    // ToDo: read more arguments.
+
+                                    // ToDo: need do more for url validation.
+
+                                    _ = try w.write("<img src=\"");
+                                    try fns.writeHtmlAttributeValue(w, src);
+                                    if (isInline) {
+                                        _ = try w.write("\" class=\"tmd-inline-media\"/>");
+                                    } else {
+                                        _ = try w.write("\" class=\"tmd-media\"/>");
+                                    }
+                                }
+
+                                element = mediaInfoElement.next;
+                                continue;
+                            },
+                        }
+                    },
                 }
+
+                element = tokenInfoElement.next;
             }
 
             if (lineInfo.treatEndAsSpace) _ = try w.write(" ");
+
             if (lineInfo == endLine) break;
-            if (lineInfoElement.next) |next| {
-                lineInfoElement = next;
-            } else unreachable;
+
+            lineInfo = lineInfo.next() orelse unreachable;
         }
 
         if (tracker.marksStack.tail()) |element| {
@@ -1434,7 +1419,8 @@ pub const TmdRender = struct {
             _ = try w.print("<li id=\"fn:{s}\" class=\"tmd-list-item tmd-footnote-item\">\n", .{footnote.id});
             const missing_flag = if (footnote.block) |block| blk: {
                 switch (block.blockType) {
-                    //.item => _ = try self.renderBlockChildren(w, block.ownerListElement(), 0),
+                    // .item can't have ID now.
+                    //.item => _ = try self.renderBlockChildren(w, block),
                     .item => unreachable,
                     else => _ = try self.renderBlock(w, block),
                 }

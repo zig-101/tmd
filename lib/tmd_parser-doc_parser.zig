@@ -45,8 +45,7 @@ fn tryToAttributeBlock(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !vo
     if (oldLastBlockInfo.blockType != .attributes) {
         if (parser.nextElementAttributes) |as| {
             var block = oldLastBlockInfo;
-            const attributesBlock = while (block.ownerListElement().prev) |prevElement| {
-                const prevBlock = &prevElement.value;
+            const attributesBlock = while (block.prev()) |prevBlock| {
                 switch (prevBlock.blockType) {
                     .attributes => break prevBlock,
                     else => block = prevBlock,

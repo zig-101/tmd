@@ -292,8 +292,6 @@ pub const BlockInfo = struct {
         return @alignCast(@fieldParentPtr("value", @constCast(self)));
     }
 
-    // ToDo: make ownerListElement private by using this one instead.
-    //       [update]: looks not feasible.
     pub fn next(self: *const @This()) ?*BlockInfo {
         return &(self.ownerListElement().next orelse return null).value;
     }
@@ -336,8 +334,7 @@ pub const BlockInfo = struct {
             },
             inline else => blk: {
                 std.debug.assert(self.isAtom());
-                if (self.blockType.ownerBlockInfo().ownerListElement().next) |nextElement| {
-                    const nextBlock = &nextElement.value;
+                if (self.blockType.ownerBlockInfo().next()) |nextBlock| {
                     std.debug.assert(nextBlock.nestingDepth <= self.nestingDepth);
                     if (nextBlock.nestingDepth == self.nestingDepth)
                         break :blk nextBlock;
@@ -406,7 +403,7 @@ pub const BlockType = union(enum) {
         const Container = void;
 
         pub fn isFirst(self: *const @This()) bool {
-            return self.list.ownerListElement().next.? == self.ownerBlockInfo().ownerListElement();
+            return self.list.next().? == self.ownerBlockInfo();
         }
 
         pub fn isLast(self: *const @This()) bool {
@@ -680,6 +677,14 @@ pub const LineInfo = struct {
 
     pub fn ownerListElement(self: *const @This()) *list.Element(@This()) {
         return @alignCast(@fieldParentPtr("value", @constCast(self)));
+    }
+
+    pub fn next(self: *const @This()) ?*LineInfo {
+        return &(self.ownerListElement().next orelse return null).value;
+    }
+
+    pub fn prev(self: *const @This()) ?*LineInfo {
+        return &(self.ownerListElement().prev orelse return null).value;
     }
 
     pub fn start(self: *const @This(), trimContainerMark: bool, trimLeadingSpaces: bool) u32 {
