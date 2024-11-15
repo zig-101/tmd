@@ -796,10 +796,7 @@ pub const TmdRender = struct {
             while (true) {
                 switch (lineInfo.lineType) {
                     .customBlockEnd => break,
-                    .data => {
-                        const r = lineInfo.range;
-                        _ = try w.write(self.doc.data[r.start..r.end]);
-                    },
+                    .data => _ = try w.write(self.doc.rangeData(lineInfo.range)),
                     else => unreachable,
                 }
 
@@ -852,10 +849,7 @@ pub const TmdRender = struct {
             while (true) {
                 switch (lineInfo.lineType) {
                     .codeBlockEnd => break,
-                    .code => {
-                        const r = lineInfo.range;
-                        try fns.writeHtmlContentText(w, self.doc.data[r.start..r.end]);
-                    },
+                    .code => try fns.writeHtmlContentText(w, self.doc.rangeData(lineInfo.range)),
                     else => unreachable,
                 }
 
@@ -931,7 +925,7 @@ pub const TmdRender = struct {
     fn renderTmdCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *const tmd.LineInfo) !void {
         const start = lineInfo.start(false, false);
         const end = lineInfo.end(false);
-        try fns.writeHtmlContentText(w, self.doc.data[start..end]);
+        try fns.writeHtmlContentText(w, self.doc.rangeData(.{ .start = start, .end = end }));
         _ = try w.write("\n");
     }
 
@@ -998,7 +992,7 @@ pub const TmdRender = struct {
                                 }
                             }
                         }
-                        const text = self.doc.data[token.start()..token.end()];
+                        const text = self.doc.rangeData(token.range());
                         _ = try fns.writeHtmlContentText(w, text);
                     },
                     .linkInfo => |*l| {
@@ -1038,7 +1032,7 @@ pub const TmdRender = struct {
                                         std.debug.assert(linkInfo.info.urlSourceText != null);
 
                                         const t = linkInfo.info.urlSourceText.?;
-                                        linkURL = LineScanner.trim_blanks(self.doc.data[t.start()..t.end()]);
+                                        linkURL = LineScanner.trim_blanks(self.doc.rangeData(t.range()));
 
                                         if (linkInfo.isFootnote()) {
                                             const footnote_id = linkURL[1..];
@@ -1101,7 +1095,7 @@ pub const TmdRender = struct {
                                     const mediaInfoToken = mediaInfoElement.value;
                                     std.debug.assert(mediaInfoToken.tokenType == .plainText);
 
-                                    const mediaInfo = self.doc.data[mediaInfoToken.start()..mediaInfoToken.end()];
+                                    const mediaInfo = self.doc.rangeData(mediaInfoToken.range());
                                     var it = mem.splitAny(u8, mediaInfo, " \t");
                                     const src = it.first();
                                     if (!std.mem.startsWith(u8, src, "./") and !std.mem.startsWith(u8, src, "../") and !std.mem.startsWith(u8, src, "https://") and !std.mem.startsWith(u8, src, "http://")) break :writeMedia;

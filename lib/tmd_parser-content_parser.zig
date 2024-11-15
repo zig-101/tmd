@@ -142,7 +142,7 @@ fn try_to_determine_line_end_render_manner(self: *ContentParser) void {
             return;
         }
 
-        const text = self.docParser.tmdDoc.data[token.start()..token.end()];
+        const text = self.docParser.tmdDoc.rangeData(token.range());
         std.debug.assert(text.len > 0);
 
         // ToDo: use ends_with_space instead?
@@ -183,7 +183,7 @@ fn determine_pending_line_end_render_manner(self: *ContentParser) void {
                     line.treatEndAsSpace = false;
                 },
                 .plainText => |_| {
-                    const text = self.docParser.tmdDoc.data[token.start()..token.end()];
+                    const text = self.docParser.tmdDoc.rangeData(token.range());
                     std.debug.assert(text.len > 0);
 
                     line.treatEndAsSpace = !utf8.start_with_CJK_rune(text);

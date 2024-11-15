@@ -113,7 +113,7 @@ fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void 
     if (headElement.value.tokenType != .commentText) return;
     std.debug.assert(headElement.next == null);
     const commentToken = &headElement.value;
-    const comment = parser.tmdDoc.data[commentToken.start()..commentToken.end()];
+    const comment = parser.tmdDoc.rangeData(commentToken.range());
     const attrs = AttributeParser.parse_element_attributes(comment);
 
     //if (forBulletContainer) {

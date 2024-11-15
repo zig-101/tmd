@@ -843,6 +843,10 @@ pub const TokenInfo = struct {
         return @tagName(self.tokenType);
     }
 
+    pub fn range(self: *const @This()) Range {
+        return .{ .start = self.start(), .end = self.end() };
+    }
+
     pub fn start(self: *const @This()) u32 {
         switch (self.tokenType) {
             .linkInfo => {
