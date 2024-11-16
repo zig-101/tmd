@@ -52,17 +52,16 @@ pub const bytesKindTable = blk: {
     table['/'] = .{ .leadingMark = .comment };
     table['&'] = .{ .leadingMark = .media };
     table['!'] = .{ .leadingMark = .escape };
+    table['?'] = .{ .leadingMark = .spoiler };
 
     table['*'] = .{ .spanMark = .fontWeight };
     table['%'] = .{ .spanMark = .fontStyle };
     table[':'] = .{ .spanMark = .fontSize };
-    table['?'] = .{ .spanMark = .spoiler };
     table['~'] = .{ .spanMark = .deleted };
     table['|'] = .{ .spanMark = .marked };
     table['_'] = .{ .spanMark = .link };
     table['$'] = .{ .spanMark = .supsub };
     table['`'] = .{ .spanMark = .code };
-    //table['!'] = .{.spanMark = .{ .markType = .escaped, .precedence = 3 } };
 
     break :blk table;
 };

@@ -964,6 +964,7 @@ pub const TmdRender = struct {
 
         while (true) {
             var element = lineInfo.tokens().?.head();
+            var isNonBareSpoilerLine = false;
             while (element) |tokenInfoElement| {
                 const token = &tokenInfoElement.value;
                 switch (token.tokenType) {
@@ -1078,6 +1079,12 @@ pub const TmdRender = struct {
                                 _ = try w.write("<br/>");
                             },
                             .escape => {},
+                            .spoiler => if (tokenInfoElement.next) |_| {
+                                _ = try w.write(
+                                    \\<span class="tmd-spoiler">
+                                );
+                                isNonBareSpoilerLine = true;
+                            },
                             .comment => break,
                             .media => blk: {
                                 if (tracker.activeLinkInfo) |_| {
@@ -1123,6 +1130,8 @@ pub const TmdRender = struct {
 
                 element = tokenInfoElement.next;
             }
+
+            if (isNonBareSpoilerLine) _ = try w.write("</span>");
 
             if (lineInfo.treatEndAsSpace) _ = try w.write(" ");
 
@@ -1263,17 +1272,6 @@ pub const TmdRender = struct {
                     );
                 }
             },
-            .spoiler => {
-                if (spanMark.secondary) {
-                    _ = try w.write(
-                        \\<span class="tmd-secure-spoiler">
-                    );
-                } else {
-                    _ = try w.write(
-                        \\<span class="tmd-spoiler">
-                    );
-                }
-            },
             .deleted => {
                 if (spanMark.secondary) {
                     _ = try w.write(
@@ -1320,7 +1318,7 @@ pub const TmdRender = struct {
     // ToDo: to optimize
     fn writeCloseMark(w: anytype, spanMark: *tmd.SpanMark) !void {
         switch (spanMark.markType) {
-            .link, .fontWeight, .fontStyle, .fontSize, .spoiler, .deleted => {
+            .link, .fontWeight, .fontStyle, .fontSize, .deleted => {
                 _ = try w.write("</span>");
             },
             .marked => {

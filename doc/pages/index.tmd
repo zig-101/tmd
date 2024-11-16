@@ -27,12 +27,6 @@ while preserving the familiar readability of its predecessor.
 
 ::smaller font size:: and ^::larger font size::.
 
-spoiler text: ??spoiler text?? (selectable, 
-invisible when unslected, visible when selected).
-
-secure spoiler text: ^??secure spoiler text??
-(selectable, always invisible).
-
 ~~deleted text~~ and invisible text:
 ^~~invisible text~~ (non-selectable, still occupy space).
 
@@ -69,6 +63,10 @@ This block
 \\ line-broken
 \\ several times.
 \\ The following is an image.
+
+The answer is:
+?? 997
+(visible when selected).
 
 && ./static/image/sample-image.png
 }

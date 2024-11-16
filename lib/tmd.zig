@@ -1057,7 +1057,6 @@ pub const SpanMarkType = enum(u8) {
     fontWeight,
     fontStyle,
     fontSize,
-    spoiler,
     deleted,
     marked,
     supsub,
@@ -1080,4 +1079,5 @@ pub const LineSpanMarkType = enum(u8) {
     comment, // //
     media, // @@
     escape, // !!
+    spoiler, // ??
 };

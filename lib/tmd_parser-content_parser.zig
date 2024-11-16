@@ -502,7 +502,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
 
                     // jump out of the swith block
                 },
-                .escape => {
+                .escape, .spoiler => {
                     const numBlanks = lineScanner.readUntilLineEnd();
                     const textEnd = lineScanner.cursor - numBlanks;
                     std.debug.assert(textEnd > textStart);

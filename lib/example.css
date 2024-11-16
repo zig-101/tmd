@@ -251,18 +251,7 @@ ol.tmd-footnotes > li::marker {
 }
 
 .tmd-spoiler {
-  background: black;
-  color: black;
-  border-bottom: 3px black solid;
-}
-
-.tmd-secure-spoiler {
   color: white;
-}
-
-.tmd-secure-spoiler::selection {
-  color: rgba(0, 0, 0, 0.0);
-  background: #888;
 }
 
 .tmd-deleted {
@@ -345,6 +334,8 @@ ol.tmd-footnotes > li::marker {
   display: none;
 }
 
-
+:target {
+	border: dotted 2px;
+}
 
 
