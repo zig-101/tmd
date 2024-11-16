@@ -871,7 +871,7 @@ pub const TmdRender = struct {
             } else if (std.mem.startsWith(u8, content, "#")) {
                 const id = content[1..];
                 const b = if (self.doc.getBlockByID(id)) |b| b else break :blk;
-                _ = try self.renderTmdCode(w, b);
+                _ = try self.renderTmdCode(w, b, true);
             } else break :blk;
         }
 
@@ -882,47 +882,47 @@ pub const TmdRender = struct {
         try fns.writeCloseTag(w, tag, true);
     }
 
-    fn renderTmdCode(self: *TmdRender, w: anytype, blockInfo: *const tmd.BlockInfo) anyerror!void {
+    fn renderTmdCode(self: *TmdRender, w: anytype, blockInfo: *const tmd.BlockInfo, trimBoundaryLines: bool) anyerror!void {
         switch (blockInfo.blockType) {
             .root => unreachable,
             .base => |base| {
-                try self.renderTmdCodeOfLine(w, base.openLine);
+                try self.renderTmdCodeOfLine(w, base.openLine, trimBoundaryLines);
                 try self.renderTmdCodeForBlockChildren(w, blockInfo);
-                if (base.closeLine) |closeLine| try self.renderTmdCodeOfLine(w, closeLine);
+                if (base.closeLine) |closeLine| try self.renderTmdCodeOfLine(w, closeLine, trimBoundaryLines);
             },
 
-            // containers
-
+            // built-in containers
             .list, .item, .table, .quotation, .notice, .reveal, .unstyled => {
                 try self.renderTmdCodeForBlockChildren(w, blockInfo);
             },
 
             // atom
-            .seperator, .header, .usual, .attributes, .blank, .code, .custom => try self.renderTmdCodeForAtomBlock(w, blockInfo),
+            .seperator, .header, .usual, .attributes, .blank, .code, .custom => try self.renderTmdCodeForAtomBlock(w, blockInfo, trimBoundaryLines),
         }
     }
 
     fn renderTmdCodeForBlockChildren(self: *TmdRender, w: anytype, parentBlockInfo: *const tmd.BlockInfo) !void {
         var child = parentBlockInfo.firstChild() orelse return;
         while (true) {
-            try self.renderTmdCode(w, child);
+            try self.renderTmdCode(w, child, false);
             child = if (child.nextSibling()) |sibling| sibling else break;
         }
     }
 
-    fn renderTmdCodeForAtomBlock(self: *TmdRender, w: anytype, atomBlock: *const tmd.BlockInfo) !void {
+    fn renderTmdCodeForAtomBlock(self: *TmdRender, w: anytype, atomBlock: *const tmd.BlockInfo, trimBoundaryLines: bool) !void {
         var lineInfo = atomBlock.getStartLine();
-        try self.renderTmdCodeOfLine(w, lineInfo);
-
         const endLine = atomBlock.getEndLine();
-        while (lineInfo != endLine) {
-            lineInfo = lineInfo.next() orelse break;
+        while (true) {
+            try self.renderTmdCodeOfLine(w, lineInfo, trimBoundaryLines);
 
-            try self.renderTmdCodeOfLine(w, lineInfo);
+            if (lineInfo == endLine) break;
+            lineInfo = lineInfo.next() orelse unreachable;
         }
     }
 
-    fn renderTmdCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *const tmd.LineInfo) !void {
+    fn renderTmdCodeOfLine(self: *TmdRender, w: anytype, lineInfo: *const tmd.LineInfo, trimBoundaryLines: bool) !void {
+        if (trimBoundaryLines and lineInfo.isBoundary()) return;
+
         const start = lineInfo.start(false, false);
         const end = lineInfo.end(false);
         try fns.writeHtmlContentText(w, self.doc.rangeData(.{ .start = start, .end = end }));

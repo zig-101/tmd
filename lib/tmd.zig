@@ -719,6 +719,13 @@ pub const LineInfo = struct {
             else => unreachable,
         };
     }
+
+    pub fn isBoundary(self: @This()) bool {
+        return switch (self.lineType) {
+            inline .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .customBlockStart, .customBlockEnd => true,
+            else => false,
+        };
+    }
 };
 
 pub const LineEndType = enum {
