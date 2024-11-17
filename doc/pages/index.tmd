@@ -1,7 +1,7 @@
 
 ##### Tapir's Markdown Format
 
-Tapir's Markdown (TapirMD) is a distinct evolution of traditional markdown __#note-1__,
+Tapir's Markdown (TapirMD) is a distinct evolution of traditional markdown __#note-markdown__,
 offering both increased specificity and enhanced power
 while preserving the familiar readability of its predecessor.
 
@@ -84,7 +84,7 @@ The answer is:
 {
 // __Go 101 website ` https://go101.org
 
-Visit __Go 101 website__ (the link is defined above) __#note-2__.
+Visit __Go 101 website__ (the link is defined above) __#note-go101__.
 
 Go 1.22 broke backwards compatibility. More information
 is on __`for` Loop Semantic Changes in Go 1.22:
@@ -350,6 +350,6 @@ Backticks in code span: `
 {//
 @@@ #note-markdown
 Traditional markdown is known for it is limited and not well specified.
-@@@ #note-spec-source
+@@@ #note-go101
 The **%% Go 101 %%** website is an up-to-date knowledge base for Go programming self learning.
 }
