@@ -303,7 +303,7 @@ pub const BlockInfo = struct {
     pub fn firstChild(self: *const @This()) ?*const BlockInfo {
         switch (self.blockType) {
             .root, .base => if (self.next()) |nextBlock| {
-                if (nextBlock != self.nextSibling()) return nextBlock;
+                if (nextBlock.nestingDepth > self.nestingDepth) return nextBlock;
             },
             else => {
                 if (self.isContainer()) return self.next().?;
@@ -962,8 +962,8 @@ pub const TokenType = union(enum) {
         secondary: bool,
 
         // `` means a void char.
-        // ^`` means a ` char.
-        // ToDo: ```` means non-collapsable space?
+        // ```` means (pairCount-1) non-collapsable spaces?
+        // ^```` means pairCount ` chars.
     },
     spanMark: struct {
         // For a close mark, this might be the start of the attached blanks.
@@ -1049,7 +1049,6 @@ pub const TokenType = union(enum) {
         }
     },
     // ToDo: follow a .media LineSpanMarkType.
-    //       Noneistance for nothing.
     //mediaInfo: struct {
     //    attrs: *MediaAttributes,
     //},
