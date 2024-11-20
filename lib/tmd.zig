@@ -939,7 +939,7 @@ pub const TokenType = union(enum) {
     // Try to keep each field size <= (32 + 32 + 64) bits.
 
     // ToDo: lineEndSpace (merged into plainText. .start == .end means lineEndSpace)
-    plainText: struct {
+    plainText: packed struct {
         start: u32,
         // The value should be the same as the start of the next token, or end of line.
         // But it is good to keep it here, to verify the this value is the same as ....
@@ -949,14 +949,14 @@ pub const TokenType = union(enum) {
         // it is only used for self-defined URL.
         nextInLink: ?*TokenInfo = null,
     },
-    commentText: struct {
+    commentText: packed struct {
         start: u32,
         // The value should be the same as the end of line.
         end: u32,
 
         inAttributesLine: bool, // ToDo: don't use commentText tokens for attributes lines.
     },
-    evenBackticks: struct {
+    evenBackticks: packed struct {
         start: u32,
         pairCount: u32,
         secondary: bool,
@@ -965,13 +965,11 @@ pub const TokenType = union(enum) {
         // ```` means (pairCount-1) non-collapsable spaces?
         // ^```` means pairCount ` chars.
     },
-    spanMark: struct {
+    spanMark: packed struct {
         // For a close mark, this might be the start of the attached blanks.
         // For a open mark, this might be the position of the secondary sign.
         start: u32,
         blankLen: u32, // blank char count after open-mark or before close-mark in a line.
-
-        // ToDo: replace the bools as bits.
 
         open: bool,
         secondary: bool = false,
@@ -1033,7 +1031,7 @@ pub const TokenType = union(enum) {
             self.followingOpenLinkSpanMark().urlConfirmed = confirmed;
         }
     },
-    leadingMark: struct {
+    leadingMark: packed struct {
         start: u32,
         blankLen: u32, // blank char count after the mark.
         markType: LineSpanMarkType,
