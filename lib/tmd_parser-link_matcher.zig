@@ -25,23 +25,35 @@ fn copyLinkText(dst: anytype, from: u32, src: []const u8) u32 {
     var n: u32 = from;
     for (src) |r| {
         std.debug.assert(r != '\n');
-        if (!LineScanner.bytesKindTable[r].isBlank()) {
-            dst.set(n, r);
-            n += 1;
-        }
+        if (dst.set(n, r)) n += 1;
     }
     return n;
 }
 
 const DummyLinkText = struct {
-    pub fn set(_: DummyLinkText, _: u32, _: u8) void {}
+    //lastIsSpace: bool = false,
+    pub fn set(_: *DummyLinkText, _: u32, r: u8) bool {
+        if (LineScanner.bytesKindTable[r].isBlank()) {
+            //if (!self.lastIsSpace and LineScanner.bytesKindTable[r].isSpace()) {
+            //    self.lastIsSpace = true;
+            //    return true;
+            //}
+            return false;
+        }
+        //self.lastIsSpace = false;
+        return true;
+    }
 };
 
 const RealLinkText = struct {
     text: [*]u8,
-
-    pub fn set(self: *const RealLinkText, n: u32, r: u8) void {
-        self.text[n] = r;
+    dummy: DummyLinkText = .{},
+    pub fn set(self: *RealLinkText, n: u32, r: u8) bool {
+        if (self.dummy.set(n, r)) {
+            self.text[n] = r;
+            return true;
+        }
+        return false;
     }
 };
 
@@ -541,17 +553,18 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                 var linkTextLen: u32 = 0;
                 var lastToken = firstTextToken;
                 // count sum length without the last text token
+                var dummyLinkText = DummyLinkText{};
                 while (lastToken.tokenType.plainText.nextInLink) |nextToken| {
                     defer lastToken = nextToken;
                     const str = self.tokenAsString(lastToken);
-                    linkTextLen = copyLinkText(DummyLinkText{}, linkTextLen, str);
+                    linkTextLen = copyLinkText(&dummyLinkText, linkTextLen, str);
                 }
 
                 // handle the last text token
                 {
                     const str = LineScanner.trim_blanks(self.tokenAsString(lastToken));
                     if (linkInfo.inComment()) {
-                        if (copyLinkText(DummyLinkText{}, 0, str) == 0) {
+                        if (copyLinkText(&dummyLinkText, 0, str) == 0) {
                             // This link definition will be ignored.
 
                             //std.debug.print("ignored for blank link definition\n", .{});
@@ -570,7 +583,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
 
                         break :blk;
                     } else {
-                        linkTextLen = copyLinkText(DummyLinkText{}, linkTextLen, str);
+                        linkTextLen = copyLinkText(&dummyLinkText, linkTextLen, str);
                     }
 
                     if (linkTextLen == 0) {
@@ -589,6 +602,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                     .len = linkTextLen,
                     .text = textPtr,
                 };
+                //defer std.debug.print("====={}: ||{s}||\n", .{linkInfo.inComment(), revisedLinkText.asString()});
 
                 const theElement = try self.allocator.create(list.Element(LinkForTree));
                 linksForTree.push(theElement);
@@ -596,7 +610,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                 const linkForTree = &theElement.value;
 
                 const confirmed = while (true) { // ToDo: use a labled non-loop block
-                    const realLinkText = RealLinkText{
+                    var realLinkText = RealLinkText{
                         .text = textPtr, // == revisedLinkText.text,
                     };
 
@@ -606,7 +620,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                     while (lastToken.tokenType.plainText.nextInLink) |nextToken| {
                         defer lastToken = nextToken;
                         const str = self.tokenAsString(lastToken);
-                        linkTextLen2 = copyLinkText(realLinkText, linkTextLen2, str);
+                        linkTextLen2 = copyLinkText(&realLinkText, linkTextLen2, str);
                     }
 
                     // handle the last text token
@@ -625,7 +639,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                         // For a link whose url is not built-in determined,
                         // all of its text tokens are used as link texts.
 
-                        linkTextLen2 = copyLinkText(realLinkText, linkTextLen2, str);
+                        linkTextLen2 = copyLinkText(&realLinkText, linkTextLen2, str);
                         std.debug.assert(linkTextLen2 == linkTextLen);
 
                         //std.debug.print("    111 linkText = {s}\n", .{revisedLinkText.asString()});
