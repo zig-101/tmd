@@ -204,11 +204,14 @@ pub fn stackListItemBlock(self: *BlockArranger, listItemBlock: *tmd.BlockInfo, m
         if (baseContext.openingListCount == 0) { // start list context
             const last = self.stackedBlocks[self.count_1];
             self.count_1 = baseContext.nestingDepth + 1;
+            const prevSibling = self.stackedBlocks[self.count_1];
             if (last.blockType == .blank and last.nestingDepth != self.count_1) {
-                const prevSibling = self.stackedBlocks[self.count_1];
                 prevSibling.setNextSibling(last);
                 // Ensure the nestingDepth of the blank block.
                 last.nestingDepth = self.count_1;
+                // no need to setNextSibling for atom blocks.
+            } else if (prevSibling.blockType != .root) { // ! Yes, it might be .root temporarily
+                prevSibling.setNextSibling(theListBlock);
             }
         } else std.debug.assert(baseContext.openingListNestingDepths[markTypeIndex] == 0);
 
