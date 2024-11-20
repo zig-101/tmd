@@ -346,12 +346,13 @@ fn parse(parser: *DocParser) !void {
                 break :parse_line;
             } // atom code/custom block context
 
-            lineInfo.rangeTrimmed.start = leadingBlankEnd;
-
             // handle blank line.
             if (lineScanner.lineEnd) |_| {
+                // For a blank line, all blanks belongs to the line-end token.
+                lineInfo.rangeTrimmed.start = lineInfo.range.start;
+                lineInfo.rangeTrimmed.end = lineInfo.range.start;
+
                 lineInfo.lineType = .{ .blank = .{} };
-                lineInfo.rangeTrimmed.end = leadingBlankEnd;
 
                 if (currentAtomBlockInfo.blockType != .blank) {
                     const blankBlockInfo = try parser.createAndPushBlockInfoElement();
@@ -369,6 +370,8 @@ fn parse(parser: *DocParser) !void {
 
                 break :parse_line;
             }
+
+            lineInfo.rangeTrimmed.start = leadingBlankEnd;
 
             const lineStart = lineScanner.cursor;
             // try to parse leading container mark.
