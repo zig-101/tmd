@@ -620,15 +620,6 @@ pub const LineInfo = struct {
 
     endType: LineEndType,
 
-    // For content block lines.
-    // The value is false when any of the following ones is true:
-    // * this is the last line in the most nesting block.
-    // * the line doesn't contain a plainText token.
-    // * no plainText tokens after an open-mark token in the line.
-    // * no plainText tokens before a close-mark token in the line.
-    // * the last plainText token in the line ends with a CJK char
-    //   and the first plainText token in the next line (in the same most nesting block)
-    //   containing plainText tokens starts with a CJK char.
     treatEndAsSpace: bool = false,
 
     // ...
@@ -936,6 +927,7 @@ pub const LeadingMark = std.meta.FieldType(TokenType, .leadingMark);
 pub const LinkInfo = std.meta.FieldType(TokenType, .linkInfo);
 
 pub const TokenType = union(enum) {
+
     // Try to keep each field size <= (32 + 32 + 64) bits.
 
     // ToDo: lineEndSpace (merged into plainText. .start == .end means lineEndSpace)
@@ -985,6 +977,8 @@ pub const TokenType = union(enum) {
             return @tagName(self.markType);
         }
     },
+    // ToDo: with the zig tip, this size of this type is 24.
+    //       In fact, 16 is enough.
     // A linkInfo token is always before an open .link SpanMarkType token.
     linkInfo: struct {
         attrs: ?*ElementAttibutes = null,

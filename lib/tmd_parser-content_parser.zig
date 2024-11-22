@@ -31,11 +31,11 @@ blockSession: struct {
 
     //endLine: ?*tmd.LineInfo = null,
 
-    // The line must have plainText tokens, and the last
-    // plainText token must end with a CJK char.
+    // The line must have a plainText token as the last token in the line
+    // and the plainText token must end with a non-CJK char.
     //
     // The line is a previous line. It might not be the last line.
-    lineWithPendingLineEndRenderManner: ?*tmd.LineInfo = null,
+    lineWithPending_treatEndAsSpace: ?*tmd.LineInfo = null,
 } = .{},
 
 lineSession: struct {
@@ -43,21 +43,8 @@ lineSession: struct {
     contentStart: u32, // start of line
 
     tokens: *list.List(tmd.TokenInfo),
-
-    isMedia: bool = false,
-
-    // If it is the first one in line, it is used to determine
-    // the line-end render manner of lineWithPendingLineEndRenderManner.
-    // If it is the last one in line, it is used to determine whether or not
-    // the current line should be the next lineWithPendingLineEndRenderManner.
-    lastPlainTextToken: ?*tmd.TokenInfo = null, // ToDo: changed to ?const []u8
-    spanStatusChangesBeforeTheFirstPlainTextToken: u32 = 0,
-
-    activePlainText: ?*tmd.PlainText = null,
-
-    anchor: u32,
-    //cursor: u32,
-    pendingBlankCount: u32 = 0, // ToDo: now it means blankCount ...
+    firstContentToken: ?*tmd.TokenInfo = null,
+    lastContentToken: ?*tmd.TokenInfo = null,
 } = undefined,
 
 //----
@@ -105,8 +92,9 @@ pub fn on_new_atom_block(self: *ContentParser, atomBlock: *tmd.BlockInfo) void {
     //if (self.blockSession.endLine) |line| {
     //    line.treatEndAsSpace = false;
     //}
-    if (self.blockSession.lineWithPendingLineEndRenderManner) |line| {
-        line.treatEndAsSpace = false;
+    if (self.blockSession.lineWithPending_treatEndAsSpace) |line| {
+        std.debug.assert(line.treatEndAsSpace == false);
+        //line.treatEndAsSpace = false;
     }
 
     self.blockSession = .{
@@ -120,81 +108,8 @@ fn set_currnet_line(self: *ContentParser, lineInfo: *tmd.LineInfo, lineStart: u3
             .currentLine = lineInfo,
             .contentStart = lineStart,
             .tokens = tokens,
-            .anchor = lineStart,
-            //.cursor = contentStart,
         };
     } else unreachable;
-}
-
-fn try_to_determine_line_end_render_manner(self: *ContentParser) void {
-    if (self.lineSession.isMedia) {
-        // self.lineSession.currentLine.treatEndAsSpace = false;
-        std.debug.assert(self.lineSession.currentLine.treatEndAsSpace == false);
-        return;
-    }
-
-    if (self.lineSession.lastPlainTextToken) |token| {
-        std.debug.assert(token.tokenType == .plainText);
-        std.debug.assert(self.blockSession.lineWithPendingLineEndRenderManner == null);
-        std.debug.assert(token == self.blockSession.lastPlainTextToken);
-        if (self.blockSession.spanStatusChangesAfterTheLastPlainTextToken != 0) {
-            std.debug.assert(self.lineSession.currentLine.treatEndAsSpace == false);
-            return;
-        }
-
-        const text = self.docParser.tmdDoc.rangeData(token.range());
-        std.debug.assert(text.len > 0);
-
-        // ToDo: use ends_with_space instead?
-        if (utf8.end_with_CJK_rune(text) or LineScanner.ends_with_blank(text)) {
-            std.debug.assert(self.lineSession.currentLine.treatEndAsSpace == false);
-            return;
-        }
-
-        // may be reserted in determine_pending_line_end_render_manner.
-        self.lineSession.currentLine.treatEndAsSpace = true;
-
-        self.blockSession.lineWithPendingLineEndRenderManner = self.lineSession.currentLine;
-
-        //self.blockSession.endLine = self.lineSession.currentLine;
-
-    } else {
-        // self.blockSession.lineWithPendingLineEndRenderManner might null or not.
-        // self.lineSession.currentLine.treatEndAsSpace = false;
-        std.debug.assert(self.lineSession.currentLine.treatEndAsSpace == false);
-    }
-}
-
-fn determine_pending_line_end_render_manner(self: *ContentParser) void {
-    if (self.blockSession.lineWithPendingLineEndRenderManner) |line| {
-        std.debug.assert(line.treatEndAsSpace);
-
-        defer self.blockSession.lineWithPendingLineEndRenderManner = null;
-
-        if (self.lineSession.tokens.tail()) |element| {
-            const token = &element.value;
-            switch (token.tokenType) {
-                .spanMark => |spanMark| {
-                    std.debug.assert(!spanMark.open);
-                    line.treatEndAsSpace = false;
-                },
-                .leadingMark => |leadingMark| {
-                    std.debug.assert(leadingMark.markType == .lineBreak or leadingMark.markType == .media);
-                    line.treatEndAsSpace = false;
-                },
-                .plainText => |_| {
-                    const text = self.docParser.tmdDoc.rangeData(token.range());
-                    std.debug.assert(text.len > 0);
-
-                    line.treatEndAsSpace = !utf8.start_with_CJK_rune(text);
-
-                    // By the rules, the line is actually unnecessary.
-                    //if (line.treatEndAsSpace) self.blockSession.currentTextNumber += 1;
-                },
-                else => unreachable,
-            }
-        } else unreachable;
-    }
 }
 
 fn create_token(self: ContentParser) !*tmd.TokenInfo {
@@ -236,19 +151,14 @@ fn create_plain_text_token(self: *ContentParser, start: u32, end: u32) !*tmd.Tok
     self.blockSession.spanStatusChangesAfterTheLastPlainTextToken = 0;
     self.blockSession.currentTextNumber += 1;
 
-    self.lineSession.spanStatusChangesBeforeTheFirstPlainTextToken = 0;
-    if (self.lineSession.lastPlainTextToken == null) {
-        self.determine_pending_line_end_render_manner();
-    }
-    self.lineSession.lastPlainTextToken = tokenInfo;
-    self.lineSession.activePlainText = &tokenInfo.tokenType.plainText;
+    if (self.lineSession.firstContentToken == null)
+        self.lineSession.firstContentToken = tokenInfo;
+    self.lineSession.lastContentToken = tokenInfo;
 
     return tokenInfo;
 }
 
 fn create_leading_mark(self: *ContentParser, markType: tmd.LineSpanMarkType, markStart: u32, markLen: u32) !*tmd.LeadingMark {
-    std.debug.assert(self.lineSession.lastPlainTextToken == null);
-
     std.debug.assert(markStart == self.lineSession.contentStart);
 
     var tokenInfo = try self.create_token();
@@ -260,17 +170,6 @@ fn create_leading_mark(self: *ContentParser, markType: tmd.LineSpanMarkType, mar
             .blankLen = undefined, // might be modified later
         },
     };
-
-    switch (markType) {
-        .lineBreak => {
-            self.determine_pending_line_end_render_manner();
-        },
-        .media => {
-            self.determine_pending_line_end_render_manner();
-            self.lineSession.isMedia = true;
-        },
-        else => {},
-    }
 
     return &tokenInfo.tokenType.leadingMark;
 }
@@ -320,18 +219,11 @@ fn open_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, m
         },
     };
 
-    self.lineSession.activePlainText = null;
-
     self.blockSession.spanStatuses[markType.asInt()] = .{
         .markLen = @intCast(markLen),
         .openMark = &tokenInfo.tokenType.spanMark,
         .openTextNumber = self.blockSession.currentTextNumber,
     };
-    const bit: u32 = @as(u32, 1) << @truncate(markType.asInt());
-    if (self.lineSession.lastPlainTextToken == null) {
-        self.lineSession.spanStatusChangesBeforeTheFirstPlainTextToken |= bit;
-    }
-    self.blockSession.spanStatusChangesAfterTheLastPlainTextToken |= bit;
 
     return &tokenInfo.tokenType.spanMark;
 }
@@ -366,18 +258,6 @@ fn close_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, 
         },
     };
 
-    self.lineSession.activePlainText = null;
-
-    const bit: u32 = @as(u32, 1) << @truncate(markType.asInt());
-    if (self.lineSession.lastPlainTextToken == null) {
-        if (self.lineSession.spanStatusChangesBeforeTheFirstPlainTextToken & bit == 0) {
-            self.determine_pending_line_end_render_manner();
-        } else {
-            self.lineSession.spanStatusChangesBeforeTheFirstPlainTextToken &= ~bit;
-        }
-    }
-    self.blockSession.spanStatusChangesAfterTheLastPlainTextToken &= ~bit;
-
     return &tokenInfo.tokenType.spanMark;
 }
 
@@ -398,7 +278,9 @@ fn create_even_backticks_span(self: *ContentParser, markStart: u32, pairCount: u
         self.blockSession.currentTextNumber += 1;
     }
 
-    self.lineSession.activePlainText = null;
+    if (self.lineSession.firstContentToken == null)
+        self.lineSession.firstContentToken = tokenInfo;
+    self.lineSession.lastContentToken = tokenInfo;
 
     return &tokenInfo.tokenType.evenBackticks;
 }
@@ -709,26 +591,86 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
         } // parse_span_marks
     }; // parse_tokens
 
-    if (self.lineSession.tokens.head()) |head| blk: {
-        switch (head.value.tokenType) {
-            .leadingMark => |m| if (m.markType == .media) break :blk,
-            else => {},
-        }
-        self.blockSession.atomBlock.hasNonMediaTokens = true;
-    }
-
     std.debug.assert(lineScanner.lineEnd != null);
 
-    if (self.isCommentLineParser()) {} else if (lineScanner.lineEnd != .void) {
-        self.try_to_determine_line_end_render_manner();
-    } else if (self.blockSession.lineWithPendingLineEndRenderManner) |line| {
-        line.treatEndAsSpace = false;
-    }
-
-    if (self.lineSession.tokens.tail()) |element| {
+    const lastToken = if (self.lineSession.tokens.tail()) |element| blk: {
         const lastToken = &element.value;
         std.debug.assert(contentEnd == lastToken.end());
-    } else unreachable;
+        break :blk lastToken;
+    } else unreachable; // a line might have no tokens, but then this function will not be called for such a line.
+
+    if (self.lineSession.tokens.head()) |head| {
+        var notMediaLine = true;
+        var tryToPendLine = true;
+        var cancelPeading = false;
+        switch (head.value.tokenType) {
+            .leadingMark => |m| switch (m.markType) {
+                .media => {
+                    notMediaLine = false;
+                    tryToPendLine = false;
+                    cancelPeading = true;
+                },
+                .comment => tryToPendLine = false,
+                .lineBreak => cancelPeading = true,
+                .escape, .spoiler => if (head.next) |next| {
+                    const first = &next.value;
+                    cancelPeading = first.tokenType == .spanMark and !first.tokenType.spanMark.open;
+                },
+            },
+            else => {
+                const first = &head.value;
+                cancelPeading = first.tokenType == .spanMark and !first.tokenType.spanMark.open;
+            },
+        }
+
+        self.blockSession.atomBlock.hasNonMediaTokens = notMediaLine;
+
+        // determine .treatEndAsSpace for .lineWithPending_treatEndAsSpace
+
+        if (self.blockSession.lineWithPending_treatEndAsSpace) |line| handle: {
+            if (cancelPeading) {
+                self.blockSession.lineWithPending_treatEndAsSpace = null;
+                break :handle;
+            }
+
+            const contentToken = self.lineSession.firstContentToken orelse break :handle;
+            const asSpace = switch (contentToken.tokenType) {
+                .plainText => blk: {
+                    const text = self.docParser.tmdDoc.rangeData(contentToken.range());
+                    std.debug.assert(text.len > 0);
+                    break :blk !(utf8.begins_with_CJK_rune(text) or LineScanner.begins_with_blank(text));
+                },
+                .evenBackticks => true,
+                else => unreachable,
+            };
+
+            std.debug.assert(!line.treatEndAsSpace);
+            line.treatEndAsSpace = asSpace;
+            self.blockSession.lineWithPending_treatEndAsSpace = null;
+        }
+
+        if (tryToPendLine) handle: {
+            if (lastToken.tokenType == .spanMark and lastToken.tokenType.spanMark.open) break :handle;
+
+            const contentToken = self.lineSession.lastContentToken orelse break :handle;
+
+            std.debug.assert(self.blockSession.lineWithPending_treatEndAsSpace == null);
+
+            const shouldPend = switch (contentToken.tokenType) {
+                .plainText => blk: {
+                    const text = self.docParser.tmdDoc.rangeData(contentToken.range());
+                    std.debug.assert(text.len > 0);
+                    break :blk !(utf8.ends_with_CJK_rune(text) or LineScanner.ends_with_blank(text));
+                },
+                .evenBackticks => true,
+                else => unreachable,
+            };
+
+            if (shouldPend) {
+                self.blockSession.lineWithPending_treatEndAsSpace = self.lineSession.currentLine;
+            }
+        }
+    } else {} // possible for the first lines
 
     return contentEnd;
 }

@@ -1,11 +1,11 @@
 const std = @import("std");
 const unicode = std.unicode;
 
-pub fn start_with_CJK_rune(utf8: []const u8) bool {
+pub fn begins_with_CJK_rune(utf8: []const u8) bool {
     return is_CJK_rune(read_rune(utf8));
 }
 
-pub fn end_with_CJK_rune(utf8: []const u8) bool {
+pub fn ends_with_CJK_rune(utf8: []const u8) bool {
     return is_CJK_rune(read_last_rune(utf8));
 }
 

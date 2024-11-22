@@ -296,6 +296,11 @@ pub fn slice_to_first_space(str: []const u8) []const u8 {
     return str[0..i];
 }
 
+pub fn begins_with_blank(data: []const u8) bool {
+    if (data.len == 0) return false;
+    return bytesKindTable[data[0]].isBlank();
+}
+
 pub fn ends_with_blank(data: []const u8) bool {
     if (data.len == 0) return false;
     return bytesKindTable[data[data.len - 1]].isBlank();

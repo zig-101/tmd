@@ -800,6 +800,7 @@ pub const TmdRender = struct {
                     else => unreachable,
                 }
 
+                // ToDo: should handle line-end spacing?
                 std.debug.assert(!lineInfo.treatEndAsSpace);
                 _ = try w.write("\n");
 
@@ -1135,9 +1136,13 @@ pub const TmdRender = struct {
 
             if (lineInfo.treatEndAsSpace) _ = try w.write(" ");
 
-            if (lineInfo == endLine) break;
-
-            lineInfo = lineInfo.next() orelse unreachable;
+            if (lineInfo != endLine) {
+                if (lineInfo.treatEndAsSpace) _ = try w.write(" ");
+                lineInfo = lineInfo.next() orelse unreachable;
+            } else {
+                std.debug.assert(!lineInfo.treatEndAsSpace);
+                break;
+            }
         }
 
         if (tracker.marksStack.tail()) |element| {

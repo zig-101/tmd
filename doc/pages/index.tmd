@@ -39,7 +39,7 @@ this is __a broken link__,
 and this is ^__an underlined text__.
 
 This is a code span: ` var z = foo::x || bar::y `.
-and this is a mono font text span:
+And this is a mono font text span:
 ^` var z = x$$ 2 $$ + y^$$ n $$`.
 }
 
@@ -284,7 +284,7 @@ The below is a horizontal line.
 
 @@@ #section-demo-7
 ###+++++++++++++++++++++++++++++++++++++++++
-	Demo 7 (line spacing)
+	Demo 7 (line end spacing)
 
 # ### TapirMD Source
   ### Render Result
@@ -303,20 +303,17 @@ hello`
 你好
 世界
 
+你好 ``
+世界
+
 hello
 世界
 
-你好
-world
-
-你好 ``
+hello ``
 世界
 
 hello
 `` 世界
-
-你好 ``
-world
 }
 
 @@@ #section-demo-8
