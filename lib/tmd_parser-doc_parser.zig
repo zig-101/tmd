@@ -485,12 +485,12 @@ fn parse(parser: *DocParser) !void {
                             };
                         },
                         '.' => {
-                            lineInfo.containerMark = .{ .unstyled = .{
+                            lineInfo.containerMark = .{ .plain = .{
                                 .markEnd = markEnd,
                                 .markEndWithSpaces = markEndWithSpaces,
                             } };
                             containerBlockInfo.blockType = .{
-                                .unstyled = .{},
+                                .plain = .{},
                             };
                         },
                         else => unreachable,

@@ -327,7 +327,7 @@ pub const BlockInfo = struct {
                 break :blk itemList.lastBullet.blockType.item.nextSibling;
             },
             .item => |*item| if (item.ownerBlockInfo() == item.list.blockType.list.lastBullet) null else item.nextSibling,
-            inline .table, .quotation, .notice, .reveal, .unstyled => |container| blk: {
+            inline .table, .quotation, .notice, .reveal, .plain => |container| blk: {
                 const nextBlock = container.nextSibling orelse break :blk null;
                 // ToDo: the assurence might be unnecessary.
                 break :blk if (nextBlock.nestingDepth == self.nestingDepth) nextBlock else null;
@@ -356,7 +356,7 @@ pub const BlockInfo = struct {
                 //itemList.lastBullet.blockType.item.nextSibling = sibling;
                 unreachable; // .list.nextSibling is always set through its .lastItem.
             },
-            inline .item, .table, .quotation, .notice, .reveal, .unstyled => |*container| {
+            inline .item, .table, .quotation, .notice, .reveal, .plain => |*container| {
                 container.nextSibling = sibling;
             },
             else => {
@@ -457,7 +457,7 @@ pub const BlockType = union(enum) {
         const Container = void;
         nextSibling: ?*BlockInfo = null,
     },
-    unstyled: struct {
+    plain: struct {
         const Container = void;
         nextSibling: ?*BlockInfo = null,
     },
@@ -760,7 +760,7 @@ pub const ContainerLeadingMark = union(enum) {
         markEnd: u32,
         markEndWithSpaces: u32,
     },
-    unstyled: struct {
+    plain: struct {
         markEnd: u32,
         markEndWithSpaces: u32,
     },

@@ -363,16 +363,16 @@ pub const TmdRender = struct {
 
                 try fns.writeCloseTag(w, tag, true);
             },
-            .unstyled => {
+            .plain => {
                 const tag = "div";
-                const classes = "tmd-unstyled";
+                const classes = "tmd-plain";
 
                 try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
 
                 const firstContentBlock = if (blockInfo.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     {
                         const headerTag = "div";
-                        const headerClasses = "tmd-unstyled-header";
+                        const headerClasses = "tmd-plain-header";
 
                         try fns.writeOpenTag(w, headerTag, headerClasses, headerBlock.attributes, true);
                         try self.writeUsualContentBlockLines(w, headerBlock);
@@ -893,7 +893,7 @@ pub const TmdRender = struct {
             },
 
             // built-in containers
-            .list, .item, .table, .quotation, .notice, .reveal, .unstyled => {
+            .list, .item, .table, .quotation, .notice, .reveal, .plain => {
                 try self.renderTmdCodeForBlockChildren(w, blockInfo);
             },
 

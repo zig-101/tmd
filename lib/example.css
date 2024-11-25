@@ -42,12 +42,12 @@ body {
   width: 100%;
   display: none;
   padding: .5em 1em;
-  background: #eee;
+  background: #fff;
 }
 
 .tmd-tab-radio:checked + .tmd-tab-label {
   font-weight: bold;
-  background: #eee;
+  background: #fff;
   margin-bottom: -1px;
   z-index: 1;
 }
@@ -160,13 +160,15 @@ body {
 .tmd-reveal-header {
 }
 
-.tmd-unstyled {
+.tmd-plain {
 }
 
-.tmd-unstyled-header {
+.tmd-plain-header {
   font-style: italic;
   background: #fcdba5;
-  padding-left: 6px;
+  padding: 0px 6px 6px;
+  border-radius: 6px 6px 0px 0px;
+  margin-bottom: -6px;
 }
 
 table.tmd-table {
@@ -211,6 +213,7 @@ ol.tmd-footnotes > li::marker {
 
 .tmd-header-2 {
   font-size: 1.95em;
+  border-bottom: 3px solid #2f2f2f;
 }
 
 .tmd-header-3 {
@@ -335,7 +338,7 @@ ol.tmd-footnotes > li::marker {
 }
 
 :target {
-	border: dotted 2px;
+	background: #d8d8ff;
 }
 
 
