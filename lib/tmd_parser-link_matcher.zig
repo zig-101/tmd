@@ -571,7 +571,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                             linkInfo.setSourceOfURL(null, false);
                             break :blk;
                         }
-                    } else if (AttributeParser.isValidURL(str)) {
+                    } else if (AttributeParser.isValidLinkURL(str)) {
                         // For built-in cases, no need to call callback to determine the url.
 
                         //std.debug.print("self defined url: {s}\n", .{str});
@@ -630,11 +630,11 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
 
                         //std.debug.print("    222 linkText = {s}\n", .{revisedLinkText.asString()});
 
-                        //std.debug.print("==== /{s}/, {}\n", .{ str, AttributeParserisValidURL(str) });
+                        //std.debug.print("==== /{s}/, {}\n", .{ str, AttributeParserisValidLinkURL(str) });
 
-                        break AttributeParser.isValidURL(str);
+                        break AttributeParser.isValidLinkURL(str);
                     } else {
-                        std.debug.assert(!AttributeParser.isValidURL(str));
+                        std.debug.assert(!AttributeParser.isValidLinkURL(str));
 
                         // For a link whose url is not built-in determined,
                         // all of its text tokens are used as link texts.

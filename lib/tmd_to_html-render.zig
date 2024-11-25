@@ -6,6 +6,7 @@ const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 const LineScanner = @import("tmd_parser-line_scanner.zig");
+const AttributeParser = @import("tmd_parser-attribute_parser.zig");
 const fns = @import("tmd_to_html-fns.zig");
 
 const FootnoteRedBlack = tree.RedBlack(*Footnote, Footnote);
@@ -1103,15 +1104,14 @@ pub const TmdRender = struct {
                                     const mediaInfoToken = mediaInfoElement.value;
                                     std.debug.assert(mediaInfoToken.tokenType == .plainText);
 
-                                    const mediaInfo = self.doc.rangeData(mediaInfoToken.range());
-                                    var it = mem.splitAny(u8, mediaInfo, " \t");
-                                    const src = it.first();
-                                    if (!std.mem.startsWith(u8, src, "./") and !std.mem.startsWith(u8, src, "../") and !std.mem.startsWith(u8, src, "https://") and !std.mem.startsWith(u8, src, "http://")) break :writeMedia;
-                                    if (!std.mem.endsWith(u8, src, ".png") and !std.mem.endsWith(u8, src, ".gif") and !std.mem.endsWith(u8, src, ".jpg") and !std.mem.endsWith(u8, src, ".jpeg")) break :writeMedia;
+                                    //const mediaInfo = self.doc.rangeData(mediaInfoToken.range());
+                                    //var it = mem.splitAny(u8, mediaInfo, " \t");
+                                    //const src = it.first();
+                                    //if (!std.mem.startsWith(u8, src, "./") and !std.mem.startsWith(u8, src, "../") and !std.mem.startsWith(u8, src, "https://") and !std.mem.startsWith(u8, src, "http://")) break :writeMedia;
+                                    //if (!std.mem.endsWith(u8, src, ".png") and !std.mem.endsWith(u8, src, ".gif") and !std.mem.endsWith(u8, src, ".jpg") and !std.mem.endsWith(u8, src, ".jpeg")) break :writeMedia;
 
-                                    // ToDo: read more arguments.
-
-                                    // ToDo: need do more for url validation.
+                                    const src = self.doc.rangeData(mediaInfoToken.range());
+                                    if (!AttributeParser.isValidMediaURL(src)) break :writeMedia;
 
                                     _ = try w.write("<img src=\"");
                                     try fns.writeHtmlAttributeValue(w, src);

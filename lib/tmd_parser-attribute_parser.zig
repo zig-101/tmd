@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const ascii = std.ascii;
 
 const tmd = @import("tmd.zig");
 
@@ -316,8 +317,71 @@ pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAtt
     return attrs;
 }
 
-pub fn isValidURL(text: []const u8) bool {
+pub fn isValidLinkURL(text: []const u8) bool {
     // ToDo: more precisely and performant.
 
-    return mem.startsWith(u8, text, "#") or mem.startsWith(u8, text, "http") or mem.indexOf(u8, text, ".htm") != null or mem.indexOf(u8, text, ".html") != null;
+    if (ascii.startsWithIgnoreCase(text, "#")) return true;
+    if (ascii.startsWithIgnoreCase(text, "http")) {
+        const t = text[4..];
+        if (ascii.startsWithIgnoreCase(t, "s://")) return true;
+        if (ascii.startsWithIgnoreCase(t, "://")) return true;
+    }
+
+    const t = if (mem.indexOfScalar(u8, text, '#')) |k| blk: {
+        const t = text[0..k];
+        //if (ascii.endsWithIgnoreCase(t, ".tmd")) return true;
+        break :blk t;
+    } else text;
+
+    if (ascii.endsWithIgnoreCase(t, ".htm")) return true;
+    if (ascii.endsWithIgnoreCase(t, ".html")) return true;
+
+    return false;
+}
+
+test "isValidLinkURL" {
+    std.debug.assert(isValidLinkURL("http://aaa"));
+    std.debug.assert(isValidLinkURL("https://aaa"));
+    std.debug.assert(false == isValidLinkURL("http:"));
+    std.debug.assert(false == isValidLinkURL("https"));
+    std.debug.assert(isValidLinkURL("foo.htm"));
+    std.debug.assert(isValidLinkURL("foo.html#bar"));
+    std.debug.assert(isValidLinkURL("foo.htm#bar"));
+    std.debug.assert(isValidLinkURL("foo.html"));
+    //std.debug.assert(isValidLinkURL("foo.tmd#"));
+    std.debug.assert(isValidLinkURL("#"));
+    std.debug.assert(isValidLinkURL("#bar"));
+}
+
+// ToDo: more
+const supportedMediaExts = [_][]const u8{
+    ".png",
+    ".gif",
+    ".jpg",
+    ".jpeg",
+};
+
+pub fn isValidMediaURL(src: []const u8) bool {
+    // ToDo: more precisely and performant.
+
+    //next: {
+    //    //if (std.mem.startsWith(u8, src, "./") break :next;
+    //    //if (std.mem.startsWith(u8, src, "../") break :next;
+    //    if (ascii.startsWithIgnoreCase(text, "http")) {
+    //        const t = text[4..];
+    //        if (ascii.startsWithIgnoreCase(t, "s://")) break :next;
+    //        if (ascii.startsWithIgnoreCase(t, "://")) break :next;
+    //    }
+    //}
+
+    for (supportedMediaExts) |ext| {
+        if (ascii.endsWithIgnoreCase(src, ext)) return true;
+    }
+
+    return false;
+}
+
+test "isValidMediaURL" {
+    std.debug.assert(isValidMediaURL("foo.png"));
+    std.debug.assert(false == isValidMediaURL("foo.xxxxx"));
 }
