@@ -3,14 +3,16 @@ const mem = std.mem;
 
 const tmd = @import("tmd.zig");
 
-pub fn writeOpenTag(w: anytype, tag: []const u8, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes, writeNewLine: bool) !void {
+pub fn writeOpenTag(w: anytype, tag: []const u8, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes, endAndWriteNewLine: ?bool) !void {
     std.debug.assert(tag.len > 0);
 
     _ = try w.write("<");
     _ = try w.write(tag);
     try writeBlockAttributes(w, classesSeperatedBySpace, attributes);
-    _ = try w.write(">");
-    if (writeNewLine) _ = try w.write("\n");
+    if (endAndWriteNewLine) |write| {
+        _ = try w.write(">");
+        if (write) _ = try w.write("\n");
+    }
 }
 
 pub fn writeCloseTag(w: anytype, tag: []const u8, writeNewLine: bool) !void {
@@ -42,13 +44,13 @@ pub fn writeBlockAttributes(w: anytype, classesSeperatedBySpace: []const u8, att
     }
 }
 
-fn writeID(w: anytype, id: []const u8) !void {
+pub fn writeID(w: anytype, id: []const u8) !void {
     _ = try w.write(" id=\"");
     _ = try w.write(id);
     _ = try w.write("\"");
 }
 
-fn writeClasses(w: anytype, classesSeperatedBySpace: []const u8, classesSeperatedBySemicolon: []const u8) !void {
+pub fn writeClasses(w: anytype, classesSeperatedBySpace: []const u8, classesSeperatedBySemicolon: []const u8) !void {
     if (classesSeperatedBySpace.len == 0 and classesSeperatedBySemicolon.len == 0) return;
 
     _ = try w.write(" class=\"");

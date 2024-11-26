@@ -213,7 +213,7 @@ ol.tmd-footnotes > li::marker {
 
 .tmd-header-2 {
   font-size: 1.95em;
-  border-bottom: 3px solid #2f2f2f;
+  border-bottom: 2px solid #2f2f2f;
 }
 
 .tmd-header-3 {
@@ -331,6 +331,10 @@ ol.tmd-footnotes > li::marker {
 
 .tmd-align-justify {
   text-align: justify;
+}
+
+.tmd-align-top {
+  vertical-align: top;
 }
 
 .tmd-hidden {

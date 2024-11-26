@@ -132,6 +132,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
 
     const commentedOut = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "commentedOut").?;
     const horizontalAlign = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "horizontalAlign").?;
+    const verticalAlign = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "verticalAlign").?;
     const cellSpans = std.meta.fieldIndex(tmd.BaseBlockAttibutes, "cellSpans").?;
 
     var lastOrder: isize = -1;
@@ -165,6 +166,14 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
                         attrs.horizontalAlign = .center
                     else if (mem.eql(u8, item, "<>"))
                         attrs.horizontalAlign = .justify;
+                },
+                '^' => {
+                    if (lastOrder >= verticalAlign) break;
+                    defer lastOrder = verticalAlign;
+
+                    if (item.len != 2) break;
+                    if (item[1] != '^') break;
+                    attrs.verticalAlign = .top;
                 },
                 '.' => {
                     if (lastOrder >= cellSpans) break;

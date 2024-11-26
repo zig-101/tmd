@@ -153,6 +153,10 @@ pub const BaseBlockAttibutes = struct {
         right,
         justify,
     } = .none,
+    verticalAlign: enum {
+        none,
+        top,
+    } = .none,
     cellSpans: struct {
         axisSpan: u32 = 1,
         crossSpan: u32 = 1,

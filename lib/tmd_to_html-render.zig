@@ -660,25 +660,34 @@ pub const TmdRender = struct {
 
     // ToDo: write align
     fn renderTableCellBlock(self: *TmdRender, w: anytype, tableCellBlock: *const tmd.BlockInfo, spans: TableCell.Spans) !void {
+        var tdClass: []const u8 = "";
         switch (tableCellBlock.blockType) {
             .header => |header| {
                 if (header.level(self.doc.data) == 1)
                     return try self.renderTableHeaderCellBlock(w, tableCellBlock, spans);
             },
-            .base => |_| { // some headers might need different text aligns.
+            .base => |*base| { // some headers might need different text aligns.
                 if (tableCellBlock.getSpecialHeaderChild(self.doc.data)) |headerBlock| {
                     if (headerBlock.nextSibling() == null)
                         return try self.renderTableHeaderCellBlock(w, headerBlock, spans);
+                }
+
+                const attrs = base.attributes();
+                switch (attrs.verticalAlign) {
+                    .none => {},
+                    .top => tdClass = "tmd-align-top",
                 }
             },
             else => {},
         }
 
-        _ = try w.write("<td");
+        const tag = "td";
+
+        try fns.writeOpenTag(w, tag, tdClass, null, null);
         try writeTableCellSpans(w, spans);
         _ = try w.write(">\n");
         try self.renderBlock(w, tableCellBlock);
-        _ = try w.write("</td>\n");
+        try fns.writeCloseTag(w, tag, true);
     }
 
     fn renderTableBlock_RowOriented(self: *TmdRender, w: anytype, tableBlockInfo: *const tmd.BlockInfo, firstChild: *tmd.BlockInfo) !void {
