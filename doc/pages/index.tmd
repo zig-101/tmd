@@ -1,352 +1,78 @@
 
-##### Tapir's Markdown Format
+##### The Homepage of TapirMD
 
-Tapir's Markdown (TapirMD) is a distinct evolution of traditional markdown __#note-markdown__,
-offering both increased specificity and enhanced power
-while preserving the familiar readability of its predecessor.
+TapirMD (Tapirs's Markdown) is a powerful,
+next-generation markup language that simplifies content creation.
 
-###-
+# {
+  Features:
 
-@@@ #section-demos
-###======= Demos
-
-@@@ #section-demo-1
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 1 (span styles)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''''
-''''' << #demo-1
-@@@ #demo-1
-{
-**bold text** and ^**dimmed text**.
-
-%%italic text%% and ^%%revert italic text%%.
-
-::smaller font size:: and ^::larger font size::.
-
-~~deleted text~~ and invisible text:
-^~~invisible text~~ (non-selectable, still occupy space).
-
-||marked text|| and ^||marked text with mistake smell||.
-
-$$subscript$$ and ^$$superscript$$.
-
-This is __a self-defined link``https://go101.org__,
-this is __a broken link__,
-and this is ^__an underlined text__.
-
-This is a code span: ` var z = foo::x || bar::y `.
-And this is a mono font text span:
-^` var z = x$$ 2 $$ + y^$$ n $$`.
-}
-
-@@@ #section-demo-2
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 2 (line leading marks)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''''
-''''' << #demo-2
-@@@ #demo-2
-{
-A comment line is between the following two words: foo
-// comment text
-bar.
-
-This block
-\\ is
-\\ line-broken
-\\ several times.
-\\ The following is an image.
-
-The answer is:
-?? 997
-(visible when selected).
-
-&& ./static/image/sample-image.png
-}
-
-@@@ #section-demo-3
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 3 (link definitions)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''''
-''''' << #demo-3
-@@@ #demo-3
-{
-// __Go 101 website ` https://go101.org
-
-Visit __Go 101 website__ (the link is defined above) __#note-go101__.
-
-Go 1.22 broke backwards compatibility. More information
-is on __`for` Loop Semantic Changes in Go 1.22:
-Be Aware of the Impact__ (the link is defined below).
-
-// __for Loop... :: https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
-
-__No Safe Efficient Ways to Do Three-way String Comparisons in Go__
-(the link is defined below).
-
-// __...in Go ~~ https://go101.org/blog/2022-10-01-three-way-string-comparison.html
-}
-
-@@@ #section-demo-4
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 4 (built-in containers)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''''
-''''' << #demo-4
-@@@ #demo-4
-{
-*. This is a 1st-level list item (ordered)..
-  {
-  - This is a 2nd-level list item
-  - This is another 2nd-level list item.
+  * Intuitive Concepts:
+    + Character and character sequences.
+    + Blocks, lines, and tokens.
+    + Atom blocks, predefined container blocks, and base blocks.
+  * Simple Syntax:
+    + All marks consist of ASCII punctuation characters.
+    + Minimizes non-content text to enhance readibilty.
+    + **Semantics vary based on composition**, reducing unnecessary syntax complexity.
+  * Consistent Syntax:
+    + Predefined container block marks typically consist of one punctuation character.
+    + Atom container block marks begin with 3+ identical punctuation characters.
+    + Most styling marks consist of 2+ identical punctuation characters.
+  * Rich Predefined Container Block Types:
+    + Lists with nesting support:
+      ~ Ordered lists.
+      ~ Unordered lists.
+      ~ Definition Lists.
+      ~ **Tab lists**.
+    + **Tables with advanced features**:
+      ~ Support for spans of cell rows and cell columns.
+      ~ Cell text alignment control.
+    + Notice blocks for highlighting notes, warnings, etc.
+    + Quotation blocks with footer support for citations or references.
+    + **Reveal blocks** for creating accordion-style panels (without JavaScript).
+    + Footer blocks.
+  * Concrete Atom Block Types:
+    + Blank blocks.
+    + Usual blocks.
+    + Header blocks.
+    + Seperator blocks.
+    + Attribute blocks to set block IDs and classes.
+    + Code blocks.
+    + **Custom (data) blocks** for extending TapirMD functionality.
+  * Rich Inline Styles:
+    + **Spoilers**.
+    + Image embedding.
+    + Manual line breaks.
+    + Comment lines.
+    + Font weight (bold and pale).
+    + Font style (italic and revert-italic).
+    + Font size (smaller and larger).
+    + Text deletion (strikethrough and hidden text).
+    + Subscript and superscript (without nesting).
+    + Text marking for highlighting.
+    + Underline for emphasis.
+    + Hyperlinks.
+      ~ Self-defined links.
+      ~ Link definitions based on exact, **prefix, or suffix matching**.
+  * More
+    + TOC (table of contents) generation for automatic navigation.
+    + Footnotes for references and citations.
   }
-  This is still in the 1st-level list item.
+  {^^
+  __Specification:: specification.html
 
-*. This is another 1st-level list item (ordered).
-  The following is a definition list:
-  : ### Term 1
-    ;;; Explanations of term 1.
-  : ### Term 2
-    ;;; Explanations of term 2.
+  __Porject page:: https://github.com/zig-101/tmd
 
-. // force ending of a container
+  __Demos:: demos.html
 
-* ### Tab 1
-  ;;; Content of tab 1.
-  {
-    
-  Another definition list:
-  :. ### Zig
-    ;;; A programming language optimized for performance 
-        and featuring a robust metaprogramming system.
-  :. ### Go
-    ;;; A statically-typed programming language with
-        dynamic language flexibility and moderate performance.
+  __Use cases:: use-cases.html
+
+  __@zigo_101 :: https://x.com/zigo_101
   }
-* ### Tab 2
-  ;;; Content of tab 2.
-  ;;;
-  && ./static/image/sample-image.png
-  
-
-> This is a quotation text.
-  ;;; a footer
-  @@@
-
-> ### This is a quotation block which font looks larger.
-  {
-  footer line 1
-  \\ footer line 2
-  }
-  @@@
-
-! This is a notice box without header.
-
-! ### WARNING!
-  {
-  This is a notice box with header.
+  -------
+  {>< ..2
+  :: The page is written in TapirMD (source is available __here__).
+  // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/index.tmd
   }
 
-? This is a reveal box without summary.
-
-? ### Why TapirMD?
-  {
-  Because traditional markdown formats
-  have many ambiguities and not powerful enough.
-  }
-}
-
-
-
-@@@ #section-demo-5
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 5 (table)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''''
-''''' << #demo-5
-@@@ #demo-5
-{
-A table (row-oriented):
-
-# ;;; 11
-  {..2:2
-  22
-  }
-  {..2:1
-  21
-  }
-  -----
-  ;;; 11
-  {:3
-  13
-  }
-  ;;; 11
-  ---------
-  {..4
-  31
-  }
-  {..1:2
-  12
-  }
-  ---------
-  ;;; 11
-  ;;; 11
-  ;;; 11
-
-Another table (column-oriented):
-
-#
-  ;;; 11
-  {..2:2
-  22
-  }
-  {..2:1
-  21
-  }
-  -----
-  ;;; 11
-  {:3
-  13
-  }
-  ;;; 11
-  ---------
-  {..4
-  31
-  }
-  {..1:2
-  12
-  }
-  ---------
-  ;;; 11
-  ;;; 11
-  ;;; 11
-}
-
-@@@ #section-demo-6
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 6 (atom blocks)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''''
-''''' << #demo-6
-@@@ #demo-6
-{
-####### Header 1 %%::(for titles generally)
-
-###====== Header 2
-
-###++++++ Header 3
-
-###------ Header 4
-
-This is a usual block. Nothing special.
-
-;;; This is also a usual block.
-The below is a horizontal line.
-
----
-
-@@@ This is an attributes block. 
-@@@ The texts here must be of 
-@@@ certain formats to be meaningful.
-@@@ We can specify ID and classes
-@@@ for the next sibling block here.
-
-@@@ #code-snippet-1
-. ### code-snippet-1.zig
-'''zig
-  const std = @import("std");
-
-  pub fn main() void {
-    std.log.info("TapirMD, yes!", .{});
-  }
-'''
-}
-
-@@@ #section-demo-7
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 7 (line end spacing)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''
-''' << #demo-7
-@@@ #demo-7
-{
-
-hello
-world
-
-hello`
-`world
-
-你好
-世界
-
-你好 ``
-世界
-
-hello
-世界
-
-hello ``
-世界
-
-hello
-`` 世界
-}
-
-@@@ #section-demo-8
-###+++++++++++++++++++++++++++++++++++++++++
-	Demo 8 (character escaping)
-
-# ### TapirMD Source
-  ### Render Result
---------------------------
-'''''
-''''' << #demo-8
-@@@ #demo-8
-{
-*``* all marks %``% are escaped *``* ^```` !``!``!.
-
-!! ** all marks %% are escaped ** `` !!!.
-
-Backticks in code span: ` ^``code^```
-
-Backticks in code span: `
-!! `code`
-`
-
-`` ! This is not a **note box**.
-
-`` // This is not a %%comment line%%.
-}
-
----
-
-{//
-@@@ #note-markdown
-Traditional markdown is known for it is limited and not well specified.
-@@@ #note-go101
-The **%% Go 101 %%** website is an up-to-date knowledge base for Go programming self learning.
-}
