@@ -153,6 +153,8 @@ fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) !vo
                 std.debug.assert(atomBlockInfo.blockType == .header);
                 std.debug.assert(headerBlock == atomBlockInfo);
 
+                if (headerBlock.blockType.header.isBare()) break :handle;
+
                 const level = headerBlock.blockType.header.level(parser.tmdDoc.data);
                 if (level == 1) {
                     if (parser.tmdDoc.titleHeader == null) {
@@ -160,8 +162,6 @@ fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) !vo
                         break :handle;
                     }
                 }
-
-                if (headerBlock.blockType.header.isBare()) break :handle;
 
                 std.debug.assert(1 <= level and level <= tmd.MaxHeaderLevel);
                 // used as hasNonBareHeaders temporarily.
