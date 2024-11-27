@@ -1,5 +1,5 @@
 
-### TapirMD (Tapirs's Markdown) Format Specification
+### TapirMD (Tapir's Markdown) Format Specification
 
 ! {><
   :: The specification is written in TapirMD (source is available __here__).
@@ -1445,11 +1445,14 @@ They should be escaped when they appear at usual line beginning.
 )))
 '''
 
-The following punctuation character sequences are potential style marks.
+The following punctuation character sequences are potential inline marks.
 They should be escaped in header and usual blocks.
 '''
 ,,
 ^^
+<<
+>>
+@@
 ((
 ))
 [[

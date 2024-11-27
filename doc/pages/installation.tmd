@@ -1,0 +1,51 @@
+
+##### Install the Official TapirMD Renderer
+
+! {><
+  :: The page is written in TapirMD (source is available __here__).
+  }
+  // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/installation.tmd
+
+This page shows the steps of installing and using the official __TapirMD__ renderer.
+
+  // __TapirMD:: index.html
+
+Steps:
+
+*. Install __Git__, if needed.
+
+*. Install __Zig__, if needed. The latest version tip (master) versoon is recommended.
+
+*. Get the source code of __the TapirMD project__.
+
+*. Open a terminal shell, and enter the local TapirMD project directory.
+   Then run
+   '''
+   zig build
+   '''
+   If succeeds, the `tmd` command binary file is generated in the `bin` folder
+   under the project local `zig-out` folder.
+
+*. (Optional), copy the `tmd` binary file to directory configured
+   in the `PATH` enviroment variable, or add the path of
+   the `bin` folder to the `PATH` enviroment variable.
+
+*. Edit a TapirMD document and save it in a file with the recommended `.tmd` extension.
+   Assume the file name is `mydoc.tmd`.
+
+*. Run
+   '''
+   tmd render --full-html mydoc.tmd
+   '''
+   to generate a `mydoc.html` file for your TapirMD document.
+   Then you can open the `mydoc.html` file in a web browser to view the render result.
+   
+*. You can also run
+   '''
+   tmd render mydoc.tmd
+   '''
+   to geneate a incomplete HTML file for embedding purpose. 
+
+  // __Git :: https://git-scm.com/downloads
+  // __Zig :: https://ziglang.org/download/
+  // __the TapirMD project :: https://github.com/zig-101/tmd

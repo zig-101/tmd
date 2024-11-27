@@ -1,7 +1,7 @@
 
 ##### The Homepage of TapirMD
 
-TapirMD (Tapirs's Markdown) is a powerful,
+TapirMD (Tapir's Markdown) is a powerful,
 next-generation markup language that simplifies content creation.
 
 # {
@@ -25,9 +25,10 @@ next-generation markup language that simplifies content creation.
       ~ Unordered lists.
       ~ Definition Lists.
       ~ **Tab lists**.
-    + **Tables with advanced features**:
+    + Tables with basic and advanced features:
       ~ Support for spans of cell rows and cell columns.
       ~ Cell text alignment control.
+      ~ Support for row-oriented and **column-oriented table** layouts.
     + Notice blocks for highlighting notes, warnings, etc.
     + Quotation blocks with footer support for citations or references.
     + **Reveal blocks** for creating accordion-style panels (without JavaScript).
@@ -58,15 +59,22 @@ next-generation markup language that simplifies content creation.
   * More
     + TOC (table of contents) generation for automatic navigation.
     + Footnotes for references and citations.
+    + Subtitles.
   }
   {^^
-  __Specification:: specification.html
+  __Installation:: installation.html
 
-  __Porject page:: https://github.com/zig-101/tmd
+  ^**Libraries (coming)
+
+  __Specification:: specification.html
 
   __Demos:: demos.html
 
   __Use cases:: use-cases.html
+
+  \\
+
+  __Porject page:: https://github.com/zig-101/tmd
 
   __@zigo_101 :: https://x.com/zigo_101
   }
