@@ -417,7 +417,12 @@ pub const TmdRender = struct {
                 if (header.isBare()) {
                     try self.writeTableOfContents(w, level);
                 } else {
-                    self.toRenderSubtitles = if (blockInfo.nextSibling()) |sibling| sibling.blockType == .usual else false;
+                    const realLevel = if (blockInfo == self.doc.titleHeader) blk: {
+                        if (blockInfo.nextSibling()) |sibling| {
+                            self.toRenderSubtitles = sibling.blockType == .usual;
+                        }
+                        break :blk level;
+                    } else if (self.doc.headerLevelNeedAdjusted(level)) level + 1 else level;
 
                     if (self.toRenderSubtitles) {
                         const headerTag = "header";
@@ -425,7 +430,6 @@ pub const TmdRender = struct {
                         try fns.writeOpenTag(w, headerTag, headerClasses, null, true);
                     }
 
-                    const realLevel = if (blockInfo != self.doc.titleHeader and self.doc.headerLevelNeedAdjusted(level)) level + 1 else level;
                     _ = try w.print("<h{}", .{realLevel});
                     try fns.writeBlockAttributes(w, tmdHeaderClass(realLevel), blockInfo.attributes);
                     _ = try w.write(">\n");

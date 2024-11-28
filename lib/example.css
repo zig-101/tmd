@@ -215,12 +215,6 @@ header.tmd-with-subtitle h1 {
   margin-block-end: 0;
 }
 
-header.tmd-with-subtitle .tmd-usual {
-	font-size: 1rem;
-	font-weight: normal;
-	line-height: 1.5;
-}
-
 .tmd-header-1 {
   font-size: 2.5em;
 }
