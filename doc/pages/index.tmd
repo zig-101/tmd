@@ -1,86 +1,89 @@
 
 ##### The Homepage of TapirMD
+;;; A powerful, next-generation markup language that simplifies content creation.
 
-TapirMD (Tapir's Markdown) is a powerful,
-next-generation markup language that simplifies content creation.
-
-# {
-  Features:
-
-  * Intuitive Concepts:
-    + Character and character sequences.
-    + Blocks, lines, and tokens.
-    + Atom blocks, predefined container blocks, and base blocks.
-  * Simple Syntax:
-    + All marks consist of ASCII punctuation characters.
-    + Minimizes non-content text to enhance readibilty.
-    + **Semantics vary based on composition**, reducing unnecessary syntax complexity.
-  * Consistent Syntax:
-    + Predefined container block marks typically consist of one punctuation character.
-    + Atom container block marks begin with 3+ identical punctuation characters.
-    + Most styling marks consist of 2+ identical punctuation characters.
-  * Rich Predefined Container Block Types:
-    + Lists with nesting support:
-      ~ Ordered lists.
-      ~ Unordered lists.
-      ~ Definition Lists.
-      ~ **Tab lists**.
-    + Tables with basic and advanced features:
-      ~ Support for spans of cell rows and cell columns.
-      ~ Cell text alignment control.
-      ~ Support for row-oriented and **column-oriented table** layouts.
-    + Notice blocks for highlighting notes, warnings, etc.
-    + Quotation blocks with footer support for citations or references.
-    + **Reveal blocks** for creating accordion-style panels (without JavaScript).
-    + Footer blocks.
-  * Concrete Atom Block Types:
-    + Blank blocks.
-    + Usual blocks.
-    + Header blocks.
-    + Seperator blocks.
-    + Attribute blocks to set block IDs and classes.
-    + Code blocks.
-    + **Custom (data) blocks** for extending TapirMD functionality.
-  * Rich Inline Styles:
-    + **Spoilers**.
-    + Image embedding.
-    + Manual line breaks.
-    + Comment lines.
-    + Font weight (bold and pale).
-    + Font style (italic and revert-italic).
-    + Font size (smaller and larger).
-    + Text deletion (strikethrough and hidden text).
-    + Subscript and superscript (without nesting).
-    + Text marking for highlighting.
-    + Underline for emphasis.
-    + Hyperlinks.
-      ~ Self-defined links.
-      ~ Link definitions based on exact, **prefix, or suffix matching**.
-  * More
-    + TOC (table of contents) generation for automatic navigation.
-    + Footnotes for references and citations.
-    + Subtitles.
-  }
-  {^^
-  __Installation:: installation.html
-
-  ^**Libraries (coming)
-
-  __Specification:: specification.html
-
-  __Demos:: demos.html
-
-  __Use cases:: use-cases.html
-
+---
+{
+  ::
+  ``- __Installation`` installation.html __
+  |
+  ^**Libraries (coming) **
+  |
+  __Specification`` specification.html __
   \\
+  ``- __Demos`` demos.html __
+  |
+  __Use cases`` use-cases.html __
+  |
+  ^**Try it online (coming) **
+  \\
+  `` - __Porject page`` https://github.com/zig-101/tmd __
+  |
+  __@zigo_101`` https://x.com/zigo_101 __
+}
+---
 
-  __Porject page:: https://github.com/zig-101/tmd
+Features:
 
-  __@zigo_101 :: https://x.com/zigo_101
-  }
-  -------
-  {>< ..2
-  :: The page is written in TapirMD (source is available __here__).
-  // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/index.tmd
-  }
+* Intuitive Concepts:
+  + Character and character sequences.
+  + Blocks, lines, and tokens.
+  + Atom blocks, predefined container blocks, and base blocks.
+* Simple Syntax:
+  + All marks consist of ASCII punctuation characters.
+  + Minimizes non-content text to enhance readibilty.
+  + **Semantics vary based on composition**, reducing unnecessary syntax complexity.
+* Consistent Syntax:
+  + Predefined container block marks typically consist of one punctuation character.
+  + Atom container block marks begin with 3+ identical punctuation characters.
+  + Most styling marks consist of 2+ identical punctuation characters.
+* Rich Predefined Container Block Types:
+  + Lists with nesting support:
+    ~ Ordered lists.
+    ~ Unordered lists.
+    ~ Definition Lists.
+    ~ **Tab lists**.
+  + Tables with basic and advanced features:
+    ~ Support for spans of cell rows and cell columns.
+    ~ Cell text alignment control.
+    ~ Support for row-oriented and **column-oriented table** layouts.
+  + Notice blocks for highlighting notes, warnings, etc.
+  + Quotation blocks with footer support for citations or references.
+  + **Reveal blocks** for creating accordion-style panels (without JavaScript).
+  + Footer blocks.
+* Concrete Atom Block Types:
+  + Blank blocks.
+  + Usual blocks.
+  + Header blocks.
+  + Seperator blocks.
+  + Attribute blocks to set block IDs and classes.
+  + Code blocks.
+  + **Custom (data) blocks** for extending TapirMD functionality.
+* Rich Inline Styles:
+  + **Spoilers**.
+  + Image embedding.
+  + Manual line breaks.
+  + Comment lines.
+  + Font weight (bold and pale).
+  + Font style (italic and revert-italic).
+  + Font size (smaller and larger).
+  + Text deletion (strikethrough and hidden text).
+  + Subscript and superscript (without nesting).
+  + Text marking for highlighting.
+  + Underline for emphasis.
+  + Hyperlinks.
+    ~ Self-defined links.
+    ~ Link definitions based on exact, **prefix, or suffix matching**.
+* More
+  + TOC (table of contents) generation for automatic navigation.
+  + Footnotes for references and citations.
+  + Subtitles.
+  + **Line-end spacing control**.
+
+---
+{
+The page is written in TapirMD (source is available __here__).
+// __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/index.tmd
+@@@
+}
 

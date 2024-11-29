@@ -299,7 +299,7 @@ When a list closes, its seen last item block ends.
 The item block is confirmed as the last item block of the list.
 
 @@@ #container-blocks
-###+++++ About children blocks of base and predefined container blocks
+###+++++ About child blocks of base and predefined container blocks
 
 Every predefined container block (of either item type or not)
 directly nests at least one atom and base blocks (a.k.a. has at least one child).
@@ -1479,4 +1479,3 @@ They should be escaped in header and usual blocks.
 
 } footnotes
 
-} all

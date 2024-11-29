@@ -983,6 +983,13 @@ pub const TokenType = union(enum) {
     },
     // ToDo: with the zig tip, this size of this type is 24.
     //       In fact, 16 is enough.
+    //       ToDo: use packed union and maintain a InvalidToken in parser.
+    //
+    //           info: packed union {
+    //               firstPlainText: ?*TokenInfo,
+    //               urlSourceText: ?*TokenInfo,
+    //           }
+    //
     // A linkInfo token is always before an open .link SpanMarkType token.
     linkInfo: struct {
         attrs: ?*ElementAttibutes = null,

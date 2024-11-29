@@ -10,11 +10,17 @@ This page shows the steps of installing and using the official __TapirMD__ rende
 
   // __TapirMD:: index.html
 
+TapirMD hasn't yet reached version 1.0.0 (or even 0.1.0).
+At this stage, building from source is the only way to run
+the offcial TapirMD commands locally.
+
+###+++++ Build from source
+
 Steps:
 
 *. Install __Git__, if needed.
 
-*. Install __Zig__, if needed. The latest version tip (master) versoon is recommended.
+*. Install __Zig__, if needed. The latest version tip (master) version is recommended.
 
 *. Get the source code of __the TapirMD project__.
 
@@ -39,7 +45,7 @@ Steps:
    '''
    to generate a `mydoc.html` file for your TapirMD document.
    Then you can open the `mydoc.html` file in a web browser to view the render result.
-   
+
 *. You can also run
    '''
    tmd render mydoc.tmd
