@@ -379,7 +379,7 @@ pub fn stackFirstLevelHeaderBlock(self: *BlockArranger, blockInfo: *tmd.BlockInf
                 // listItem.confirmTabItem();
                 //listItem.list.blockType.list.isTab = true;
                 if (listItem.list.blockType.list.listType == .bullets)
-                    listItem.list.blockType.list.listType = .tabs;
+                    listItem.list.blockType.list.listType = .coincides;
             },
             else => {},
         }
@@ -394,7 +394,7 @@ pub fn stackFirstLevelHeaderBlock(self: *BlockArranger, blockInfo: *tmd.BlockInf
                     // listItem.confirmTabItem();
                     //listItem.list.blockType.list.isTab = true;
                     if (listItem.list.blockType.list.listType == .bullets)
-                        listItem.list.blockType.list.listType = .tabs;
+                        listItem.list.blockType.list.listType = .coincides;
                 },
                 else => {},
             }

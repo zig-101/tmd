@@ -411,7 +411,7 @@ fn parse(parser: *DocParser) !void {
                         listBlockInfo.blockType = .{
                             .list = .{
                                 ._itemTypeIndex = markTypeIndex,
-                                .listType = tmd.listType(markStr), // if .bullets, might be adjusted to .tabs later
+                                .listType = tmd.listType(markStr), // if .bullets, might be adjusted to .coincides later
                                 .secondMode = markStr.len == 2,
                                 .index = listCount,
                             },

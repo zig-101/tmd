@@ -114,7 +114,7 @@ pub fn listItemTypeIndex(itemMark: []const u8) ListItemTypeIndex {
     }
 }
 
-// When this function is called, .tabs is still unable to be determined.
+// When this function is called, .coincides is still unable to be determined.
 pub fn listType(itemMark: []const u8) ListType {
     switch (itemMark.len) {
         1, 2 => return switch (itemMark[0]) {
@@ -388,7 +388,7 @@ pub const BlockInfo = struct {
 
 pub const ListType = enum {
     bullets,
-    tabs,
+    coincides,
     definitions,
 };
 
