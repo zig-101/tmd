@@ -510,7 +510,7 @@ line spacing, mark character escaping, etc.
 The usual lines in header and usual blocks may contain various style and formatting tokens.
 These tokens enable content creators to apply a wide range of effects, such as:
 * text styling, including
-  - bold and pale
+  - bold and dimmed
   - italic and revert-italic
   - underline and dotted underline
   - strikethrough and text hiding
@@ -663,7 +663,7 @@ All style types are listed in the following table.
   ### %% font-weight
   ;;; ^`*
   ;;; bold
-  ;;; pale
+  ;;; dimmed
   ------------------
   ### %% font-style
   ;;; ^`%
@@ -1074,8 +1074,11 @@ is treated as an ordered list in HTML output.
 
 If the mark of a list begins with `*`, `+`, `-` or `~`,
 and the first non-attribute child block of at least one if
-its item blocks is a first-level header blocks, then the list
-is treated as tab panel in HTML output.
+its item blocks is a first-level header block, then the list
+is treated as a %%**coincide block list**%% in HTML output.
+
+The official TapirMD renderer renders a coincide block list
+as a tab panel.
 
 ? ### (a tab panel example)
   {

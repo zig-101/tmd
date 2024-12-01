@@ -64,7 +64,7 @@ Features:
   + Image embedding.
   + Manual line breaks.
   + Comment lines.
-  + Font weight (bold and pale).
+  + Font weight (bold and dimmed).
   + Font style (italic and revert-italic).
   + Font size (smaller and larger).
   + Text deletion (strikethrough and hidden text).

@@ -50,7 +50,7 @@ Steps:
    '''
    tmd render mydoc.tmd
    '''
-   to geneate a incomplete HTML file for embedding purpose. 
+   to geneate an incomplete HTML file for embedding purpose. 
 
   // __Git :: https://git-scm.com/downloads
   // __Zig :: https://ziglang.org/download/
