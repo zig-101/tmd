@@ -611,16 +611,14 @@ even number of backtick (`^```) characters.
 Even-backtick mark tokens can operate in a secondary mode.
 In secondary mode, an even-backtick mark token begins with an additional `^` (caret) character.
 
-Even-backtick mark tokens doesn't affect the styles of content texts.
-They are used to denote various characters or character sequences.
-
-Different semantics for various even-backtick mark tokens:
-* An even-backtick mark token with exact one pair of backticks is treated as a void character
-  and is rendered as nothing in HTML output.
-* An even-backtick mark token with more than one pair of backticks is treated as
-  a non-collapsable space sequence.
+Even-backtick mark tokens are used to denote various special
+characters or character sequences.
+* An even-backtick mark token in primary mode and with exact one pair of backticks
+  is treated as a void character and rendered as nothing in HTML output.
+* An even-backtick mark token in primary mode and with more than one pair of backticks
+  is treated as a non-collapsable space sequence.
   The number of non-collapsable spaces in the sequence is the pair count minus one.
-* A secondary even-backtick mark token is treated as backtick character sequence,
+* An even-backtick mark token in secondary mode is treated as backtick character sequence,
   with the number of backticks in the sequence equal to the pair count.
 
 As even-backtick mark tokens represent specific character or character sequences,
@@ -1077,8 +1075,7 @@ and the first non-attribute child block of at least one if
 its item blocks is a first-level header block, then the list
 is treated as a %%**coincide block list**%% in HTML output.
 
-The official TapirMD renderer renders a coincide block list
-as a tab panel.
+The official TapirMD renderer renders coincide block lists as tab panels.
 
 ? ### (a tab panel example)
   {
