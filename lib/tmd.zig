@@ -372,15 +372,16 @@ pub const BlockInfo = struct {
 
     pub fn getSpecialHeaderChild(self: *const @This(), tmdData: []const u8) ?*const BlockInfo {
         std.debug.assert(self.isContainer() or self.blockType == .base);
-
         var child = self.firstChild() orelse return null;
         while (true) {
             switch (child.blockType) {
-                .attributes => continue,
+                .attributes => {
+                    child = if (child.nextSibling()) |sibling| sibling else break;
+                    continue;
+                },
                 .header => |header| if (header.level(tmdData) == 1) return child else break,
                 else => break,
             }
-            child = if (self.next()) |nextBlock| nextBlock else break;
         }
         return null;
     }
