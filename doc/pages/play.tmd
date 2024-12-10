@@ -37,30 +37,44 @@ document.addEventListener("DOMContentLoaded", function() {
 	});
 });
 
+function setRenderOutput(output, isHTML) {
+	const resultDiv = document.getElementById("render-result");
+	if (isHTML) {
+		resultDiv.innerHTML = output;
+	} else {
+		resultDiv.textContent = output;
+	}
+}
+
 function tmdToHTML() {
 	if (memory == null) {
-		console.log("wasm is not initialized yet");
+		//console.log("wasm is not initialized yet");
+		setRenderOutput("wasm is not initialized yet", false);
 		return;
 	}
 
+	//let startTime = new Date();
+	
 	const inputOffset = buffer_offset();
-	console.log("inputOffset: ", inputOffset);
+	//console.log("inputOffset: ", inputOffset);
 	if (inputOffset < 0) {
-		console.log("bad inputOffset: ", inputOffset);
+		//console.log("bad inputOffset: ", inputOffset);
+		setRenderOutput("bad inputOffset: " + inputOffset, false);
 		return;
 	}
 	const inputView = new DataView(memory.buffer, inputOffset);
 	const maxInputLength = inputView.getUint32(0, true);
-	console.log("maxInputLength: ", maxInputLength);
+	//console.log("maxInputLength: ", maxInputLength);
 	
 	const inputTextArea = document.getElementById('tmd-source');
 	const tmdData = inputTextArea.value;
 	var inputLength = new TextEncoder().encode(tmdData).length;
 	if (inputLength > maxInputLength) {
-		console.log(`inputLength (${inputLength}) is too large (larger than ${maxInputLength})`);
+		//console.log(`inputLength (${inputLength}) is too large (larger than ${maxInputLength})`);
+		setRenderOutput("inputLength  (" + inputLength + ") is too large (larger than " + maxInputLength + ").", false);
 		return;
 	}
-	console.log("inputLength: ", inputLength);
+	//console.log("inputLength: ", inputLength);
 	
 	let offset = 0;
 	const demoSuffix = "__demo";
@@ -74,25 +88,31 @@ function tmdToHTML() {
 	offset += 4;
 	const inputBytes = new Uint8Array(memory.buffer, inputOffset + offset);
 	const { written } = new TextEncoder().encodeInto(tmdData, inputBytes);
-	console.log("written: ", written);
+	//console.log("written: ", written);
+
+	//console.log("elapsed time (prepare input): ", new Date() - startTime); startTime = new Date();
 	
 	const outputOffset = tmd_to_html(false, false);
 	if (outputOffset < 0) {
-		console.log("bad outputOffset: ", outputOffset);
+		//console.log("bad outputOffset: ", outputOffset);
+		setRenderOutput("bad outputOffset: " + outputOffset, false);
 		return;
 	}
+
+	//console.log("elapsed time (tmd_to_html): ", new Date() - startTime); startTime = new Date();
 	
 	const outputView = new DataView(memory.buffer, outputOffset);
 	
 	const outputLength = outputView.getUint32(0, true);
-	console.log("outputLength: ", outputLength);
+	//console.log("outputLength: ", outputLength);
 	
 	const outputBytes = new Uint8Array(memory.buffer, outputOffset+4, outputLength);
 	const output = new TextDecoder().decode(outputBytes);
-	console.log("output: ", output);
+	//console.log("output: ", output);
 
-	const resultDiv = document.getElementById("render-result");
-	resultDiv.innerHTML = output;
+	//console.log("elapsed time (decode output): ", new Date() - startTime);
+
+	setRenderOutput(output, true);
 }
 
 function loadWasm() {

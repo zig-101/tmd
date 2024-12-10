@@ -3,20 +3,17 @@ const builtin = @import("builtin");
 
 const tmd = @import("tmd");
 
-pub fn main() !void {
-    const MaxInFileSize = 1 << 20;
-    const MaxDocDataSize = 1 << 20;
-    const MaxOutFileSize = 8 << 20;
+const maxInFileSize = 1 << 23; // 8M
+const bufferSize = maxInFileSize * 8;
 
+pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const gpaAllocator = gpa.allocator();
 
-    const FixedBufferSize = MaxInFileSize + MaxDocDataSize + MaxOutFileSize;
-    const fixedBuffer = try gpaAllocator.alloc(u8, FixedBufferSize);
-    defer gpaAllocator.free(fixedBuffer);
-    var fba = std.heap.FixedBufferAllocator.init(fixedBuffer);
-    const fbaAllocator = fba.allocator();
+    const buffer = try gpaAllocator.alloc(u8, bufferSize);
+    defer gpaAllocator.free(buffer);
+    var fba = std.heap.FixedBufferAllocator.init(buffer);
 
     const args = try std.process.argsAlloc(gpaAllocator);
     defer std.process.argsFree(gpaAllocator, args);
@@ -61,22 +58,34 @@ pub fn main() !void {
 
         // load file
 
-        defer fba.reset();
-
         const tmdFile = try std.fs.cwd().openFile(arg, .{});
         defer tmdFile.close();
         const stat = try tmdFile.stat();
-        if (stat.kind != .file) try stderr.print("[{s}] is not a file.\n", .{arg});
+        if (stat.kind != .file) {
+            try stderr.print("[{s}] is not a file.\n", .{arg});
+            continue;
+        }
+        if (stat.size > maxInFileSize) {
+            try stderr.print("[{s}] size is too large ({} > {}).\n", .{ arg, stat.size, maxInFileSize });
+            continue;
+        }
 
-        const tmdContent = try tmdFile.readToEndAlloc(fbaAllocator, MaxInFileSize);
-        defer fbaAllocator.free(tmdContent);
+        const tmdContent = buffer[bufferSize - stat.size ..];
+        const remainingBuffer = buffer[0 .. bufferSize - maxInFileSize];
 
-        std.debug.assert(tmdContent.len == stat.size);
+        const readSize = try tmdFile.readAll(tmdContent);
+        if (stat.size != readSize) {
+            try stderr.print("[{s}] read size not match ({} != {}).\n", .{ arg, stat.size, readSize });
+            continue;
+        }
+
+        defer fba.reset();
+        const fbaAllocator = fba.allocator();
 
         // parse file
 
         var tmdDoc = try tmd.parser.parse_tmd_doc(tmdContent, fbaAllocator);
-        defer tmd.parser.destroy_tmd_doc(&tmdDoc, fbaAllocator); // if fba, then this is actually not necessary.
+        // defer tmd.parser.destroy_tmd_doc(&tmdDoc, fbaAllocator); // if fba, then this is actually not necessary.
 
         // render file
 
@@ -97,7 +106,7 @@ pub fn main() !void {
         std.mem.copyBackwards(u8, outputFilePath[outputFilename.len..], htmlExt);
         outputFilename = outputFilePath[0 .. outputFilename.len + htmlExt.len];
 
-        const renderBuffer = try fbaAllocator.alloc(u8, MaxOutFileSize);
+        const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
         defer fbaAllocator.free(renderBuffer);
         var fbs = std.io.fixedBufferStream(renderBuffer);
         try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), option_full_html, option_support_custom_blocks, "", gpaAllocator);

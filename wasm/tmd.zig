@@ -11,11 +11,8 @@ fn logMessage(msg: []const u8, extraMsg: []const u8, extraInt: isize) void {
     print(@intFromPtr(msg.ptr), msg.len, @intFromPtr(extraMsg.ptr), extraMsg.len, extraInt);
 }
 
-const maxInFileSize = 1 << 20;
-const maxDocDataSize = 1 << 20;
-const maxOutFileSize = (1 << 23); // + (1 << 22); // it looks it is okay with 4M more.
-
-const bufferSize = maxInFileSize + maxDocDataSize + maxOutFileSize;
+const maxInFileSize = 1 << 20; // 1M
+const bufferSize = maxInFileSize * 10;
 
 var buffer: []u8 = "";
 
@@ -47,6 +44,10 @@ fn init() ![]u8 {
 }
 
 fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
+    if (buffer.len == 0) {
+        return error.BufferNotCreatedYet;
+    }
+
     var fbs = std.io.fixedBufferStream(buffer);
     const suffixForIdsAndNames: []const u8 = blk: {
         const suffixLen = try fbs.reader().readByte();
@@ -62,15 +63,9 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
     const tmdDataEnd = tmdDataStart + tmdDataLength;
 
     const tmdContent = buffer[tmdDataStart..tmdDataEnd];
-    const fixedBuffer = buffer[tmdDataEnd..];
+    const remainingBuffer = buffer[tmdDataEnd..];
 
-    // ToDo: it is best to use a top-to-down allocator to parse tmd doc, so that
-    //       the input tmd data and output html data can start at the same memory address.
-    //       Two benefits:
-    //       1. more memory space for output html.
-    //       2. the tmd_to_html function doesn't need to return an address.
-
-    var fba = std.heap.FixedBufferAllocator.init(fixedBuffer);
+    var fba = std.heap.FixedBufferAllocator.init(remainingBuffer);
     const fbaAllocator = fba.allocator();
 
     // parse file
@@ -79,13 +74,18 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
 
     // render file
 
-    const renderBuffer = try fbaAllocator.alloc(u8, maxOutFileSize);
+    //logMessage("", "tmdDataLength: ", @intCast(tmdDataLength));
+    //logMessage("", "fba.end_index: ", @intCast(fba.end_index));
+
+    const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
     fbs = std.io.fixedBufferStream(renderBuffer);
     try fbs.writer().writeInt(u32, 0, .little);
     try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), fullHtmlPage, supportCustomBlocks, suffixForIdsAndNames, std.heap.wasm_allocator);
     const htmlWithLengthHeader = fbs.getWritten();
     try fbs.seekTo(0);
     try fbs.writer().writeInt(u32, htmlWithLengthHeader.len - 4, .little);
+
+    //logMessage("", "htmlWithLengthHeader.len: ", @intCast(htmlWithLengthHeader.len));
 
     return htmlWithLengthHeader;
 }

@@ -87,7 +87,7 @@ pub fn build(b: *std.Build) !void {
     // It looks the program itself need minimum memory between 1M and 1.5M initially.
     // The program will dynamically allocate about 10M at run time.
     // But why is the max_memory required to be set so large?
-    wasm.max_memory = (1 << 24) + (1 << 21);
+    wasm.max_memory = (1 << 24) + (1 << 21); // 18M
 
     wasm.root_module.addImport("tmd", tmdLibModule);
     const installWasm = b.addInstallArtifact(wasm, .{});
