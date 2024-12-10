@@ -33,6 +33,9 @@ const TabListInfo = struct {
 pub const TmdRender = struct {
     doc: *const tmd.Doc,
 
+    supportCustomBlocks: bool = false,
+    suffixForIdsAndNames: []const u8 = "",
+
     toRenderSubtitles: bool = false,
 
     tabListInfos: [tmd.MaxBlockNestingDepth]TabListInfo = undefined,
@@ -89,7 +92,7 @@ pub const TmdRender = struct {
         }
     }
 
-    pub fn render(self: *TmdRender, w: anytype, renderRoot: bool) !void {
+    pub fn render(self: *TmdRender, w: anytype, comptime renderRoot: bool) !void {
         defer self.cleanup();
 
         var nilFootnoteTreeNode = FootnoteRedBlack.Node{
@@ -116,7 +119,7 @@ pub const TmdRender = struct {
             const tag = "footer";
             const classes = "tmd-footer";
 
-            try fns.writeOpenTag(w, tag, classes, footer.attributes, true);
+            try fns.writeOpenTag(w, tag, classes, footer.attributes, self.suffixForIdsAndNames, true);
             break :blk tag;
         } else "";
 
@@ -127,7 +130,7 @@ pub const TmdRender = struct {
                 const tag = "div";
                 const classes = "tmd-doc";
 
-                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
                 try self.renderBlockChildren(w, blockInfo.firstChild());
                 try self.writeFootnotes(w);
                 try fns.writeCloseTag(w, tag, true);
@@ -145,7 +148,7 @@ pub const TmdRender = struct {
                     .right => "tmd-base tmd-align-right",
                 };
 
-                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
                 try self.renderBlockChildren(w, blockInfo.firstChild());
                 try fns.writeCloseTag(w, tag, true);
             },
@@ -158,7 +161,7 @@ pub const TmdRender = struct {
                         const tag = if (itemList.secondMode) "ol" else "ul";
                         const classes = "tmd-list";
 
-                        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
                         try self.renderBlockChildren(w, blockInfo.firstChild());
                         try fns.writeCloseTag(w, tag, true);
                     },
@@ -166,7 +169,7 @@ pub const TmdRender = struct {
                         const tag = "dl";
                         const classes = if (itemList.secondMode) "tmd-list tmd-defs-oneline" else "tmd-list tmd-defs";
 
-                        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
                         try self.renderBlockChildren(w, blockInfo.firstChild());
                         try fns.writeCloseTag(w, tag, true);
                     },
@@ -174,7 +177,7 @@ pub const TmdRender = struct {
                         const tag = "div";
                         const classes = "tmd-tab";
 
-                        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
 
                         {
                             const orderId = self.nextTabListOrderId;
@@ -207,7 +210,7 @@ pub const TmdRender = struct {
                         const tag = "li";
                         const classes = "tmd-list-item";
 
-                        try fns.writeOpenTag(w, tag, classes, null, true);
+                        try fns.writeOpenTag(w, tag, classes, null, self.suffixForIdsAndNames, true);
                         try self.renderBlockChildren(w, blockInfo.firstChild());
                         try fns.writeCloseTag(w, tag, true);
                     },
@@ -216,7 +219,7 @@ pub const TmdRender = struct {
                             const tag = "dt";
                             const classes = "";
 
-                            try fns.writeOpenTag(w, tag, classes, headerBlock.attributes, true);
+                            try fns.writeOpenTag(w, tag, classes, headerBlock.attributes, self.suffixForIdsAndNames, true);
                             try self.writeUsualContentBlockLines(w, headerBlock);
                             try fns.writeCloseTag(w, tag, true);
 
@@ -226,7 +229,7 @@ pub const TmdRender = struct {
                         const tag = "dd";
                         const classes = "";
 
-                        try fns.writeOpenTag(w, tag, classes, null, true);
+                        try fns.writeOpenTag(w, tag, classes, null, self.suffixForIdsAndNames, true);
                         try self.renderBlockChildren(w, forDdBlock);
                         try fns.writeCloseTag(w, tag, true);
                     },
@@ -237,9 +240,9 @@ pub const TmdRender = struct {
                         tabInfo.nextItemOrderId += 1;
 
                         _ = try w.print(
-                            \\<input type="radio" class="tmd-tab-radio" name="tmd-tab-{d}" id="tmd-tab-{d}-input-{d}"
+                            \\<input type="radio" class="tmd-tab-radio" name="tmd-tab-{d}{s}" id="tmd-tab-{d}-input-{d}{s}"
                         ,
-                            .{ tabInfo.orderId, tabInfo.orderId, tabInfo.nextItemOrderId },
+                            .{ tabInfo.orderId, self.suffixForIdsAndNames, tabInfo.orderId, tabInfo.nextItemOrderId, self.suffixForIdsAndNames },
                         );
 
                         if (listItem.isFirst()) _ = try w.write(" checked");
@@ -248,12 +251,13 @@ pub const TmdRender = struct {
                         const headerTag = "label";
                         const headerClasses = "tmd-tab-header";
                         _ = try w.print(
-                            \\<{s} for="tmd-tab-{d}-input-{d}" class="tmd-tab-label"
+                            \\<{s} for="tmd-tab-{d}-input-{d}{s}" class="tmd-tab-label"
                         ,
-                            .{ headerTag, tabInfo.orderId, tabInfo.nextItemOrderId },
+                            .{ headerTag, tabInfo.orderId, tabInfo.nextItemOrderId, self.suffixForIdsAndNames },
                         );
+
                         const firstContentBlock = if (blockInfo.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
-                            try fns.writeBlockAttributes(w, headerClasses, headerBlock.attributes);
+                            try fns.writeBlockAttributes(w, headerClasses, headerBlock.attributes, self.suffixForIdsAndNames);
                             _ = try w.write(">");
 
                             if (listItem.list.blockType.list.secondMode) {
@@ -263,7 +267,7 @@ pub const TmdRender = struct {
 
                             break :blk headerBlock.nextSibling();
                         } else blk: {
-                            try fns.writeBlockAttributes(w, headerClasses, null);
+                            try fns.writeBlockAttributes(w, headerClasses, null, self.suffixForIdsAndNames);
                             _ = try w.write(">");
 
                             if (listItem.list.blockType.list.secondMode) {
@@ -277,7 +281,8 @@ pub const TmdRender = struct {
                         const tag = "div";
                         const classes = "tmd-tab-content";
 
-                        try fns.writeOpenTag(w, tag, classes, null, true);
+                        try fns.writeOpenTag(w, tag, classes, null, self.suffixForIdsAndNames, true);
+
                         try self.renderBlockChildren(w, firstContentBlock);
                         try fns.writeCloseTag(w, tag, true);
                     },
@@ -291,13 +296,13 @@ pub const TmdRender = struct {
 
                 const firstContentBlock = if (blockInfo.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     const classes = "tmd-quotation-large";
-                    try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                    try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
 
                     {
                         const headerTag = "div";
                         const headerClasses = "tmd-usual";
 
-                        try fns.writeOpenTag(w, tag, headerClasses, headerBlock.attributes, true);
+                        try fns.writeOpenTag(w, tag, headerClasses, headerBlock.attributes, self.suffixForIdsAndNames, true);
                         try self.writeUsualContentBlockLines(w, headerBlock);
                         try fns.writeCloseTag(w, headerTag, true);
                     }
@@ -305,7 +310,7 @@ pub const TmdRender = struct {
                     break :blk headerBlock.nextSibling();
                 } else blk: {
                     const classes = "tmd-quotation";
-                    try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                    try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
 
                     break :blk blockInfo.firstChild();
                 };
@@ -317,14 +322,14 @@ pub const TmdRender = struct {
                 const tag = "div";
                 const classes = "tmd-notice";
 
-                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
 
                 const firstContentBlock = if (blockInfo.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     {
                         const headerTag = "div";
                         const headerClasses = "tmd-notice-header";
 
-                        try fns.writeOpenTag(w, tag, headerClasses, headerBlock.attributes, true);
+                        try fns.writeOpenTag(w, tag, headerClasses, headerBlock.attributes, self.suffixForIdsAndNames, true);
                         try self.writeUsualContentBlockLines(w, headerBlock);
                         try fns.writeCloseTag(w, headerTag, true);
                     }
@@ -336,7 +341,7 @@ pub const TmdRender = struct {
                     const contentTag = "div";
                     const contentClasses = "tmd-notice-content";
 
-                    try fns.writeOpenTag(w, contentTag, contentClasses, null, true);
+                    try fns.writeOpenTag(w, contentTag, contentClasses, null, self.suffixForIdsAndNames, true);
                     try self.renderBlockChildren(w, firstContentBlock);
                     try fns.writeCloseTag(w, contentTag, true);
                 }
@@ -347,17 +352,17 @@ pub const TmdRender = struct {
                 const tag = "details";
                 const classes = "tmd-reveal";
 
-                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
 
                 const headerTag = "summary";
                 const headerClasses = "tmd-reveal-header tmd-usual";
                 const firstContentBlock = if (blockInfo.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
-                    try fns.writeOpenTag(w, headerTag, headerClasses, headerBlock.attributes, true);
+                    try fns.writeOpenTag(w, headerTag, headerClasses, headerBlock.attributes, self.suffixForIdsAndNames, true);
                     try self.writeUsualContentBlockLines(w, headerBlock);
 
                     break :blk headerBlock.nextSibling();
                 } else blk: {
-                    try fns.writeOpenTag(w, headerTag, headerClasses, null, true);
+                    try fns.writeOpenTag(w, headerTag, headerClasses, null, self.suffixForIdsAndNames, true);
 
                     break :blk blockInfo.firstChild();
                 };
@@ -367,7 +372,7 @@ pub const TmdRender = struct {
                     const contentTag = "div";
                     const contentClasses = "tmd-reveal-content";
 
-                    try fns.writeOpenTag(w, contentTag, contentClasses, null, true);
+                    try fns.writeOpenTag(w, contentTag, contentClasses, null, self.suffixForIdsAndNames, true);
                     try self.renderBlockChildren(w, firstContentBlock);
                     try fns.writeCloseTag(w, contentTag, true);
                 }
@@ -378,14 +383,14 @@ pub const TmdRender = struct {
                 const tag = "div";
                 const classes = "tmd-plain";
 
-                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
 
                 const firstContentBlock = if (blockInfo.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     {
                         const headerTag = "div";
                         const headerClasses = "tmd-plain-header";
 
-                        try fns.writeOpenTag(w, headerTag, headerClasses, headerBlock.attributes, true);
+                        try fns.writeOpenTag(w, headerTag, headerClasses, headerBlock.attributes, self.suffixForIdsAndNames, true);
                         try self.writeUsualContentBlockLines(w, headerBlock);
                         try fns.writeCloseTag(w, headerTag, true);
                     }
@@ -403,14 +408,15 @@ pub const TmdRender = struct {
                 const tag = "p";
                 const classes = "";
 
-                try fns.writeBareTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, false);
+                try fns.writeCloseTag(w, tag, true);
             },
             .attributes => {},
             .seperator => {
                 const tag = "hr";
                 const classes = "tmd-line";
 
-                try fns.writeBareTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeBareTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
             },
             .header => |*header| {
                 const level = header.level(self.doc.data);
@@ -427,11 +433,11 @@ pub const TmdRender = struct {
                     if (self.toRenderSubtitles) {
                         const headerTag = "header";
                         const headerClasses = "tmd-with-subtitle";
-                        try fns.writeOpenTag(w, headerTag, headerClasses, null, true);
+                        try fns.writeOpenTag(w, headerTag, headerClasses, null, self.suffixForIdsAndNames, true);
                     }
 
                     _ = try w.print("<h{}", .{realLevel});
-                    try fns.writeBlockAttributes(w, tmdHeaderClass(realLevel), blockInfo.attributes);
+                    try fns.writeBlockAttributes(w, tmdHeaderClass(realLevel), blockInfo.attributes, self.suffixForIdsAndNames);
                     _ = try w.write(">\n");
 
                     try self.writeUsualContentBlockLines(w, blockInfo);
@@ -446,13 +452,13 @@ pub const TmdRender = struct {
                     const blankTag = "p";
                     const blankClasses = "";
 
-                    try fns.writeBareTag(w, blankTag, blankClasses, null, true);
+                    try fns.writeBareTag(w, blankTag, blankClasses, null, self.suffixForIdsAndNames, true);
                 }
 
                 const tag = "div";
                 const classes = if (self.toRenderSubtitles) "tmd-usual tmd-subtitle" else "tmd-usual";
 
-                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+                try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
                 try self.writeUsualContentBlockLines(w, blockInfo);
                 try fns.writeCloseTag(w, tag, true);
 
@@ -470,9 +476,11 @@ pub const TmdRender = struct {
                 }
             },
             .custom => |*custom| {
-                const attrs = custom.attributes();
-                if (!attrs.commentedOut) {
-                    try self.writeCustomBlock(w, blockInfo, attrs);
+                if (self.supportCustomBlocks) {
+                    const attrs = custom.attributes();
+                    if (!attrs.commentedOut) {
+                        try self.writeCustomBlock(w, blockInfo, attrs);
+                    }
                 }
             },
         }
@@ -500,7 +508,7 @@ pub const TmdRender = struct {
         block: *tmd.BlockInfo,
         next: ?*TableCell = null,
 
-        // Used to sort column-oriented table cells.
+        // Used to sort column-major table cells.
         fn compare(_: void, x: @This(), y: @This()) bool {
             if (x.col < y.col) return true;
             if (x.col > y.col) return false;
@@ -712,7 +720,7 @@ pub const TmdRender = struct {
 
         const tag = "td";
 
-        try fns.writeOpenTag(w, tag, tdClass, null, null);
+        try fns.writeOpenTag(w, tag, tdClass, null, self.suffixForIdsAndNames, null);
         try writeTableCellSpans(w, spans);
         _ = try w.write(">\n");
         try self.renderBlock(w, tableCellBlock);
@@ -730,7 +738,7 @@ pub const TmdRender = struct {
         const tag = "table";
         const classes = "tmd-table";
 
-        try fns.writeOpenTag(w, tag, classes, tableBlockInfo.attributes, true);
+        try fns.writeOpenTag(w, tag, classes, tableBlockInfo.attributes, self.suffixForIdsAndNames, true);
 
         _ = try w.write("<tr>\n");
         var lastRow: u32 = 0;
@@ -762,7 +770,7 @@ pub const TmdRender = struct {
         const tag = "table";
         const classes = "tmd-table";
 
-        try fns.writeOpenTag(w, tag, classes, tableBlockInfo.attributes, true);
+        try fns.writeOpenTag(w, tag, classes, tableBlockInfo.attributes, self.suffixForIdsAndNames, true);
 
         _ = try w.write("<tr>\n");
         var lastCol: u32 = 0;
@@ -781,11 +789,11 @@ pub const TmdRender = struct {
         try fns.writeCloseTag(w, tag, true);
     }
 
-    fn renderTableBlocks_WithoutCells(_: *TmdRender, w: anytype, tableBlockInfo: *const tmd.BlockInfo) !void {
+    fn renderTableBlocks_WithoutCells(self: *TmdRender, w: anytype, tableBlockInfo: *const tmd.BlockInfo) !void {
         const tag = "div";
         const classes = "tmd-table-no-cells";
 
-        try fns.writeOpenTag(w, tag, classes, tableBlockInfo.attributes, true);
+        try fns.writeOpenTag(w, tag, classes, tableBlockInfo.attributes, self.suffixForIdsAndNames, true);
         try fns.writeCloseTag(w, tag, true);
     }
 
@@ -821,7 +829,7 @@ pub const TmdRender = struct {
     fn writeCustomBlock(self: *TmdRender, w: anytype, blockInfo: *const tmd.BlockInfo, attrs: tmd.CustomBlockAttibutes) !void {
         // Not a good idea to wrapping the content.
         //_ = try w.write("<div");
-        //try writeBlockAttributes(w, "tmd-custom", blockInfo.attributes);
+        //try writeBlockAttributes(w, "tmd-custom", blockInfo.attributes, self.suffixForIdsAndNames);
         //_ = try w.write("\">");
 
         if (attrs.app.len == 0) {
@@ -871,7 +879,7 @@ pub const TmdRender = struct {
         const tag = "pre";
         const classes = "tmd-code";
 
-        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, true);
+        try fns.writeOpenTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
 
         if (attrs.language.len > 0) {
             _ = try w.write("<code class=\"language-");
@@ -1088,7 +1096,7 @@ pub const TmdRender = struct {
                                             const footnote = try self.onFootnoteReference(footnote_id);
                                             tracker.linkFootnote = footnote;
 
-                                            if (writeTags) _ = try w.print("<sup><a id=\"fn:{s}:ref-{}\" href=\"#fn:{s}\"", .{ footnote_id, footnote.refCount, footnote_id });
+                                            if (writeTags) _ = try w.print("<sup><a id=\"fn:{s}{s}:ref-{}\" href=\"#fn:{s}{s}\"", .{ footnote_id, self.suffixForIdsAndNames, footnote.refCount, footnote_id, self.suffixForIdsAndNames });
                                             break :blk;
                                         }
                                     } else {
@@ -1112,7 +1120,7 @@ pub const TmdRender = struct {
 
                                 if (tracker.activeLinkInfo.?.attrs) |attrs| {
                                     std.debug.assert(!linkInfo.isFootnote());
-                                    try fns.writeBlockAttributes(w, "", attrs);
+                                    try fns.writeBlockAttributes(w, "", attrs, self.suffixForIdsAndNames);
                                 }
                                 _ = try w.write(">");
 
@@ -1470,7 +1478,7 @@ pub const TmdRender = struct {
             defer listElement = element.next;
             const footnote = element.value.value;
 
-            _ = try w.print("<li id=\"fn:{s}\" class=\"tmd-list-item tmd-footnote-item\">\n", .{footnote.id});
+            _ = try w.print("<li id=\"fn:{s}{s}\" class=\"tmd-list-item tmd-footnote-item\">\n", .{ footnote.id, self.suffixForIdsAndNames });
             const missing_flag = if (footnote.block) |block| blk: {
                 switch (block.blockType) {
                     // .item can't have ID now.
@@ -1482,7 +1490,7 @@ pub const TmdRender = struct {
             } else "?";
 
             for (1..footnote.refCount + 1) |n| {
-                _ = try w.print(" <a href=\"#fn:{s}:ref-{}\">↩︎{s}</a>", .{ footnote.id, n, missing_flag });
+                _ = try w.print(" <a href=\"#fn:{s}{s}:ref-{}\">↩︎{s}</a>", .{ footnote.id, self.suffixForIdsAndNames, n, missing_flag });
             }
             _ = try w.write("</li>\n");
         }

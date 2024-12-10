@@ -27,8 +27,8 @@ export fn buffer_offset() isize {
     return @intCast(@intFromPtr(bufferWithHeader.ptr));
 }
 
-export fn tmd_to_html() isize {
-    const htmlWithLengthHeader = render() catch |err| {
+export fn tmd_to_html(fullHtmlPage: bool, supportCustomBlocks: bool) isize {
+    const htmlWithLengthHeader = render(fullHtmlPage, supportCustomBlocks) catch |err| {
         logMessage("render error: ", @errorName(err), @intFromError(err));
         return -@as(i32, @intFromError(err));
     };
@@ -46,15 +46,22 @@ fn init() ![]u8 {
     return buffer;
 }
 
-fn render() ![]u8 {
+fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
     var fbs = std.io.fixedBufferStream(buffer);
+    const suffixForIdsAndNames: []const u8 = blk: {
+        const suffixLen = try fbs.reader().readByte();
+        break :blk buffer[1 .. 1 + suffixLen];
+    };
+    fbs = std.io.fixedBufferStream(buffer[1 + suffixForIdsAndNames.len ..]);
     const tmdDataLength = try fbs.reader().readInt(u32, .little);
-    if (tmdDataLength > maxInFileSize)
+    if (tmdDataLength > maxInFileSize) {
         return error.DataSizeTooLarge;
+    }
 
-    const tmdDataEnd = 4 + tmdDataLength;
+    const tmdDataStart = 1 + 4 + suffixForIdsAndNames.len;
+    const tmdDataEnd = tmdDataStart + tmdDataLength;
 
-    const tmdContent = buffer[4..tmdDataEnd];
+    const tmdContent = buffer[tmdDataStart..tmdDataEnd];
     const fixedBuffer = buffer[tmdDataEnd..];
 
     // ToDo: it is best to use a top-to-down allocator to parse tmd doc, so that
@@ -75,7 +82,7 @@ fn render() ![]u8 {
     const renderBuffer = try fbaAllocator.alloc(u8, maxOutFileSize);
     fbs = std.io.fixedBufferStream(renderBuffer);
     try fbs.writer().writeInt(u32, 0, .little);
-    try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), false, std.heap.wasm_allocator);
+    try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), fullHtmlPage, supportCustomBlocks, suffixForIdsAndNames, std.heap.wasm_allocator);
     const htmlWithLengthHeader = fbs.getWritten();
     try fbs.seekTo(0);
     try fbs.writer().writeInt(u32, htmlWithLengthHeader.len - 4, .little);

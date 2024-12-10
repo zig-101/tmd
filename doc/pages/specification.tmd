@@ -1129,14 +1129,14 @@ of table blocks can be either base blocks or any non-blank atom blocks.
   }
   -----------
   ### usual blocks
-  ;;; table cell or table orientation specifier
+  ;;; table cell or table major axis specifier
   {>< :2
   center
   }
   {
   If the first child block of a table block is a usual block
   containing only blank tokens, it specifies that the table
-  is column-oriented. Otherwise, the table is row-oriented.
+  is column-major. Otherwise, the table is row-major.
 
   Other usual blocks are treated as table cell blocks.
   }
@@ -1170,10 +1170,10 @@ of table blocks can be either base blocks or any non-blank atom blocks.
 
 The vertical text alignment of table cells is always middle.
 
-? ### (a row-oriented table examples)
+? ### (a row-major table examples)
   {
   * ### Render Result
-    @@@ #row-oriented-table-examples
+    @@@ #row-major-table-examples
     {
     # ### Language
       ### Simplicity
@@ -1200,13 +1200,13 @@ The vertical text alignment of table cells is always middle.
   
   * ### TapirMD Source
     '''
-    ''' << #row-oriented-table-examples
+    ''' << #row-major-table-examples
   }
 
-? ### (a column-oriented table examples)
+? ### (a column-major table examples)
   {
   * ### Render Result
-    @@@ #column-oriented-table-examples
+    @@@ #column-major-table-examples
     {
     # 
       ### Language
@@ -1234,7 +1234,7 @@ The vertical text alignment of table cells is always middle.
   
   * ### TapirMD Source
     '''
-    ''' << #column-oriented-table-examples
+    ''' << #column-major-table-examples
   }
 
 @@@ #quotation-semantics

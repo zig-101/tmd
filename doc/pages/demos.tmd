@@ -187,7 +187,7 @@ __No Safe Efficient Ways to Do Three-way String Comparisons in Go__
 ''''' << #demo-5
 @@@ #demo-5
 {
-A table (row-oriented):
+A table (row-major):
 
 # ;;; 11
   {..2:2
@@ -214,7 +214,7 @@ A table (row-oriented):
   ;;; 11
   ;;; 11
 
-Another table (column-oriented):
+Another table (column-major):
 
 #
   ;;; 11

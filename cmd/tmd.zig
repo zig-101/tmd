@@ -2,19 +2,16 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const tmd = @import("tmd");
-//const tmd_parser = @import("tmd_parser.zig");
-//const tmd_to_html = @import("tmd_to_html.zig");
-
-const demo3 = @embedFile("demo3.tmd");
 
 pub fn main() !void {
+    const MaxInFileSize = 1 << 20;
+    const MaxDocDataSize = 1 << 20;
+    const MaxOutFileSize = 8 << 20;
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const gpaAllocator = gpa.allocator();
 
-    const MaxInFileSize = 1 << 20;
-    const MaxDocDataSize = 1 << 20;
-    const MaxOutFileSize = 8 << 20;
     const FixedBufferSize = MaxInFileSize + MaxDocDataSize + MaxOutFileSize;
     const fixedBuffer = try gpaAllocator.alloc(u8, FixedBufferSize);
     defer gpaAllocator.free(fixedBuffer);
@@ -45,6 +42,7 @@ pub fn main() !void {
 
     var optionsDone = false;
     var option_full_html = false;
+    var option_support_custom_blocks = false;
 
     for (args[2..]) |arg| {
 
@@ -54,6 +52,8 @@ pub fn main() !void {
 
             if (std.mem.eql(u8, arg[2..], "full-html")) {
                 option_full_html = true;
+            } else if (std.mem.eql(u8, arg[2..], "support-custom-blocks")) {
+                option_support_custom_blocks = true;
             }
 
             continue;
@@ -100,7 +100,7 @@ pub fn main() !void {
         const renderBuffer = try fbaAllocator.alloc(u8, MaxOutFileSize);
         defer fbaAllocator.free(renderBuffer);
         var fbs = std.io.fixedBufferStream(renderBuffer);
-        try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), option_full_html, gpaAllocator);
+        try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), option_full_html, option_support_custom_blocks, "", gpaAllocator);
 
         // write file
 

@@ -1,0 +1,152 @@
+
+### TapirMD Playfield
+
+This is a playfield for the __TapirMD``index.html__ markup format.
+For learning and reference, please visit
+__demos``demos.html__,
+__use cases``use-cases.html__, and
+__the specification``specification.html__.
+
+* ### Edit
+  """html
+<textarea id="tmd-source" rows="22" style="width: 100%;"></textarea>
+  """
+
+* @@@ #result-tab
+  ### Render Result
+  @@@ #render-result
+  {
+  }
+  
+
+"""html
+<script>
+let buffer_offset = null;
+let tmd_to_html = null;
+let memory = null;
+
+document.addEventListener("DOMContentLoaded", function() {
+	loadWasm();
+	
+	const resultLabel = document.getElementById("result-tab");
+	const resultRatio = resultLabel.previousElementSibling;
+	resultRatio.addEventListener('change', (event) => {
+		if (event.target.checked) {
+			tmdToHTML();
+		}
+	});
+});
+
+function tmdToHTML() {
+	if (memory == null) {
+		console.log("wasm is not initialized yet");
+		return;
+	}
+
+	const inputOffset = buffer_offset();
+	console.log("inputOffset: ", inputOffset);
+	if (inputOffset < 0) {
+		console.log("bad inputOffset: ", inputOffset);
+		return;
+	}
+	const inputView = new DataView(memory.buffer, inputOffset);
+	const maxInputLength = inputView.getUint32(0, true);
+	console.log("maxInputLength: ", maxInputLength);
+	
+	const inputTextArea = document.getElementById('tmd-source');
+	const tmdData = inputTextArea.value;
+	var inputLength = new TextEncoder().encode(tmdData).length;
+	if (inputLength > maxInputLength) {
+		console.log(`inputLength (${inputLength}) is too large (larger than ${maxInputLength})`);
+		return;
+	}
+	console.log("inputLength: ", inputLength);
+	
+	let offset = 0;
+	const demoSuffix = "__demo";
+	inputView.setUint8(offset, demoSuffix.length);
+	offset += 1;
+	const suffixBytes = new Uint8Array(memory.buffer, inputOffset + offset);
+	const { } = new TextEncoder().encodeInto(demoSuffix, suffixBytes);
+	offset += demoSuffix.length;
+
+	inputView.setInt32(offset, inputLength, true);
+	offset += 4;
+	const inputBytes = new Uint8Array(memory.buffer, inputOffset + offset);
+	const { written } = new TextEncoder().encodeInto(tmdData, inputBytes);
+	console.log("written: ", written);
+	
+	const outputOffset = tmd_to_html(false, false);
+	if (outputOffset < 0) {
+		console.log("bad outputOffset: ", outputOffset);
+		return;
+	}
+	
+	const outputView = new DataView(memory.buffer, outputOffset);
+	
+	const outputLength = outputView.getUint32(0, true);
+	console.log("outputLength: ", outputLength);
+	
+	const outputBytes = new Uint8Array(memory.buffer, outputOffset+4, outputLength);
+	const output = new TextDecoder().decode(outputBytes);
+	console.log("output: ", output);
+
+	const resultDiv = document.getElementById("render-result");
+	resultDiv.innerHTML = output;
+}
+
+function loadWasm() {
+	const wasmBase64 = "<wasm-file-as-base64-string>";
+	
+	if (window.Worker) {
+		const worker = new Worker(URL.createObjectURL(new Blob([`
+			onmessage = async function(e) {
+				const wasmBase64 = e.data;
+				const wasmBinary = Uint8Array.from(atob(wasmBase64), c => c.charCodeAt(0));
+				//console.log(WebAssembly.validate(wasmBinary));
+				try {
+					const wasmModule = await WebAssembly.compile(wasmBinary);
+					self.postMessage({ type: 'wasmModule', module: wasmModule }); 
+					//console.log("compile wasm done.");
+				} catch (err) {
+					console.log("compile wasm error: ", err.message);
+				}
+			}
+		`], { type: 'application/javascript' })));
+		 // Send the base64-encoded WASM data to the worker
+		worker.postMessage(wasmBase64);
+		 // Listen for messages from the worker
+		worker.onmessage = function (event) {
+			if (event.data.type === 'wasmModule') {
+				const wasmModule = event.data.module;
+				const imports = {env: {
+					print(addr, len, addr2, len2, extraInt32) {
+						try {
+							const buff = memory.buffer.slice(addr, addr + len);
+							const message = new TextDecoder().decode(buff);
+							const buff2 = memory.buffer.slice(addr2, addr2 + len2);
+							const message2 = new TextDecoder().decode(buff2);
+							console.log(message, message2, extraInt32);
+						} catch (err) {
+							console.log("log error.");
+						}
+					}
+				}};
+				WebAssembly.instantiate(wasmModule, imports).then(instance => {
+					//console.log("instance wasm done: ", instance);
+					memory = instance.exports.memory;
+					buffer_offset = instance.exports.buffer_offset;
+					tmd_to_html = instance.exports.tmd_to_html;
+				});
+			}
+		};
+		
+		worker.onerror = function (error) {
+			console.error("Worker error: ", error);
+		};
+	} else {
+		console.log('Web Workers are not supported in this browser.');
+	}
+}
+</script>
+"""

@@ -13,11 +13,11 @@
   \\
   ``- __Demos`` demos.html __
   |
-  __Use cases`` use-cases.html __
+  __Use Cases`` use-cases.html __
   |
-  ^**Try it online (coming) **
+  __Try It Online`` play.html __
   \\
-  `` - __Project page`` https://github.com/zig-101/tmd __
+  `` - __Source Code`` https://github.com/zig-101/tmd __
   |
   __@zigo_101`` https://x.com/zigo_101 __
 }
@@ -37,20 +37,6 @@ Features:
   + Predefined container block marks typically consist of one punctuation character.
   + Atom container block marks begin with 3+ identical punctuation characters.
   + Most styling marks consist of 2+ identical punctuation characters.
-* Rich Predefined Container Block Types:
-  + Lists with nesting support:
-    ~ Ordered lists.
-    ~ Unordered lists.
-    ~ Definition Lists.
-    ~ **Tab lists**.
-  + Tables with basic and advanced features:
-    ~ Support for spans of cell rows and cell columns.
-    ~ Cell text alignment control.
-    ~ Support for row-oriented and **column-oriented table** layouts.
-  + Notice blocks for highlighting notes, warnings, etc.
-  + Quotation blocks with footer support for citations or references.
-  + **Reveal blocks** for creating accordion-style panels (without JavaScript).
-  + Footer blocks.
 * Concrete Atom Block Types:
   + Blank blocks.
   + Usual blocks.
@@ -59,6 +45,20 @@ Features:
   + Attribute blocks to set block IDs and classes.
   + Code blocks.
   + **Custom (data) blocks** for extending TapirMD functionality.
+* Rich Predefined Container Block Types:
+  + Lists with nesting support:
+    ~ Ordered lists.
+    ~ Unordered lists.
+    ~ Definition Lists.
+    ~ **Tab lists** (without JavaScript).
+  + Tables with basic and advanced features:
+    ~ Support for spans of cell rows and cell columns.
+    ~ Cell text alignment control.
+    ~ Support for both row-major and **column-major table** layouts.
+  + Notice blocks for highlighting notes, warnings, etc.
+  + Quotation blocks with footer support for citations or references.
+  + **Reveal blocks** for creating accordion-style panels (without JavaScript).
+  + Footer blocks.
 * Rich Inline Styles:
   + **Spoilers**.
   + Image embedding.

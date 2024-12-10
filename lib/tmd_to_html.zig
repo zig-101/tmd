@@ -4,11 +4,15 @@ const mem = std.mem;
 const tmd = @import("tmd.zig");
 const render = @import("tmd_to_html-render.zig");
 
-pub fn tmd_to_html(tmdDoc: *const tmd.Doc, writer: anytype, completeHTML: bool, allocator: mem.Allocator) !void {
+pub fn tmd_to_html(tmdDoc: *const tmd.Doc, writer: anytype, completeHTML: bool, supportCustomBlocks: bool, suffixForIdsAndNames: []const u8, allocator: mem.Allocator) !void {
     var r = render.TmdRender{
         .doc = tmdDoc,
         .allocator = allocator,
+
+        .supportCustomBlocks = supportCustomBlocks,
+        .suffixForIdsAndNames = suffixForIdsAndNames,
     };
+
     if (completeHTML) {
         try writeHead1(writer);
         try r.writeTitleInHtmlHeader(writer);

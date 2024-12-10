@@ -3,12 +3,12 @@ const mem = std.mem;
 
 const tmd = @import("tmd.zig");
 
-pub fn writeOpenTag(w: anytype, tag: []const u8, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes, endAndWriteNewLine: ?bool) !void {
+pub fn writeOpenTag(w: anytype, tag: []const u8, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes, idSuffix: []const u8, endAndWriteNewLine: ?bool) !void {
     std.debug.assert(tag.len > 0);
 
     _ = try w.write("<");
     _ = try w.write(tag);
-    try writeBlockAttributes(w, classesSeperatedBySpace, attributes);
+    try writeBlockAttributes(w, classesSeperatedBySpace, attributes, idSuffix);
     if (endAndWriteNewLine) |write| {
         _ = try w.write(">");
         if (write) _ = try w.write("\n");
@@ -24,29 +24,30 @@ pub fn writeCloseTag(w: anytype, tag: []const u8, writeNewLine: bool) !void {
     if (writeNewLine) _ = try w.write("\n");
 }
 
-pub fn writeBareTag(w: anytype, tag: []const u8, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes, writeNewLine: bool) !void {
+pub fn writeBareTag(w: anytype, tag: []const u8, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes, idSuffix: []const u8, writeNewLine: bool) !void {
     std.debug.assert(tag.len > 0);
 
     _ = try w.write("<");
     _ = try w.write(tag);
     _ = try w.write(" ");
-    try writeBlockAttributes(w, classesSeperatedBySpace, attributes);
+    try writeBlockAttributes(w, classesSeperatedBySpace, attributes, idSuffix);
     _ = try w.write("/>");
     if (writeNewLine) _ = try w.write("\n");
 }
 
-pub fn writeBlockAttributes(w: anytype, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes) !void {
+pub fn writeBlockAttributes(w: anytype, classesSeperatedBySpace: []const u8, attributes: ?*tmd.ElementAttibutes, idSuffix: []const u8) !void {
     if (attributes) |as| {
-        if (as.id.len != 0) try writeID(w, as.id);
+        if (as.id.len != 0) try writeID(w, as.id, idSuffix);
         try writeClasses(w, classesSeperatedBySpace, as.classes);
     } else {
         try writeClasses(w, classesSeperatedBySpace, "");
     }
 }
 
-pub fn writeID(w: anytype, id: []const u8) !void {
+pub fn writeID(w: anytype, id: []const u8, idSuffix: []const u8) !void {
     _ = try w.write(" id=\"");
     _ = try w.write(id);
+    if (idSuffix.len > 0) _ = try w.write(idSuffix);
     _ = try w.write("\"");
 }
 
