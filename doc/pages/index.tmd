@@ -58,7 +58,6 @@ Features:
   + Notice blocks for highlighting notes, warnings, etc.
   + Quotation blocks with footer support for citations or references.
   + **Reveal blocks** for creating accordion-style panels (without JavaScript).
-  + Footer blocks.
 * Rich Inline Styles:
   + **Spoilers**.
   + Image embedding.
@@ -77,6 +76,7 @@ Features:
 * More
   + TOC (table of contents) generation for automatic navigation.
   + Footnotes for references and citations.
+  + Footer blocks.
   + Subtitles.
   + **Line-end spacing control**.
 

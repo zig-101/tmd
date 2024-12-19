@@ -80,6 +80,7 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
     const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
     fbs = std.io.fixedBufferStream(renderBuffer);
     try fbs.writer().writeInt(u32, 0, .little);
+
     try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), fullHtmlPage, supportCustomBlocks, suffixForIdsAndNames, std.heap.wasm_allocator);
     const htmlWithLengthHeader = fbs.getWritten();
     try fbs.seekTo(0);

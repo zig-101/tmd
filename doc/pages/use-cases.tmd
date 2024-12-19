@@ -9,6 +9,9 @@ This page lists some use cases of __TapirMD__.
 
   // __TapirMD:: index.html
 
+* __All pages__ of the TapirMD official website are written in TapirMD.
+  // __All pages:: https://github.com/zig-101/tmd/tree/master/doc/pages
+
 * __Go101.org__ leverages TapirMD for much of its content.
   Here are the current TapirMD-written sections:
   // __Go101.org:: https://go101.org
@@ -37,7 +40,7 @@ This page lists some use cases of __TapirMD__.
     __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/bugs
     __)
-  + __ Go Language Programming Q&A
+  + __ Go Q&A 101
       ``https://go101.org/q-and-a/101.html
     __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/q-and-a

@@ -7,17 +7,26 @@ __demos``demos.html__,
 __use cases``use-cases.html__, and
 __the specification``specification.html__.
 
+@@@ #note-enable-js
+%%(Note: This page needs JavaScript to function.)
+
 * ### Edit
   """html
 <textarea id="tmd-source" rows="22" style="width: 100%;"></textarea>
   """
 
-* @@@ #result-tab
-  ### Render Result
-  @@@ #render-result
+* @@@ #effect-tab
+  ### Render Effect
+  @@@ #render-effect
   {
   }
   
+* @@@ #html-tab
+  ### Result HTML
+  @@@ #result-html
+  '''
+  '''
+
 
 """html
 <script>
@@ -25,31 +34,46 @@ let buffer_offset = null;
 let tmd_to_html = null;
 let memory = null;
 
+let lastTmdData = "";
+
 document.addEventListener("DOMContentLoaded", function() {
+	document.getElementById("note-enable-js").style.display = 'none';
+
 	loadWasm();
 	
-	const resultLabel = document.getElementById("result-tab");
-	const resultRatio = resultLabel.previousElementSibling;
-	resultRatio.addEventListener('change', (event) => {
+	const effectLabel = document.getElementById("effect-tab");
+	const effectRatio = effectLabel.previousElementSibling;
+	effectRatio.addEventListener('change', (event) => {
+		if (event.target.checked) {
+			tmdToHTML();
+		}
+	});
+	
+	const htmlLabel = document.getElementById("html-tab");
+	const htmlRatio = htmlLabel.previousElementSibling;
+	htmlRatio.addEventListener('change', (event) => {
 		if (event.target.checked) {
 			tmdToHTML();
 		}
 	});
 });
 
-function setRenderOutput(output, isHTML) {
-	const resultDiv = document.getElementById("render-result");
+function setRenderEffect(output, isHTML) {
+	const effectDiv = document.getElementById("render-effect");
+	const htmlPre = document.getElementById("result-html");
 	if (isHTML) {
-		resultDiv.innerHTML = output;
+		effectDiv.innerHTML = output;
+		htmlPre.textContent = output;
 	} else {
-		resultDiv.textContent = output;
+		effectDiv.textContent = output;
+		htmlPre.textContent = "";
 	}
 }
 
 function tmdToHTML() {
 	if (memory == null) {
 		//console.log("wasm is not initialized yet");
-		setRenderOutput("wasm is not initialized yet", false);
+		setRenderEffect("wasm is not initialized yet", false);
 		return;
 	}
 
@@ -59,7 +83,7 @@ function tmdToHTML() {
 	//console.log("inputOffset: ", inputOffset);
 	if (inputOffset < 0) {
 		//console.log("bad inputOffset: ", inputOffset);
-		setRenderOutput("bad inputOffset: " + inputOffset, false);
+		setRenderEffect("bad inputOffset: " + inputOffset, false);
 		return;
 	}
 	const inputView = new DataView(memory.buffer, inputOffset);
@@ -68,10 +92,15 @@ function tmdToHTML() {
 	
 	const inputTextArea = document.getElementById('tmd-source');
 	const tmdData = inputTextArea.value;
+	if (tmdData == lastTmdData) {
+		//console.log(`no change`);
+		return;
+	}
+
 	var inputLength = new TextEncoder().encode(tmdData).length;
 	if (inputLength > maxInputLength) {
 		//console.log(`inputLength (${inputLength}) is too large (larger than ${maxInputLength})`);
-		setRenderOutput("inputLength  (" + inputLength + ") is too large (larger than " + maxInputLength + ").", false);
+		setRenderEffect("inputLength  (" + inputLength + ") is too large (larger than " + maxInputLength + ").", false);
 		return;
 	}
 	//console.log("inputLength: ", inputLength);
@@ -95,7 +124,7 @@ function tmdToHTML() {
 	const outputOffset = tmd_to_html(false, false);
 	if (outputOffset < 0) {
 		//console.log("bad outputOffset: ", outputOffset);
-		setRenderOutput("bad outputOffset: " + outputOffset, false);
+		setRenderEffect("bad outputOffset: " + outputOffset, false);
 		return;
 	}
 
@@ -112,12 +141,11 @@ function tmdToHTML() {
 
 	//console.log("elapsed time (decode output): ", new Date() - startTime);
 
-	setRenderOutput(output, true);
+	setRenderEffect(output, true);
+	lastTmdData = tmdData;
 }
 
 function loadWasm() {
-	const wasmBase64 = "<wasm-file-as-base64-string>";
-	
 	if (window.Worker) {
 		const worker = new Worker(URL.createObjectURL(new Blob([`
 			onmessage = async function(e) {
@@ -129,13 +157,13 @@ function loadWasm() {
 					self.postMessage({ type: 'wasmModule', module: wasmModule }); 
 					//console.log("compile wasm done.");
 				} catch (err) {
-					console.log("compile wasm error: ", err.message);
+					console.error("compile wasm error: ", err.message);
 				}
 			}
 		`], { type: 'application/javascript' })));
-		 // Send the base64-encoded WASM data to the worker
+
 		worker.postMessage(wasmBase64);
-		 // Listen for messages from the worker
+
 		worker.onmessage = function (event) {
 			if (event.data.type === 'wasmModule') {
 				const wasmModule = event.data.module;
@@ -148,7 +176,7 @@ function loadWasm() {
 							const message2 = new TextDecoder().decode(buff2);
 							console.log(message, message2, extraInt32);
 						} catch (err) {
-							console.log("log error.");
+							console.error("log error.");
 						}
 					}
 				}};
@@ -168,5 +196,7 @@ function loadWasm() {
 		console.log('Web Workers are not supported in this browser.');
 	}
 }
+
+const wasmBase64 = "<wasm-file-as-base64-string>";
 </script>
 """

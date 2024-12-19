@@ -51,6 +51,9 @@ pub fn main() !void {
                 option_full_html = true;
             } else if (std.mem.eql(u8, arg[2..], "support-custom-blocks")) {
                 option_support_custom_blocks = true;
+            } else {
+                try stderr.print("Unrecognized option: {s}", .{arg[2..]});
+                std.process.exit(1);
             }
 
             continue;

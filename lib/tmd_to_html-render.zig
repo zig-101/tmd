@@ -249,9 +249,9 @@ pub const TmdRender = struct {
                         _ = try w.write(">\n");
 
                         const headerTag = "label";
-                        const headerClasses = "tmd-tab-header";
+                        const headerClasses = "tmd-tab-header tmd-tab-label";
                         _ = try w.print(
-                            \\<{s} for="tmd-tab-{d}-input-{d}{s}" class="tmd-tab-label"
+                            \\<{s} for="tmd-tab-{d}-input-{d}{s}"
                         ,
                             .{ headerTag, tabInfo.orderId, tabInfo.nextItemOrderId, self.suffixForIdsAndNames },
                         );
@@ -1192,8 +1192,6 @@ pub const TmdRender = struct {
             if (writeTags) {
                 if (isNonBareSpoilerLine) _ = try w.write("</span>");
             }
-
-            if (lineInfo.treatEndAsSpace) _ = try w.write(" ");
 
             if (lineInfo != endLine) {
                 if (lineInfo.treatEndAsSpace) _ = try w.write(" ");

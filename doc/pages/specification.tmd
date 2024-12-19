@@ -818,30 +818,22 @@ which is commented out. Footnote blocks will be always rendered at the end of HT
 ###+++++ Line-end spacing rules
 
 A line end in a usual or header block may be ignored or
-rendered as an ASCII space character in HTML output,
-depending on the content of the lines before and after the line end.
+rendered as an ASCII Space character in HTML output.
 
-For line ends of comment lines and media-embedding lines,
-their line ends are always ignored in HTML output.
+Line ends of comment lines and media-embedding lines are always ignored in HTML output.
 
 In a usual or header block,
 for a line which is neither a comment line nor a media-embedding line,
-its line end is rendered as an ASCII space character unless the following
-cases happen:
-* The line has an opening style mark token followed by the line-end blank token.
+its line end is rendered as an ASCII Space character unless any of the following
+cases happens:
+* The line has an opening style mark token followed by a line-end blank token.
 * The line has no content tokens (including even-backtick mark tokens).
-* The last content token in the line ends with a CJK character __#note-cjk-chars__.
-  \\ Note: Even-backtick mark tokens in primary mode are interpreted as CJK characters.
-* Within the containing block, no more content tokens are found after the line.
-* Within the containing block, before the next content token,
-  any of the following tokens is found:
-  + a media-embedding token
-  + a line-break token
-  + a closing style mark token which follows
-    ~ a mark-escaping token or
-    ~ a spoiler token or
-    ~ a blank token which is the first token in its containling line.
-* The next content token begins with a CJK character.  
+* The last content token in the line ends with a blank or CJK character __#note-cjk-chars__.
+  \\ (%% Note: Even-backtick mark tokens in primary mode are interpreted as CJK characters. %%)
+* Within the block, after the line, no more content tokens are found.
+* After the line and before the next content token, a media-embedding or line-break token is found.
+* The next content token begins with a blank or CJK character.
+  \\ (%% Again, even-backtick mark tokens in primary mode are interpreted as CJK characters. %%)
 
 ! ### NOTE:
   ;;; The current line-end spacing rules are not perfect and may be adjusted later.

@@ -352,8 +352,6 @@ Backticks in code span: `
 ---
 
 {//
-@@@ #note-markdown
-Traditional markdown is known for it is limited and not well specified.
 @@@ #note-go101
 The **%% Go 101 %%** website is an up-to-date knowledge base for Go programming self learning.
 }

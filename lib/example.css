@@ -200,7 +200,7 @@ ol.tmd-footnotes > li::marker {
 
 .tmd-code {
   margin-top: 0px;
-  margin-bottom: 0px;
+  margin-bottom: 2px;
   background: #efefef;
   border: solid 1px #c8c8c8;
   border-radius: 6px;
