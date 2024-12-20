@@ -12,7 +12,7 @@ __the specification``specification.html__.
 
 * ### Edit
   """html
-<textarea id="tmd-source" rows="22" style="width: 100%;"></textarea>
+<textarea id="tmd-source" rows="22" style="width: 100%; border: 1px solid #c7923c; background: #fddaa1;"></textarea>
   """
 
 * @@@ #effect-tab
@@ -23,7 +23,7 @@ __the specification``specification.html__.
   
 * @@@ #html-tab
   ### Result HTML
-  @@@ #result-html
+  @@@ #result-html .tmd-auto-wrap
   '''
   '''
 

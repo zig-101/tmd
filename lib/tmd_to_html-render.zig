@@ -414,7 +414,7 @@ pub const TmdRender = struct {
             .attributes => {},
             .seperator => {
                 const tag = "hr";
-                const classes = "tmd-line";
+                const classes = "tmd-seperator";
 
                 try fns.writeBareTag(w, tag, classes, blockInfo.attributes, self.suffixForIdsAndNames, true);
             },
