@@ -3,6 +3,7 @@
 
 pub const parser = @import("tmd_parser.zig");
 pub const render = @import("tmd_to_html.zig");
+pub const tests = @import("tests.zig");
 
 // The above two sub-namespaces and the following pub declartions
 // in the current namespace are visible to the "tmd" module users.
@@ -114,7 +115,7 @@ pub fn listItemTypeIndex(itemMark: []const u8) ListItemTypeIndex {
     }
 }
 
-// When this function is called, .coincides is still unable to be determined.
+// When this function is called, .tabs is still unable to be determined.
 pub fn listType(itemMark: []const u8) ListType {
     switch (itemMark.len) {
         1, 2 => return switch (itemMark[0]) {
@@ -389,7 +390,7 @@ pub const BlockInfo = struct {
 
 pub const ListType = enum {
     bullets,
-    coincides,
+    tabs,
     definitions,
 };
 
@@ -616,11 +617,15 @@ pub const BlockType = union(enum) {
     }
 };
 
+// ToDo: the current size of LineInfo is too large, try to reduce it.
+pub const DocSize = u28; // max 256M
+pub const BlockIndex = u20; // max 1M
+
 pub const LineInfo = struct {
     index: u32, // one basedd (for debug purpose only)
     atomBlockIndex: u32, // one based (for debug purpose only)
 
-    range: Range,
+    range: Range, // ToDo: save memory. The end is the same as the start of the next line. (Remove the start).
     rangeTrimmed: Range, // without leanding and traling blanks (except .code lines)
 
     endType: LineEndType,
@@ -779,7 +784,7 @@ pub const LineType = union(enum) {
     blank: struct {},
     usual: struct {
         // A usual line might start with 3+ semicolon or nothing.
-        // So either markLen == 0, or markLen >= 3
+        // So either markLen == 0, or markLen >= 3.
         markLen: u32,
         markEndWithSpaces: u32,
         tokens: list.List(TokenInfo) = .{},

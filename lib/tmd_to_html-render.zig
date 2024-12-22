@@ -173,7 +173,7 @@ pub const TmdRender = struct {
                         try self.renderBlockChildren(w, blockInfo.firstChild());
                         try fns.writeCloseTag(w, tag, true);
                     },
-                    .coincides => {
+                    .tabs => {
                         const tag = "div";
                         const classes = "tmd-tab";
 
@@ -233,7 +233,7 @@ pub const TmdRender = struct {
                         try self.renderBlockChildren(w, forDdBlock);
                         try fns.writeCloseTag(w, tag, true);
                     },
-                    .coincides => {
+                    .tabs => {
                         std.debug.assert(self.currentTabListDepth >= 0 and self.currentTabListDepth < tmd.MaxBlockNestingDepth);
                         //self.tabListInfos[@intCast(self.currentTabListDepth)].nextItemOrderId += 1;
                         const tabInfo = &self.tabListInfos[@intCast(self.currentTabListDepth)];
