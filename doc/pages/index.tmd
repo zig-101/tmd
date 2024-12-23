@@ -76,9 +76,10 @@ Features:
 * More
   + TOC (table of contents) generation for automatic navigation.
   + Footnotes for references and citations.
-  + Footer blocks.
+  + Footer blocks (without dedicated syntax).
   + Subtitles.
   + **Line-end spacing control**.
+  + **Source streaming (to code blocks)**.
 
 ---
 {

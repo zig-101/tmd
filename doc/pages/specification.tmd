@@ -25,8 +25,8 @@ making it a flexible and efficient tool for content creation.
 
 The recommended file extension for TapirMD documents is `.tmd`.
 
-Table of contents:
-###---
+? ### Table of contents
+  ###---
 
 @@@ #all
 ###===== Terminologies, Rules and Semantics
@@ -34,34 +34,33 @@ Table of contents:
 @@@ #chars
 ###+++++ Character and character sequences
 
-A %%**line end**%% in a TapirMD document is defined as either of the following:
-* a single ASCII Line Feed character (Unicode value ^`0A$$ hex $$` __#char-values__),
-* a character sequence consisting of
-  - an ASCII Carriage Return (Unicode value ^`0D$$ hex $$`) character, followed by
-  - an ASCII Line Feed character.
+A %%**line end**%% in a TapirMD document is defined as one of the following:
+* A character sequence consisting of
+  - An ASCII Carriage Return character (Unicode: `U+000D`), followed by
+  - An ASCII Line Feed character (Unicode: `U+000A`).
+* A single ASCII Line Feed character that doesn't follow an ASCII Carriage Return character.
+* The end of the document if it doesn't end with either of the above two cases.
 
-A %%**whitespace character**%% is defined as either of
-* an ASCII Space character (Unicode value ^`20$$ hex $$`) character,
-* an ASCII Horizontal Tab character (Unicode value ^`09$$ hex $$`) character.
+A %%**whitespace character**%% is defined as either of the following:
+* An ASCII Space character (Unicode: `U+0020`), or
+* An ASCII Horizontal Tab character (Unicode: `U+0009`).
 
 A %%**blank character**%% is defined as any of the following:
-* the ASCII character with Unicode value ^`7F$$ hex $$`,
-* any ASCII characters with a Unicode values in the inclusive range ^`[00$$ hex $$, 20$$ hex $$]`.
-  \\ Most characters in the range are invisible. The range also includes
-  whitespace characters and the characters comprising line ends.
+* The ASCII DEL character (Unicode: `U+007F`).
+* Any ASCII character with a Unicode value in the inclusive range `U+0000` to `U+0020`.
 
-A %%**blank character sequence**%% is defined as a sequence of blank characters that
-contains at most one line end. If it contains a line end, it ends at that line end.
+Most blank characters are invisible in popular text editing software.
+
+A %%**blank character sequence**%% is defined as a sequence of blank characters
+and can contain at most one line end.
+If it contains a line end, it must end with the line end.
 
 A %%**perceivable blank character sequence**%% s defined as a blank character sequence that
 satisfies at least one of the following conditions:
 * it contains at least one whitespace character.
-* it ends at a line end (including the line end).
-* it ends at the end of the containing document (which is not a character),
-  if the containing document doesn't end with a line end.
-
-The last two cases of perceivable blank character sequences are also
-called %%**line-end blank character sequences**%%.
+* it ends with a line end.
+  \\ Perceivable blank character sequences of this case are
+  specifically called %%**line-end blank character sequences**%%.
 
 @@@ #elements
 ###+++++ Blocks, lines, and tokens
@@ -82,26 +81,27 @@ The TapirMD format is carefully designed to allow each document to be parsed in 
 
 After parsing, each line is divided into one or more %%**tokens**%% (text segments),
 such as %%**content tokens**%%, %%**mark tokens**%% and %%**blank tokens**%%.
-Tokens cannot cross line boundaries.
+Tokens cannot cross lines.
 
-Each blank token is a blank character sequence.
-In particular,
-* if the blank character sequence is perceivable,
+Each blank token represents a sequence of blank characters.
+* Specifically, if the sequence of blank characters is perceivable,
   the corresponding blank token is called a %%**perceivable blank token**%%.
-* if the blank character sequence ends with a line-end blank character sequence,
+* More specifically, if the sequence of blank characters ends with a line-end blank character sequence,
   the corresponding blank token is called a %%**line-end blank token**%%.
 
 A line
-* always ends with a line-end blank token.
-* may start with optional blank toekn.
-* never contains consecutive blank tokens.
-  If consecutive blank tokens do exist in a line,
-  they are merged into a single end blank token.
+* Always ends with a line-end blank token.
+* May begin with an optional blank token.
+* Never contains consecutive blank tokens.
+  If consecutive blank tokens do exist within a line,
+  they are merged into a single blank token.
 
-A mark token consists of one or more punctuation mark characters
-and an optional blank character sequence.
+Each mark token consists of one or more punctuation mark characters
+and an optional blank character sequence which is
+either before or after the punctuation mark characters.
 
-A content token may contain blank character sequences.
+Generally, a content token contains visible characters (including whitespace characters),
+but it may contain invislbe blank characters.
 
 @@@ #block-types
 ###+++++ Overview of block types
@@ -1063,11 +1063,9 @@ is treated as an ordered list in HTML output.
 
 
 If the mark of a list begins with `*`, `+`, `-` or `~`,
-and the first non-attribute child block of at least one if
-its item blocks is a first-level header block, then the list
-is treated as a %%**coincide block list**%% in HTML output.
-
-The official TapirMD renderer renders coincide block lists as tab panels.
+and the first non-attribute child block of one item blocks
+in the list is a first-level header block, then the list
+is treated as a %%**tab panel**%% in HTML output.
 
 ? ### (a tab panel example)
   {
@@ -1462,9 +1460,6 @@ They should be escaped in header and usual blocks.
 @@@ #note-gen-targets
   Without relying on interactive UI elements, a TapirMD document can easily be
   converted to multiple formats beyond HTML, including EPUB and others.
-
-@@@ #char-values
-  Character values are all in hexadecimal form within this document.
 
 @@@ #note-cjk-chars
   CJK is a short form standing for Chinese, Japanese, and Korean.
