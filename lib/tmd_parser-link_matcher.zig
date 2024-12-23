@@ -388,13 +388,12 @@ fn Patricia(comptime TextType: type) type {
             return null;
         }
 
-        fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.TokenInfo, confirmed: bool, attrs: ?*tmd.ElementAttibutes) void {
+        fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
             var le = node.value.linkInfos.head();
             while (le) |linkInfoElement| {
                 if (linkInfoElement.value.info != .urlSourceText) {
                     //std.debug.print("    333 aaa exact match, found and setSourceOfURL.\n", .{});
                     linkInfoElement.value.setSourceOfURL(urlSource, confirmed);
-                    linkInfoElement.value.attrs = attrs;
                 } else {
                     //std.debug.print("    333 aaa exact match, found but sourceURL has set.\n", .{});
                 }
@@ -406,19 +405,18 @@ fn Patricia(comptime TextType: type) type {
             }
         }
 
-        fn setUrlSourceForTreeNodes(theTree: *Tree, urlSource: ?*tmd.TokenInfo, confirmed: bool, attrs: ?*tmd.ElementAttibutes) void {
+        fn setUrlSourceForTreeNodes(theTree: *Tree, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
             const NodeHandler = struct {
                 urlSource: ?*tmd.TokenInfo,
                 confirmed: bool,
-                attrs: ?*tmd.ElementAttibutes,
 
                 pub fn onNode(h: @This(), node: *Node) void {
-                    setUrlSourceForTreeNodes(&node.value.deeperTree, h.urlSource, h.confirmed, h.attrs);
-                    setUrlSourceForNode(node, h.urlSource, h.confirmed, h.attrs);
+                    setUrlSourceForTreeNodes(&node.value.deeperTree, h.urlSource, h.confirmed);
+                    setUrlSourceForNode(node, h.urlSource, h.confirmed);
                 }
             };
 
-            const handler = NodeHandler{ .urlSource = urlSource, .confirmed = confirmed, .attrs = attrs };
+            const handler = NodeHandler{ .urlSource = urlSource, .confirmed = confirmed };
             theTree.traverseNodes(handler);
         }
     };
@@ -458,7 +456,6 @@ const Matcher = struct {
 
         const urlSource = linkInfo.info.urlSourceText.?;
         const confirmed = linkInfo.urlConfirmed();
-        const attrs = linkInfo.attrs;
 
         const linkText = linkDef.revisedLinkText.asString();
 
@@ -471,8 +468,8 @@ const Matcher = struct {
                 //std.debug.print("    333 all match.\n", .{});
                 // all match
 
-                NormalPatricia.setUrlSourceForTreeNodes(&self.normalPatricia.topTree, urlSource, confirmed, attrs);
-                //InvertedPatricia.setUrlSourceForTreeNodes(&self.invertedPatricia.topTree, urlSource, confirmed, attrs);
+                NormalPatricia.setUrlSourceForTreeNodes(&self.normalPatricia.topTree, urlSource, confirmed);
+                //InvertedPatricia.setUrlSourceForTreeNodes(&self.invertedPatricia.topTree, urlSource, confirmed);
 
                 self.normalPatricia.clear();
                 self.invertedPatricia.clear();
@@ -482,8 +479,8 @@ const Matcher = struct {
 
                 const revisedLinkText = linkDef.revisedLinkText.prefix(linkDef.revisedLinkText.len - @as(u32, ddd.len));
                 if (self.normalPatricia.searchLinkInfo(revisedLinkText, true)) |node| {
-                    NormalPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed, attrs);
-                    NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed, attrs);
+                    NormalPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed);
+                    NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed);
                 } else {
                     //std.debug.print("    333 leading match. Not found.\n", .{});
                 }
@@ -495,8 +492,8 @@ const Matcher = struct {
 
                 const revisedLinkText = linkDef.revisedLinkText.suffix(@intCast(ddd.len));
                 if (self.invertedPatricia.searchLinkInfo(revisedLinkText.invert(), true)) |node| {
-                    InvertedPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed, attrs);
-                    InvertedPatricia.setUrlSourceForNode(node, urlSource, confirmed, attrs);
+                    InvertedPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed);
+                    InvertedPatricia.setUrlSourceForNode(node, urlSource, confirmed);
                 } else {
                     //std.debug.print("    333 trailing match. Not found.\n", .{});
                 }
@@ -506,7 +503,7 @@ const Matcher = struct {
 
                 if (self.normalPatricia.searchLinkInfo(linkDef.revisedLinkText, false)) |node| {
                     //std.debug.print("    333 exact match, found.\n", .{});
-                    NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed, attrs);
+                    NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed);
                 } else {
                     //std.debug.print("    333 exact match, not found.\n", .{});
                 }

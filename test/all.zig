@@ -1,4 +1,3 @@
-
 comptime {
-    _ =  @import("tmd").tests;
+    _ = @import("tmd").tests;
 }

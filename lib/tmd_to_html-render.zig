@@ -1080,8 +1080,6 @@ pub const TmdRender = struct {
                                 tracker.marksStack.pushHead(markElement);
                                 try writeCloseMarks(w, markElement, writeTags);
 
-                                var linkURL: []const u8 = undefined;
-
                                 const linkInfo = tracker.activeLinkInfo orelse unreachable;
                                 blk: {
                                     if (linkInfo.urlConfirmed()) {
@@ -1089,15 +1087,23 @@ pub const TmdRender = struct {
                                         std.debug.assert(linkInfo.info.urlSourceText != null);
 
                                         const t = linkInfo.info.urlSourceText.?;
-                                        linkURL = LineScanner.trim_blanks(self.doc.rangeData(t.range()));
+                                        const linkURL = LineScanner.trim_blanks(self.doc.rangeData(t.range()));
 
                                         if (linkInfo.isFootnote()) {
                                             const footnote_id = linkURL[1..];
                                             const footnote = try self.onFootnoteReference(footnote_id);
                                             tracker.linkFootnote = footnote;
 
-                                            if (writeTags) _ = try w.print("<sup><a id=\"fn:{s}{s}:ref-{}\" href=\"#fn:{s}{s}\"", .{ footnote_id, self.suffixForIdsAndNames, footnote.refCount, footnote_id, self.suffixForIdsAndNames });
+                                            if (writeTags) _ = try w.print(
+                                                \\<sup><a id="fn:{s}{s}:ref-{}" href="#fn:{s}{s}">
+                                            , .{ footnote_id, self.suffixForIdsAndNames, footnote.refCount, footnote_id, self.suffixForIdsAndNames });
                                             break :blk;
+                                        }
+
+                                        if (writeTags) {
+                                            _ = try w.print(
+                                                \\<a href="{s}">
+                                            , .{linkURL});
                                         }
                                     } else {
                                         std.debug.assert(!linkInfo.urlConfirmed());
@@ -1105,24 +1111,13 @@ pub const TmdRender = struct {
 
                                         // ToDo: call custom callback to try to generate a url.
 
-                                        if (writeTags) _ = try w.write("<span class=\"tmd-broken-link\"");
+                                        if (writeTags) _ = try w.write(
+                                            \\<span class="tmd-broken-link"
+                                        );
 
                                         break :blk;
                                     }
-
-                                    if (writeTags) {
-                                        _ = try w.write("<a");
-                                        _ = try w.write(" href=\"");
-                                        _ = try w.write(linkURL);
-                                        _ = try w.write("\"");
-                                    }
                                 }
-
-                                if (tracker.activeLinkInfo.?.attrs) |attrs| {
-                                    std.debug.assert(!linkInfo.isFootnote());
-                                    try fns.writeBlockAttributes(w, "", attrs, self.suffixForIdsAndNames);
-                                }
-                                _ = try w.write(">");
 
                                 try writeOpenMarks(w, markElement, writeTags);
                             } else {

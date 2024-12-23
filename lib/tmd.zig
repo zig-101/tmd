@@ -618,8 +618,12 @@ pub const BlockType = union(enum) {
 };
 
 // ToDo: the current size of LineInfo is too large, try to reduce it.
-pub const DocSize = u28; // max 256M
-pub const BlockIndex = u20; // max 1M
+pub const DocSize = u26; // max 64M (reserve 4 bits to u30)
+pub const BlockIndex = u20; // max 1M (reserve 6 bits to u26)
+
+// ToDo: for debug purpose fields, use
+//     if (builtin.mode == .Debug) u32 else void
+// alike as field types.
 
 pub const LineInfo = struct {
     index: u32, // one basedd (for debug purpose only)
@@ -931,17 +935,17 @@ pub const TokenInfo = struct {
 
 pub const PlainText = std.meta.FieldType(TokenType, .plainText);
 pub const CommentText = std.meta.FieldType(TokenType, .commentText);
-pub const DummyCodeSpans = std.meta.FieldType(TokenType, .evenBackticks);
+pub const EvenBackticks = std.meta.FieldType(TokenType, .evenBackticks);
 pub const SpanMark = std.meta.FieldType(TokenType, .spanMark);
 pub const LeadingMark = std.meta.FieldType(TokenType, .leadingMark);
 pub const LinkInfo = std.meta.FieldType(TokenType, .linkInfo);
 
 pub const TokenType = union(enum) {
 
-    // Try to keep each field size <= (32 + 32 + 64) bits.
+    // Try to keep each field size <= (32 + 32 + 64) bits == 8 bytes
 
     // ToDo: lineEndSpace (merged into plainText. .start == .end means lineEndSpace)
-    plainText: packed struct {
+    plainText: struct {
         start: u32,
         // The value should be the same as the start of the next token, or end of line.
         // But it is good to keep it here, to verify the this value is the same as ....
@@ -951,14 +955,14 @@ pub const TokenType = union(enum) {
         // it is only used for self-defined URL.
         nextInLink: ?*TokenInfo = null,
     },
-    commentText: packed struct {
+    commentText: struct {
         start: u32,
         // The value should be the same as the end of line.
         end: u32,
 
         inAttributesLine: bool, // ToDo: don't use commentText tokens for attributes lines.
     },
-    evenBackticks: packed struct {
+    evenBackticks: struct {
         start: u32,
         pairCount: u32,
         secondary: bool,
@@ -967,7 +971,7 @@ pub const TokenType = union(enum) {
         // ```` means (pairCount-1) non-collapsable spaces?
         // ^```` means pairCount ` chars.
     },
-    spanMark: packed struct {
+    spanMark: struct {
         // For a close mark, this might be the start of the attached blanks.
         // For a open mark, this might be the position of the secondary sign.
         start: u32,
@@ -987,18 +991,9 @@ pub const TokenType = union(enum) {
             return @tagName(self.markType);
         }
     },
-    // ToDo: with the zig tip, this size of this type is 24.
-    //       In fact, 16 is enough.
-    //       ToDo: use packed union and maintain a InvalidToken in parser.
-    //
-    //           info: packed union {
-    //               firstPlainText: ?*TokenInfo,
-    //               urlSourceText: ?*TokenInfo,
-    //           }
-    //
     // A linkInfo token is always before an open .link SpanMarkType token.
     linkInfo: struct {
-        attrs: ?*ElementAttibutes = null,
+        //attrs: ?*ElementAttibutes = null,
         info: union(enum) {
             // This is only used for link matching.
             firstPlainText: ?*TokenInfo, // null for a blank link span
@@ -1042,11 +1037,11 @@ pub const TokenType = union(enum) {
             self.followingOpenLinkSpanMark().urlConfirmed = confirmed;
         }
     },
-    leadingMark: packed struct {
+    leadingMark: struct {
         start: u32,
         blankLen: u32, // blank char count after the mark.
-        markType: LineSpanMarkType,
         markLen: u32,
+        markType: LineSpanMarkType,
 
         // when isBare is false,
         // * for .media, the next token is a .plainText token.

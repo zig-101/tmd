@@ -261,7 +261,7 @@ fn close_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, 
     return &tokenInfo.tokenType.spanMark;
 }
 
-fn create_even_backticks_span(self: *ContentParser, markStart: u32, pairCount: u32, isSecondary: bool) !*tmd.DummyCodeSpans {
+fn create_even_backticks_span(self: *ContentParser, markStart: u32, pairCount: u32, isSecondary: bool) !*tmd.EvenBackticks {
     std.debug.assert(markStart >= self.lineSession.contentStart);
 
     // Create the dummy code spans mark.
