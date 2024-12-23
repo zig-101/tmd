@@ -20,21 +20,6 @@ pub fn build(b: *std.Build) !void {
     //const libStep = b.step("lib", "Install lib");
     //libStep.dependOn(&installLib.step);
 
-    // test
-
-    const unitTest = b.addTest(.{
-        .name = "unit_test",
-        .root_source_file = b.path("lib/tests.zig"),
-        .target = b.host,
-    });
-    const installTest = b.addInstallArtifact(unitTest, .{});
-
-    const runtTests = b.addRunArtifact(unitTest);
-    runtTests.step.dependOn(&installTest.step);
-
-    const testStep = b.step("test", "Run unit tests");
-    testStep.dependOn(&runtTests.step);
-
     // tmd module
 
     const tmdLibModule = b.addModule("tmd", .{
@@ -46,6 +31,22 @@ pub fn build(b: *std.Build) !void {
     const libOptions = b.addOptions();
     libOptions.addOption(bool, "dump_ast", config.dumpAST);
     tmdLibModule.addOptions("config", libOptions);
+
+    // test
+
+    const unitTest = b.addTest(.{
+        .name = "unit_test",
+        .root_source_file = b.path("test/all.zig"),
+        .target = b.host,
+    });
+    unitTest.root_module.addImport("tmd", tmdLibModule);
+    const installTest = b.addInstallArtifact(unitTest, .{});
+
+    const runtTests = b.addRunArtifact(unitTest);
+    runtTests.step.dependOn(&installTest.step);
+
+    const testStep = b.step("test", "Run unit tests");
+    testStep.dependOn(&runtTests.step);
 
     // cmd (the default target)
 
