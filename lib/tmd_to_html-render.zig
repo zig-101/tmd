@@ -1112,7 +1112,7 @@ pub const TmdRender = struct {
                                         // ToDo: call custom callback to try to generate a url.
 
                                         if (writeTags) _ = try w.write(
-                                            \\<span class="tmd-broken-link"
+                                            \\<span class="tmd-broken-link">
                                         );
 
                                         break :blk;
