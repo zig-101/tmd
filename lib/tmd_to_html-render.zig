@@ -1025,7 +1025,7 @@ pub const TmdRender = struct {
                 const token = &tokenInfoElement.value;
                 switch (token.tokenType) {
                     .commentText => {},
-                    .plainText => blk: {
+                    .content => blk: {
                         if (tracker.activeLinkInfo) |linkInfo| {
                             if (!tracker.firstPlainTextInLink) {
                                 std.debug.assert(!linkInfo.isFootnote());
@@ -1154,7 +1154,7 @@ pub const TmdRender = struct {
 
                                 writeMedia: {
                                     const mediaInfoToken = mediaInfoElement.value;
-                                    std.debug.assert(mediaInfoToken.tokenType == .plainText);
+                                    std.debug.assert(mediaInfoToken.tokenType == .content);
 
                                     //const mediaInfo = self.doc.rangeData(mediaInfoToken.range());
                                     //var it = mem.splitAny(u8, mediaInfo, " \t");

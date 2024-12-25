@@ -87,7 +87,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                                     tokenInfo.typeName(),
                                 });
                             },
-                            .plainText => {
+                            .content => {
                                 std.debug.print("|{}-{}: [{s}]", .{
                                     tokenInfo.start() - lineInfo.range.start + 1,
                                     tokenInfo.end() - lineInfo.range.start + 1,

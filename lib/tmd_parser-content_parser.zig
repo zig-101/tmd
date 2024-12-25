@@ -31,8 +31,8 @@ blockSession: struct {
 
     //endLine: ?*tmd.LineInfo = null,
 
-    // The line must have a plainText token as the last token in the line
-    // and the plainText token must end with a non-CJK char.
+    // The line must have a content token as the last token in the line
+    // and the content token must end with a non-CJK char.
     //
     // The line is a previous line. It might not be the last line.
     lineWithPending_treatEndAsSpace: ?*tmd.LineInfo = null,
@@ -134,7 +134,7 @@ fn create_comment_text_token(self: *ContentParser, start: u32, end: u32, inAttri
 fn create_plain_text_token(self: *ContentParser, start: u32, end: u32) !*tmd.TokenInfo {
     var tokenInfo = try self.create_token();
     tokenInfo.tokenType = .{
-        .plainText = .{
+        .content = .{
             .start = start,
             .end = end,
         },
@@ -144,7 +144,7 @@ fn create_plain_text_token(self: *ContentParser, start: u32, end: u32) !*tmd.Tok
         if (link.tokenType.linkInfo.info.firstPlainText == null) {
             link.tokenType.linkInfo.info.firstPlainText = tokenInfo;
         } else if (self.blockSession.lastPlainTextToken) |text| {
-            text.tokenType.plainText.nextInLink = tokenInfo;
+            text.tokenType.content.nextInLink = tokenInfo;
         } else unreachable;
     }
     self.blockSession.lastPlainTextToken = tokenInfo;
@@ -635,7 +635,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
 
             const contentToken = self.lineSession.firstContentToken orelse break :handle;
             const asSpace = switch (contentToken.tokenType) {
-                .plainText => blk: {
+                .content => blk: {
                     const text = self.docParser.tmdDoc.rangeData(contentToken.range());
                     std.debug.assert(text.len > 0);
                     break :blk !(utf8.begins_with_CJK_rune(text) or LineScanner.begins_with_blank(text));
@@ -657,7 +657,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
             std.debug.assert(self.blockSession.lineWithPending_treatEndAsSpace == null);
 
             const shouldPend = switch (contentToken.tokenType) {
-                .plainText => blk: {
+                .content => blk: {
                     const text = self.docParser.tmdDoc.rangeData(contentToken.range());
                     std.debug.assert(text.len > 0);
                     break :blk !(utf8.ends_with_CJK_rune(text) or LineScanner.ends_with_blank(text));

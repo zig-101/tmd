@@ -874,7 +874,7 @@ pub const TokenInfo = struct {
             .commentText => |t| {
                 return t.end;
             },
-            .plainText => |t| {
+            .content => |t| {
                 return t.end;
             },
             .evenBackticks => |s| {
@@ -913,6 +913,14 @@ pub const TokenInfo = struct {
         return null;
     }
 
+    fn prev(self: *const @This()) ?*TokenInfo {
+        const tokenElement: *const list.Element(TokenInfo) = @alignCast(@fieldParentPtr("value", self));
+        if (tokenElement.prev) |te| {
+            return &te.value;
+        }
+        return null;
+    }
+
     fn followingSpanMark(self: *const @This()) *SpanMark {
         if (self.next()) |nextTokenInfo| {
             switch (nextTokenInfo.tokenType) {
@@ -945,15 +953,15 @@ pub const TokenInfo = struct {
 //     tag: struct {
 //        _: uN,
 //        _type: enum(uM) { // M == 16*8 - N
-//            plainText,
+//            content,
 //            commentText,
 //            ...
 //        },
 //     },
-//     plainText: ...,
+//     content: ...,
 //     commentText: ...,
 
-pub const PlainText = std.meta.FieldType(TokenType, .plainText);
+pub const PlainText = std.meta.FieldType(TokenType, .content);
 pub const CommentText = std.meta.FieldType(TokenType, .commentText);
 pub const EvenBackticks = std.meta.FieldType(TokenType, .evenBackticks);
 pub const SpanMark = std.meta.FieldType(TokenType, .spanMark);
@@ -961,7 +969,7 @@ pub const LeadingSpanMark = std.meta.FieldType(TokenType, .leadingSpanMark);
 pub const LinkInfo = std.meta.FieldType(TokenType, .linkInfo);
 
 pub const TokenType = union(enum) {
-    plainText: struct {
+    content: struct {
         start: u32,
         // The value should be the same as the start of the next token, or end of line.
         // But it is good to keep it here, to verify the this value is the same as ....
@@ -1001,7 +1009,7 @@ pub const TokenType = union(enum) {
         secondary: bool = false,
         markType: SpanMarkType, // might
         markLen: u8, // without the secondary char
-        blankSpan: bool, // enclose no texts (plainTexts or treatEndAsSpace)
+        blankSpan: bool, // enclose no texts (contents or evenBackticks or treatEndAsSpace)
 
         inComment: bool, // for .linkInfo
         urlConfirmed: bool = false, // for .linkInfo
@@ -1017,7 +1025,7 @@ pub const TokenType = union(enum) {
 
         // ToDo: Now the union size is 16 bytes anyway.
         //       So maybe it is a good idea to expand the two fields here.
-        //
+        //       (Or, use packed union, same effect).
 
         info: union(enum) {
             // This is only used for link matching.
@@ -1069,7 +1077,7 @@ pub const TokenType = union(enum) {
         markType: LineSpanMarkType,
 
         // when isBare is false,
-        // * for .media, the next token is a .plainText token.
+        // * for .media, the next token is a .content token.
         // * for .comment and .anchor, the next token is a .commentText token.
         isBare: bool = false,
 
