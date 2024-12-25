@@ -1126,7 +1126,7 @@ pub const TmdRender = struct {
                             }
                         } else try closeMark(w, m, &tracker, writeTags);
                     },
-                    .leadingMark => |m| {
+                    .leadingSpanMark => |m| {
                         switch (m.markType) {
                             .lineBreak => {
                                 if (writeTags) _ = try w.write("<br/>");

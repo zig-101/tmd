@@ -3,8 +3,6 @@ const builtin = @import("builtin");
 
 const tmd = @import("tmd");
 
-// ToDo: how to remove the content of example.css from the output wasm file?
-
 extern fn print(addr: usize, len: usize, addr2: usize, len2: usize, extra: isize) void;
 
 fn logMessage(msg: []const u8, extraMsg: []const u8, extraInt: isize) void {

@@ -251,10 +251,9 @@ fn parse(parser: *DocParser) !void {
 
         var lineInfoElement = try list.createListElement(tmd.LineInfo, parser.allocator);
         var lineInfo = &lineInfoElement.value;
-        lineInfo.containerMark = null;
+        lineInfo.* = .{};
+
         lineInfo.range.start = lineScanner.cursor;
-        // ToDo: remove this line.
-        //lineInfo.tokens = .{}; // !! Must be initialized. Otherwise undefined behavior.
 
         //std.debug.print("--- line#{}\n", .{lineScanner.cursorLineIndex});
 

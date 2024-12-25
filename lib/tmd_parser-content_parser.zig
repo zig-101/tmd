@@ -158,12 +158,12 @@ fn create_plain_text_token(self: *ContentParser, start: u32, end: u32) !*tmd.Tok
     return tokenInfo;
 }
 
-fn create_leading_mark(self: *ContentParser, markType: tmd.LineSpanMarkType, markStart: u32, markLen: u32) !*tmd.LeadingMark {
+fn create_leading_mark(self: *ContentParser, markType: tmd.LineSpanMarkType, markStart: u32, markLen: u32) !*tmd.LeadingSpanMark {
     std.debug.assert(markStart == self.lineSession.contentStart);
 
     var tokenInfo = try self.create_token();
     tokenInfo.tokenType = .{
-        .leadingMark = .{
+        .leadingSpanMark = .{
             .start = markStart,
             .markType = markType,
             .markLen = markLen,
@@ -171,7 +171,7 @@ fn create_leading_mark(self: *ContentParser, markType: tmd.LineSpanMarkType, mar
         },
     };
 
-    return &tokenInfo.tokenType.leadingMark;
+    return &tokenInfo.tokenType.leadingSpanMark;
 }
 
 fn open_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, markLen: u32, isSecondary: bool) !*tmd.SpanMark {
@@ -337,7 +337,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
             std.debug.assert(!LineScanner.bytesKindTable[c].isBlank());
 
             const leadingMarkType = switch (LineScanner.bytesKindTable[c]) {
-                .leadingMark => |leadingMarkType| leadingMarkType,
+                .leadingSpanMark => |leadingMarkType| leadingMarkType,
                 else => break :handle_leading_mark,
             };
 
@@ -359,16 +359,16 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                 break :check_bare false;
             };
 
-            const leadingMark = try self.create_leading_mark(leadingMarkType, textStart, markLen);
-            leadingMark.isBare = isBare;
+            const leadingSpanMark = try self.create_leading_mark(leadingMarkType, textStart, markLen);
+            leadingSpanMark.isBare = isBare;
 
             if (isBare) {
-                leadingMark.blankLen = 0;
+                leadingSpanMark.blankLen = 0;
                 break :parse_tokens markEnd;
             }
 
             textStart = lineScanner.cursor;
-            leadingMark.blankLen = textStart - markEnd;
+            leadingSpanMark.blankLen = textStart - markEnd;
 
             switch (leadingMarkType) {
                 .lineBreak => break :handle_leading_mark,
@@ -604,7 +604,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
         var tryToPendLine = true;
         var cancelPeading = false;
         switch (head.value.tokenType) {
-            .leadingMark => |m| switch (m.markType) {
+            .leadingSpanMark => |m| switch (m.markType) {
                 .media => {
                     notMediaLine = false;
                     tryToPendLine = false;

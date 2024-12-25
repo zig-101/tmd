@@ -94,7 +94,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                                     tokenInfo.typeName(),
                                 });
                             },
-                            .leadingMark => |m| {
+                            .leadingSpanMark => |m| {
                                 std.debug.print("|{}-{}: {s}:{s}", .{
                                     tokenInfo.start() - lineInfo.range.start + 1,
                                     tokenInfo.end() - lineInfo.range.start + 1,

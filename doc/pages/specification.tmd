@@ -586,7 +586,7 @@ Here is the list of all line-leading mark tokens supported now.
   ### %%line-break token
   ;;; ^`\\`
   {
-  A line-break token is equivalent to `<br>` in HTML.
+  A line-break token which is equivalent to `<br>` in HTML.
   }
   ----------------
   ### %%line-comment token

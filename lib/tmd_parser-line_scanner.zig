@@ -19,7 +19,7 @@ pub const bytesKindTable = blk: {
         blank: struct {
             isSpace: bool,
         },
-        leadingMark: tmd.LineSpanMarkType,
+        leadingSpanMark: tmd.LineSpanMarkType,
         spanMark: tmd.SpanMarkType,
 
         const ByteKind = @This();
@@ -48,11 +48,11 @@ pub const bytesKindTable = blk: {
     table[' '] = .{ .blank = .{ .isSpace = true } };
     table['\t'] = .{ .blank = .{ .isSpace = true } };
 
-    table['\\'] = .{ .leadingMark = .lineBreak };
-    table['/'] = .{ .leadingMark = .comment };
-    table['&'] = .{ .leadingMark = .media };
-    table['!'] = .{ .leadingMark = .escape };
-    table['?'] = .{ .leadingMark = .spoiler };
+    table['\\'] = .{ .leadingSpanMark = .lineBreak };
+    table['/'] = .{ .leadingSpanMark = .comment };
+    table['&'] = .{ .leadingSpanMark = .media };
+    table['!'] = .{ .leadingSpanMark = .escape };
+    table['?'] = .{ .leadingSpanMark = .spoiler };
 
     table['*'] = .{ .spanMark = .fontWeight };
     table['%'] = .{ .spanMark = .fontStyle };

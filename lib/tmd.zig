@@ -617,28 +617,20 @@ pub const BlockType = union(enum) {
     }
 };
 
-// ToDo: the current size of LineInfo is too large, try to reduce it.
-pub const DocSize = u26; // max 64M (reserve 4 bits to u30)
-pub const BlockIndex = u20; // max 1M (reserve 6 bits to u26)
-
-// ToDo: for debug purpose fields, use
-//     if (builtin.mode == .Debug) u32 else void
-// alike as field types.
-
 pub const LineInfo = struct {
-    index: u32, // one basedd (for debug purpose only)
-    atomBlockIndex: u32, // one based (for debug purpose only)
+    index: u32 = undefined, // one basedd (for debug purpose only)
+    atomBlockIndex: u32 = undefined, // one based (for debug purpose only)
 
-    range: Range, // ToDo: save memory. The end is the same as the start of the next line. (Remove the start).
-    rangeTrimmed: Range, // without leanding and traling blanks (except .code lines)
+    range: Range = undefined, // ToDo: save memory. The end is the same as the start of the next line. (Remove the start).
+    rangeTrimmed: Range = undefined, // without leanding and traling blanks (except .code lines)
 
-    endType: LineEndType,
+    endType: LineEndType = undefined,
 
     treatEndAsSpace: bool = false,
 
     // ...
-    containerMark: ?ContainerLeadingMark, // !!! remember init it after alloc
-    lineType: LineType, // ToDo: renamed to lineType
+    containerMark: ?ContainerLeadingMark = null, // !!! remember init it after alloc
+    lineType: LineType = undefined, // ToDo: renamed to lineType
 
     pub fn number(self: @This()) usize {
         return @intCast(self.index); // + 1;
@@ -733,7 +725,7 @@ pub const LineInfo = struct {
     }
 };
 
-pub const LineEndType = enum {
+pub const LineEndType = enum(u2) {
     void, // doc end
     n, // \n
     rn, // \r\n
@@ -898,7 +890,7 @@ pub const TokenInfo = struct {
             .linkInfo => {
                 return self.start();
             },
-            .leadingMark => |m| {
+            .leadingSpanMark => |m| {
                 return self.start() + m.markLen + m.blankLen;
             },
         }
@@ -933,18 +925,42 @@ pub const TokenInfo = struct {
     }
 };
 
+// Tokens consume most memory after a doc is parsed.
+// So try to keep the size of TokenType small and use as few tokens as possible.
+//
+// Try to keep the size of each TokenType field <= (4 + 4 + NativeWordSize) bytes.
+//
+// It is possible to make size of TokenType be 8 on 32-bit systems? (By discarding
+// the .start property of each TokenType).
+//
+// Now, even all the fields of a union type reserved enough bits for the union tag,
+// the compiler will still use extra alignment bytes for the union tag.
+// So the size of TokenType is 24 bytes now.
+// Maybe future zig compiler will make optimization to reduce the size to 16 bytes.
+//
+// An unmature idea is to add an extra enum field which only use
+// the reserved bits to emulate the union tag manually.
+// I'm nore sure how safe this way is now.
+//
+//     tag: struct {
+//        _: uN,
+//        _type: enum(uM) { // M == 16*8 - N
+//            plainText,
+//            commentText,
+//            ...
+//        },
+//     },
+//     plainText: ...,
+//     commentText: ...,
+
 pub const PlainText = std.meta.FieldType(TokenType, .plainText);
 pub const CommentText = std.meta.FieldType(TokenType, .commentText);
 pub const EvenBackticks = std.meta.FieldType(TokenType, .evenBackticks);
 pub const SpanMark = std.meta.FieldType(TokenType, .spanMark);
-pub const LeadingMark = std.meta.FieldType(TokenType, .leadingMark);
+pub const LeadingSpanMark = std.meta.FieldType(TokenType, .leadingSpanMark);
 pub const LinkInfo = std.meta.FieldType(TokenType, .linkInfo);
 
 pub const TokenType = union(enum) {
-
-    // Try to keep each field size <= (32 + 32 + 64) bits == 8 bytes
-
-    // ToDo: lineEndSpace (merged into plainText. .start == .end means lineEndSpace)
     plainText: struct {
         start: u32,
         // The value should be the same as the start of the next token, or end of line.
@@ -962,6 +978,10 @@ pub const TokenType = union(enum) {
 
         inAttributesLine: bool, // ToDo: don't use commentText tokens for attributes lines.
     },
+    // ToDo: follow a .media LineSpanMarkType.
+    //mediaInfo: struct {
+    //    attrs: *MediaAttributes,
+    //},
     evenBackticks: struct {
         start: u32,
         pairCount: u32,
@@ -994,6 +1014,11 @@ pub const TokenType = union(enum) {
     // A linkInfo token is always before an open .link SpanMarkType token.
     linkInfo: struct {
         //attrs: ?*ElementAttibutes = null,
+
+        // ToDo: Now the union size is 16 bytes anyway.
+        //       So maybe it is a good idea to expand the two fields here.
+        // 
+
         info: union(enum) {
             // This is only used for link matching.
             firstPlainText: ?*TokenInfo, // null for a blank link span
@@ -1037,7 +1062,7 @@ pub const TokenType = union(enum) {
             self.followingOpenLinkSpanMark().urlConfirmed = confirmed;
         }
     },
-    leadingMark: struct {
+    leadingSpanMark: struct {
         start: u32,
         blankLen: u32, // blank char count after the mark.
         markLen: u32,
@@ -1052,17 +1077,13 @@ pub const TokenType = union(enum) {
             return @tagName(self.markType);
         }
     },
-    // ToDo: follow a .media LineSpanMarkType.
-    //mediaInfo: struct {
-    //    attrs: *MediaAttributes,
-    //},
 
     pub fn typeName(self: @This()) []const u8 {
         return @tagName(self);
     }
 };
 
-pub const SpanMarkType = enum(u8) {
+pub const SpanMarkType = enum(u4) {
     link,
     fontWeight,
     fontStyle,
@@ -1084,10 +1105,12 @@ pub const SpanMarkType = enum(u8) {
 };
 
 // used in usual blocks:
-pub const LineSpanMarkType = enum(u8) {
+pub const LineSpanMarkType = enum(u3) {
     lineBreak, // \\
     comment, // //
-    media, // @@
+    media, // &&
     escape, // !!
     spoiler, // ??
 };
+
+
