@@ -621,9 +621,6 @@ characters or character sequences.
 * An even-backtick mark token in secondary mode is treated as backtick character sequence,
   with the number of backticks in the sequence equal to the pair count.
 
-As even-backtick mark tokens represent specific character or character sequences,
-they are classified as content tokens.
-
 Even-backtick mark tokens take higher precedence over other non-line-leading mark tokens.
 The next section will talk more about this rule.
 
@@ -743,53 +740,40 @@ A not-empty hyperlink span will be rendered as a hyperlink in HTML output.
   all tokens except the last one are used as the link text.
 
 Within a comment line, if the text following the line-comment token
-begins with `__` (two underscores), it is treated as a one-line usual block.
+begins with `__` (two underscores), it is parsed as a one-line usual block.
 Any link spans within this block are considered %%**link definitions**%%,
 which define URLs for hyperlink spans.
 A valid link definition must contain at least two content tokens.
 
-The link text of a hyperlink
-
 The URL for a hyperlink can be defined either inside or outside the corresponding hyperlink span.
-* If the last content token of a hyperlink span is a valid URL (either relative or absolute),
-  it is used as the hyperlink's URL. We call these self-defined hyperlink spans.
-* Otherwise, a matching link definition will be searched to provide the URL. 
-  ;;;
-  Link definitions following the hyperlink span have higher matching priority than those before it.
-  And
-  {
-  - for the ones following the hyperlink span, earlier ones have priority over later ones.
-  - for the ones before the hyperlink span, later ones have priority over earlier ones.
+* If the last content token of a hyperlink span is a valid URL (see below),
+  it is used as the hyperlink's URL. We call the hyperlink self-defined.
+* Otherwise, a matching link definition will be searched to provide the URL
+  (the matching rules are described below). 
+  + If a match is found, the last content token of the matching link definition is checked.
+    ~ If it's a valid URL (see below), that URL is used as the hyperlink's URL.
+    ~ If not, the last token is treated as a URL generation argument,
+      which is passed to custom user callbacks to generate a URL.
+      - If the URL is successfully generated, it is used as the hyperlink's URL.
+      - Otherwise, the hyperlink is marked as broken.
+  + If no matching definitions are found, the last content token in the hyperlink span
+    is treated as a URL generation argument and passed to user callbacks to generate a URL.
+    - If successful, the generated URL is usedas the hyperlink's URL.
+    - Otherwise, the hyperlink is marked as broken.
 
-  The matching algorithm is described below.
-  }
-  ;;;
-  If a match is found, the last content token of the highest-priority link definition is checked.
-  If it's a valid URL, that URL is used as the hyperlink's URL.
-  If not, the last token is treated as a URL generation argument,
-  which is passed to custom user callbacks to generate a URL.
-  - If the URL is successfully generated, it is used as the hyperlink's URL.
-  - Otherwise, the hyperlink is marked as broken.
+During searching a matching link definition for a hyperlink,
+link definitions following the hyperlink span have higher matching priority than those before it.
+And
+- for the ones following the hyperlink span, earlier ones have priority over later ones.
+- for the ones before the hyperlink span, later ones have priority over earlier ones.
 
-* If no matching definitions are found, the last content token in the hyperlink span
-  is treated as a URL generation argument and passed to user callbacks to generate a URL.
-  - If successful, the generated URL is usedas the hyperlink's URL.
-  - Otherwise, the hyperlink is marked as broken.
-
-Before searching a matching link definition,
-* all content tokens (not including even-backtick mark tokens) of a hyperlink span
-  are assembled into a single matching text by discarding all blank characters.
-* all content tokens (not including even-backtick mark tokens) of a link definition
-  except the last one are assembled into a single matching text
-  by discarding all blank characters.
-
-Before searching for matching link definitions:
+Matching text generation:
 * All content tokens of a hyperlink span are combined into a single matching text,
   with all blank characters removed.
 * All content tokens of a link definition, except the last one,
   are combined into a single matching text, with all blank characters removed.
 
-Link definition matching depends on the structure of the definition:
+How matching works depends on the structure of matching texts of link definitions:
 * If the matching text of a link definition consists solely of three dots (`...`),
   the definition matches all hyperlink spans.
 * If the matching text ends with three dots, prefix matching is performed.
@@ -808,11 +792,12 @@ A content token is a valid URL if its text
 ! ### NOTE:
   ;;; The URL validation rules might be adjuested with more details later.
 
-If a hyperlink span only contains a `#block-id` token,
+If a hyperlink span is in the `#fragment` token,
 then the hyperlink span is viewed as a footnote reference.
-The corresponding footnote is defined in the block specified with ID as `block-id`.
+The corresponding footnote is defined in the block specified with ID as `fragment`.
 Generally, footnote definition blocks should be placed in an explcit base block
-which is commented out. Footnote blocks will be always rendered at the end of HTML output.
+which is commented out.
+Footnote blocks will be always rendered at the end of HTML output.
 
 @@@ #line-end-spacing
 ###+++++ Line-end spacing rules
@@ -827,13 +812,16 @@ for a line which is neither a comment line nor a media-embedding line,
 its line end is rendered as an ASCII Space character unless any of the following
 cases happens:
 * The line has an opening style mark token followed by a line-end blank token.
-* The line has no content tokens (including even-backtick mark tokens).
+* The line has no content tokens.
+  \\ (%% Note: Even-backtick mark tokens are treated as content tokens. %%)
 * The last content token in the line ends with a blank or CJK character __#note-cjk-chars__.
   \\ (%% Note: Even-backtick mark tokens in primary mode are interpreted as CJK characters. %%)
 * Within the block, after the line, no more content tokens are found.
 * After the line and before the next content token, a media-embedding or line-break token is found.
 * The next content token begins with a blank or CJK character.
   \\ (%% Again, even-backtick mark tokens in primary mode are interpreted as CJK characters. %%)
+
+
 
 ! ### NOTE:
   ;;; The current line-end spacing rules are not perfect and may be adjusted later.
