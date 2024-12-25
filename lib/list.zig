@@ -2,37 +2,32 @@ const std = @import("std");
 
 pub fn List(comptime Value: type) type {
     return struct {
-        // ToDo: use the std.Lists ...
-        info: ?struct {
-            head: *Element(Value),
-            tail: *Element(Value),
-        } = null,
+        // size is 3 words.
+        //info: ?struct {
+        //    head: *Element(Value),
+        //    tail: *Element(Value),
+        //} = null,
+
+        // size is 2 words.
+        head: ?*Element(Value) = null,
+        tail: ?*Element(Value) = null,
 
         const Self = @This();
 
         pub fn empty(self: *const Self) bool {
-            return self.info == null;
-        }
-
-        pub fn head(self: *const Self) ?*Element(Value) {
-            return if (self.info) |info| info.head else null;
-        }
-
-        pub fn tail(self: *const Self) ?*Element(Value) {
-            return if (self.info) |info| info.tail else null;
+            std.debug.assert((self.head == null) == (self.tail == null));
+            return self.head == null;
         }
 
         // e must not be in any list.
         pub fn push(self: *Self, e: *Element(Value)) void {
-            if (self.info) |*info| {
-                info.tail.next = e;
-                e.prev = info.tail;
-                info.tail = e;
+            if (self.tail) |tail| {
+                tail.next = e;
+                e.prev = tail;
+                self.tail = e;
             } else {
-                self.info = .{
-                    .head = e,
-                    .tail = e,
-                };
+                self.head = e;
+                self.tail = e;
                 e.prev = null;
             }
             e.next = null;
@@ -40,15 +35,15 @@ pub fn List(comptime Value: type) type {
 
         // ToDo: renamed tp popTail/pushTail
         pub fn pop(self: *Self) ?*Element(Value) {
-            if (self.info) |*info| {
-                const e = info.tail;
-                if (e.prev) |prev| {
+            if (self.tail) |tail| {
+                if (tail.prev) |prev| {
                     prev.next = null;
-                    info.tail = prev;
+                    self.tail = prev;
                 } else {
-                    self.info = null;
+                    self.head = null;
+                    self.tail = null;
                 }
-                return e;
+                return tail;
             }
 
             return null;
@@ -56,42 +51,40 @@ pub fn List(comptime Value: type) type {
 
         // e must not be in any list.
         pub fn pushHead(self: *Self, e: *Element(Value)) void {
-            if (self.info) |*info| {
-                info.head.prev = e;
-                e.next = info.head;
-                info.head = e;
+            if (self.head) |head| {
+                head.prev = e;
+                e.next = head;
+                self.head = e;
             } else {
-                self.info = .{
-                    .head = e,
-                    .tail = e,
-                };
+                self.head = e;
+                self.tail = e;
                 e.next = null;
             }
             e.prev = null;
         }
 
         pub fn popHead(self: *Self) ?*Element(Value) {
-            if (self.info) |*info| {
-                const e = info.head;
-                if (e.next) |next| {
+            if (self.head) |head| {
+                if (head.next) |next| {
                     next.prev = null;
-                    info.head = next;
+                    self.head = next;
                 } else {
-                    self.info = null;
+                    self.head = null;
+                    self.tail = null;
                 }
-                return e;
+                return head;
             }
 
             return null;
         }
 
         pub fn delete(self: *Self, e: *Element(Value)) void {
-            if (self.info) |*info| {
-                if (e == info.head) {
+            if (self.head) |head| {
+                if (e == head) {
                     _ = self.popHead();
                     return;
                 }
-                if (e == info.tail) {
+                if (e == self.tail) {
                     _ = self.pop();
                     return;
                 }
@@ -101,8 +94,8 @@ pub fn List(comptime Value: type) type {
         }
 
         pub fn iterate(self: *Self, comptime f: fn (Value) void) void {
-            if (self.info) |info| {
-                var element = info.head;
+            if (self.head) |head| {
+                var element = head;
                 while (true) {
                     const next = element.next;
                     f(element.value);
@@ -126,7 +119,7 @@ pub fn createListElement(comptime Node: type, allocator: std.mem.Allocator) !*El
 }
 
 pub fn destroyListElements(comptime NodeValue: type, l: List(NodeValue), comptime onNodeValue: ?fn (*NodeValue, std.mem.Allocator) void, allocator: std.mem.Allocator) void {
-    var element = l.head();
+    var element = l.head;
     if (onNodeValue) |f| {
         while (element) |e| {
             const next = e.next;

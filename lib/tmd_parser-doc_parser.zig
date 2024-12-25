@@ -68,7 +68,7 @@ fn tryToAttributeBlock(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !vo
 }
 
 fn tryToAttributeTheLastBlock(parser: *DocParser) !void {
-    std.debug.assert(parser.lastBlockInfo == &parser.tmdDoc.blocks.tail().?.value);
+    std.debug.assert(parser.lastBlockInfo == &parser.tmdDoc.blocks.tail.?.value);
     switch (parser.lastBlockInfo.blockType) {
         .attributes => if (parser.nextElementAttributes) |as| {
             try parser.setBlockAttributes(parser.lastBlockInfo, as); // a footer attributes
@@ -109,7 +109,7 @@ fn setBlockAttributes(parser: *DocParser, blockInfo: *tmd.BlockInfo, as: tmd.Ele
 fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void {
     std.debug.assert(lineInfo.lineType == .attributes);
     const tokens = lineInfo.lineType.attributes.tokens;
-    const headElement = tokens.head() orelse return;
+    const headElement = tokens.head orelse return;
     if (headElement.value.tokenType != .commentText) return;
     std.debug.assert(headElement.next == null);
     const commentToken = &headElement.value;
@@ -118,7 +118,7 @@ fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void 
 
     //if (forBulletContainer) {
     //    std.debug.assert(parser.nextElementAttributes == null);
-    //    const attributesElement = parser.tmdDoc.blocks.tail() orelse unreachable;
+    //    const attributesElement = parser.tmdDoc.blocks.tail orelse unreachable;
     //    std.debug.assert(attributesElement.value.blockType == .attributes);
     //    const bulletElement = attributesElement.prev orelse unreachable;
     //    std.debug.assert(bulletElement.value.blockType == .item);
@@ -143,7 +143,7 @@ fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void 
 
 // atomBlockInfo is an atom block, or a base/root block.
 fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) !void {
-    if (parser.tmdDoc.lines.tail()) |lastLineInfoElement| {
+    if (parser.tmdDoc.lines.tail) |lastLineInfoElement| {
         std.debug.assert(!parser.tmdDoc.blocks.empty());
         std.debug.assert(atomBlockInfo.blockType != .root);
         if (atomBlockInfo.blockType != .base) handle: {

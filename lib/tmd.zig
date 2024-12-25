@@ -17,8 +17,8 @@ pub const BlockInfoRedBlack = tree.RedBlack(*BlockInfo, BlockInfo);
 
 pub const Doc = struct {
     data: []const u8,
-    blocks: list.List(BlockInfo) = .{}, // ToDo: use SinglyLinkedList
-    lines: list.List(LineInfo) = .{}, // ToDo: use SinglyLinkedList
+    blocks: list.List(BlockInfo) = .{},
+    lines: list.List(LineInfo) = .{},
 
     tocHeaders: list.List(*BlockInfo) = .{},
     titleHeader: ?*BlockInfo = null,
@@ -30,7 +30,7 @@ pub const Doc = struct {
     // The followings are used to track allocations for destroying.
     // ToDo: prefix them with _?
 
-    links: list.List(Link) = .{}, // ToDo: use SinglyLinkedList
+    links: list.List(Link) = .{}, // ToDo: use Link.next
     blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{}, // ToDo: use SinglyLinkedList
     // It is in blockTreeNodes when exists. So no need to destroy it solely in the end.
     freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null, // ToDo: use SinglyLinkedList
@@ -1017,7 +1017,7 @@ pub const TokenType = union(enum) {
 
         // ToDo: Now the union size is 16 bytes anyway.
         //       So maybe it is a good idea to expand the two fields here.
-        // 
+        //
 
         info: union(enum) {
             // This is only used for link matching.
@@ -1112,5 +1112,3 @@ pub const LineSpanMarkType = enum(u3) {
     escape, // !!
     spoiler, // ??
 };
-
-

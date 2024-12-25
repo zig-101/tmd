@@ -389,7 +389,7 @@ fn Patricia(comptime TextType: type) type {
         }
 
         fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
-            var le = node.value.linkInfos.head();
+            var le = node.value.linkInfos.head;
             while (le) |linkInfoElement| {
                 if (linkInfoElement.value.info != .urlSourceText) {
                     //std.debug.print("    333 aaa exact match, found and setSourceOfURL.\n", .{});
@@ -514,7 +514,7 @@ const Matcher = struct {
 
 pub fn matchLinks(self: *const LinkMatcher) !void {
     const links = self.links;
-    if (links.empty()) return;
+    var linkElement = links.head orelse return;
 
     var linksForTree: list.List(LinkForTree) = .{};
     defer list.destroyListElements(LinkForTree, linksForTree, destroyRevisedLinkText, self.allocator);
@@ -533,7 +533,6 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
     };
 
     // The top-to-bottom pass.
-    var linkElement = links.head().?;
     while (true) {
         const linkInfo = linkElement.value.info;
         switch (linkInfo.info) {
@@ -664,7 +663,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
         normalPatricia.clear();
         invertedPatricia.clear();
 
-        var element = linksForTree.tail();
+        var element = linksForTree.tail;
         while (element) |theElement| {
             const linkForTree = &theElement.value;
             const theLinkInfo = linkForTree.info();
@@ -681,7 +680,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
 
     // The final pass (for still unmatched links).
     {
-        var element = linksForTree.head();
+        var element = linksForTree.head;
         while (element) |theElement| {
             const theLinkInfo = theElement.value.info();
             if (theLinkInfo.info != .urlSourceText) {

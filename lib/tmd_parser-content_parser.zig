@@ -593,13 +593,13 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
 
     std.debug.assert(lineScanner.lineEnd != null);
 
-    const lastToken = if (self.lineSession.tokens.tail()) |element| blk: {
+    const lastToken = if (self.lineSession.tokens.tail) |element| blk: {
         const lastToken = &element.value;
         std.debug.assert(contentEnd == lastToken.end());
         break :blk lastToken;
     } else unreachable; // a line might have no tokens, but then this function will not be called for such a line.
 
-    if (self.lineSession.tokens.head()) |head| {
+    if (self.lineSession.tokens.head) |head| {
         var notMediaLine = true;
         var tryToPendLine = true;
         var cancelPeading = false;

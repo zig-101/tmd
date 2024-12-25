@@ -101,7 +101,7 @@ pub const TmdRender = struct {
         };
         self.footnotesByID.init(&nilFootnoteTreeNode);
 
-        if (self.doc.blocks.head()) |blockInfoElement| {
+        if (self.doc.blocks.head) |blockInfoElement| {
             const rootBlock = &blockInfoElement.value;
             std.debug.assert(rootBlock.blockType == .root);
 
@@ -1019,7 +1019,7 @@ pub const TmdRender = struct {
         }
 
         while (true) {
-            var element = lineInfo.tokens().?.head();
+            var element = lineInfo.tokens().?.head;
             var isNonBareSpoilerLine = false;
             while (element) |tokenInfoElement| {
                 const token = &tokenInfoElement.value;
@@ -1197,7 +1197,7 @@ pub const TmdRender = struct {
             }
         }
 
-        if (tracker.marksStack.tail()) |element| {
+        if (tracker.marksStack.tail) |element| {
             var markElement = element;
             while (true) {
                 if (markElement.value.mark) |m| {
@@ -1409,7 +1409,7 @@ pub const TmdRender = struct {
 
         var levelOpened: [tmd.MaxHeaderLevel + 1]bool = .{false} ** (tmd.MaxHeaderLevel + 1);
         var lastLevel: u8 = tmd.MaxHeaderLevel + 1;
-        var listElement = self.doc.tocHeaders.head();
+        var listElement = self.doc.tocHeaders.head;
         while (listElement) |element| {
             defer listElement = element.next;
             const headerBlock = element.value;
@@ -1466,7 +1466,7 @@ pub const TmdRender = struct {
 
         _ = try w.write("\n<ol class=\"tmd-list tmd-footnotes\">\n");
 
-        var listElement = self.footnoteNodes.head();
+        var listElement = self.footnoteNodes.head;
         while (listElement) |element| {
             defer listElement = element.next;
             const footnote = element.value.value;

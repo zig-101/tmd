@@ -4,7 +4,7 @@ const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 
 pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
-    var blockElement = tmdDoc.blocks.head();
+    var blockElement = tmdDoc.blocks.head;
     while (blockElement) |be| {
         defer blockElement = be.next;
         const blockInfo = &be.value;
@@ -67,7 +67,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                 });
 
                 if (lineInfo.tokens()) |tokens| {
-                    var tokenInfoElement = tokens.head();
+                    var tokenInfoElement = tokens.head;
                     //if (true) tokenInfoElement = null; // debug switch
                     while (tokenInfoElement) |element| {
                         depth = blockInfo.nestingDepth + 2;
