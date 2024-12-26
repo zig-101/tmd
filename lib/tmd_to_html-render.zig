@@ -1029,12 +1029,10 @@ pub const TmdRender = struct {
                         if (tracker.activeLinkInfo) |linkInfo| {
                             if (!tracker.firstPlainTextInLink) {
                                 std.debug.assert(!linkInfo.isFootnote());
+                                std.debug.assert(linkInfo.urlSourceSet());
 
-                                switch (linkInfo.info) {
-                                    .urlSourceText => |sourceText| {
-                                        if (sourceText == token) break :blk;
-                                    },
-                                    else => {},
+                                if (linkInfo.info.urlSourceText) |sourceText| {
+                                    if (sourceText == token) break :blk;
                                 }
                             } else {
                                 tracker.firstPlainTextInLink = false;

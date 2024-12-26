@@ -356,31 +356,20 @@ fn Patricia(comptime TextType: type) type {
             var theText = text;
             var theTree = &self.topTree;
             while (true) {
-                //std.debug.print(" aaa, text={s}\n", .{theText.asString()});
-                //std.debug.print(" aaa 111, root={s}\n", .{theTree.root.value.textSegment.asString()});
-
                 const nodeValue = NodeValue{ .textSegment = theText };
                 if (theTree.search(nodeValue)) |n| {
                     const k = NodeValue.commonPrefixLen(&n.value, &nodeValue);
-                    //std.debug.print("  bbb. {}, {}, {s}\n", .{ k, n.value.textSegment.len, n.value.textSegment.asString() });
                     if (n.value.textSegment.len < theText.len) {
-                        //std.debug.print("    ccc 111\n", .{});
                         if (k < n.value.textSegment.len) break;
                         std.debug.assert(k == n.value.textSegment.len);
                         theTree = &n.value.deeperTree;
                         theText = theText.suffix(k);
-                        //std.debug.print("    ccc 222, {}, k={}, text={s}\n", .{ theTree.count, k, theText.asString() });
-                        //std.debug.print("    ccc 222, root={s}\n", .{theTree.root.value.textSegment.asString()});
                         continue;
                     } else {
-                        //std.debug.print("    ddd 111\n", .{});
                         if (k < theText.len) break;
-                        //std.debug.print("    ddd 222\n", .{});
                         std.debug.assert(k == theText.len);
                         if (prefixMatching) return n;
-                        //std.debug.print("    ddd 333\n", .{});
                         if (n.value.textSegment.len == theText.len) return n;
-                        //std.debug.print("    ddd 444\n", .{});
                         break;
                     }
                 } else break;
@@ -391,11 +380,8 @@ fn Patricia(comptime TextType: type) type {
         fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
             var le = node.value.linkInfos.head;
             while (le) |linkInfoElement| {
-                if (linkInfoElement.value.info != .urlSourceText) {
-                    //std.debug.print("    333 aaa exact match, found and setSourceOfURL.\n", .{});
+                if (!linkInfoElement.value.urlSourceSet()) {
                     linkInfoElement.value.setSourceOfURL(urlSource, confirmed);
-                } else {
-                    //std.debug.print("    333 aaa exact match, found but sourceURL has set.\n", .{});
                 }
                 le = linkInfoElement.next;
             }
@@ -459,14 +445,11 @@ const Matcher = struct {
 
         const linkText = linkDef.revisedLinkText.asString();
 
-        //std.debug.print("    333 linkText = {s}\n", .{linkText});
-
         // ToDo: require that the ending "..." must be amtomic?
         const ddd = "...";
         if (mem.endsWith(u8, linkText, ddd)) {
             if (linkText.len == ddd.len) {
-                //std.debug.print("    333 all match.\n", .{});
-                // all match
+                // all matching
 
                 NormalPatricia.setUrlSourceForTreeNodes(&self.normalPatricia.topTree, urlSource, confirmed);
                 //InvertedPatricia.setUrlSourceForTreeNodes(&self.invertedPatricia.topTree, urlSource, confirmed);
@@ -474,38 +457,28 @@ const Matcher = struct {
                 self.normalPatricia.clear();
                 self.invertedPatricia.clear();
             } else {
-                //std.debug.print("    333 leading match.\n", .{});
-                // leading match
+                // prefix matching
 
                 const revisedLinkText = linkDef.revisedLinkText.prefix(linkDef.revisedLinkText.len - @as(u32, ddd.len));
                 if (self.normalPatricia.searchLinkInfo(revisedLinkText, true)) |node| {
                     NormalPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed);
                     NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed);
-                } else {
-                    //std.debug.print("    333 leading match. Not found.\n", .{});
                 }
             }
         } else {
             if (mem.startsWith(u8, linkText, ddd)) {
-                //std.debug.print("    333 trailing match.\n", .{});
-                // trailing match
+                // suffix matching
 
                 const revisedLinkText = linkDef.revisedLinkText.suffix(@intCast(ddd.len));
                 if (self.invertedPatricia.searchLinkInfo(revisedLinkText.invert(), true)) |node| {
                     InvertedPatricia.setUrlSourceForTreeNodes(&node.value.deeperTree, urlSource, confirmed);
                     InvertedPatricia.setUrlSourceForNode(node, urlSource, confirmed);
-                } else {
-                    //std.debug.print("    333 trailing match. Not found.\n", .{});
                 }
             } else {
-                //std.debug.print("    333 exact match.\n", .{});
-                // exact match
+                // exact matching
 
                 if (self.normalPatricia.searchLinkInfo(linkDef.revisedLinkText, false)) |node| {
-                    //std.debug.print("    333 exact match, found.\n", .{});
                     NormalPatricia.setUrlSourceForNode(node, urlSource, confirmed);
-                } else {
-                    //std.debug.print("    333 exact match, not found.\n", .{});
                 }
             }
         }
@@ -535,122 +508,120 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
     // The top-to-bottom pass.
     while (true) {
         const linkInfo = linkElement.value.info;
-        switch (linkInfo.info) {
-            .urlSourceText => unreachable,
-            .firstPlainText => |contentToken| blk: {
-                const firstTextToken = if (contentToken) |first| first else {
-                    // The link should be ignored in rendering.
+        std.debug.assert(!linkInfo.urlSourceSet());
+        blk: {
+            const firstTextToken = if (linkInfo.info.firstPlainText) |first| first else {
+                // The link should be ignored in rendering.
 
-                    //std.debug.print("ignored for no content tokens\n", .{});
-                    linkInfo.setSourceOfURL(null, false);
-                    break :blk;
-                };
+                //std.debug.print("ignored for no content tokens\n", .{});
+                linkInfo.setSourceOfURL(null, false);
+                break :blk;
+            };
 
-                var linkTextLen: u32 = 0;
-                var lastToken = firstTextToken;
-                // count sum length without the last text token
-                var dummyLinkText = DummyLinkText{};
-                while (lastToken.tokenType.content.nextInLink) |nextToken| {
-                    defer lastToken = nextToken;
-                    const str = self.tokenAsString(lastToken);
-                    linkTextLen = copyLinkText(&dummyLinkText, linkTextLen, str);
-                }
+            var linkTextLen: u32 = 0;
+            var lastToken = firstTextToken;
+            // count sum length without the last text token
+            var dummyLinkText = DummyLinkText{};
+            while (lastToken.tokenType.content.nextInLink) |nextToken| {
+                defer lastToken = nextToken;
+                const str = self.tokenAsString(lastToken);
+                linkTextLen = copyLinkText(&dummyLinkText, linkTextLen, str);
+            }
 
-                // handle the last text token
-                {
-                    const str = LineScanner.trim_blanks(self.tokenAsString(lastToken));
-                    if (linkInfo.inComment()) {
-                        if (copyLinkText(&dummyLinkText, 0, str) == 0) {
-                            // This link definition will be ignored.
+            // handle the last text token
+            {
+                const str = LineScanner.trim_blanks(self.tokenAsString(lastToken));
+                if (linkInfo.inComment()) {
+                    if (copyLinkText(&dummyLinkText, 0, str) == 0) {
+                        // This link definition will be ignored.
 
-                            //std.debug.print("ignored for blank link definition\n", .{});
-                            linkInfo.setSourceOfURL(null, false);
-                            break :blk;
-                        }
-                    } else if (AttributeParser.isValidLinkURL(str)) {
-                        // For built-in cases, no need to call callback to determine the url.
-
-                        //std.debug.print("self defined url: {s}\n", .{str});
-                        linkInfo.setSourceOfURL(lastToken, true);
-
-                        if (lastToken == firstTextToken and mem.startsWith(u8, str, "#")) {
-                            linkInfo.setFootnote(true);
-                        }
-
-                        break :blk;
-                    } else {
-                        linkTextLen = copyLinkText(&dummyLinkText, linkTextLen, str);
-                    }
-
-                    if (linkTextLen == 0) {
-                        // The link should be ignored in rendering.
-
-                        //std.debug.print("ignored for blank link text\n", .{});
+                        //std.debug.print("ignored for blank link definition\n", .{});
                         linkInfo.setSourceOfURL(null, false);
                         break :blk;
                     }
+                } else if (AttributeParser.isValidLinkURL(str)) {
+                    // For built-in cases, no need to call callback to determine the url.
+
+                    //std.debug.print("self defined url: {s}\n", .{str});
+                    linkInfo.setSourceOfURL(lastToken, true);
+
+                    if (lastToken == firstTextToken and mem.startsWith(u8, str, "#") and !mem.startsWith(u8, str[1..], "#")) {
+                        linkInfo.setFootnote(true);
+                    }
+
+                    break :blk;
+                } else {
+                    linkTextLen = copyLinkText(&dummyLinkText, linkTextLen, str);
                 }
 
-                // build RevisedLinkText
+                if (linkTextLen == 0) {
+                    // The link should be ignored in rendering.
 
-                const textPtr: [*]u8 = (try self.allocator.alloc(u8, linkTextLen)).ptr;
-                const revisedLinkText = RevisedLinkText{
-                    .len = linkTextLen,
-                    .text = textPtr,
-                };
-                //defer std.debug.print("====={}: ||{s}||\n", .{linkInfo.inComment(), revisedLinkText.asString()});
+                    //std.debug.print("ignored for blank link text\n", .{});
+                    linkInfo.setSourceOfURL(null, false);
+                    break :blk;
+                }
+            }
 
-                const theElement = try self.allocator.create(list.Element(LinkForTree));
-                linksForTree.push(theElement);
-                theElement.value.setInfoAndText(linkInfo, revisedLinkText);
-                const linkForTree = &theElement.value;
+            // build RevisedLinkText
 
-                const confirmed = while (true) { // ToDo: use a labled non-loop block
-                    var realLinkText = RealLinkText{
-                        .text = textPtr, // == revisedLinkText.text,
-                    };
+            const textPtr: [*]u8 = (try self.allocator.alloc(u8, linkTextLen)).ptr;
+            const revisedLinkText = RevisedLinkText{
+                .len = linkTextLen,
+                .text = textPtr,
+            };
+            //defer std.debug.print("====={}: ||{s}||\n", .{linkInfo.inComment(), revisedLinkText.asString()});
 
-                    var linkTextLen2: u32 = 0;
-                    lastToken = firstTextToken;
-                    // build text data without the last text token
-                    while (lastToken.tokenType.content.nextInLink) |nextToken| {
-                        defer lastToken = nextToken;
-                        const str = self.tokenAsString(lastToken);
-                        linkTextLen2 = copyLinkText(&realLinkText, linkTextLen2, str);
-                    }
+            const theElement = try self.allocator.create(list.Element(LinkForTree));
+            linksForTree.push(theElement);
+            theElement.value.setInfoAndText(linkInfo, revisedLinkText);
+            const linkForTree = &theElement.value;
 
-                    // handle the last text token
-                    const str = LineScanner.trim_blanks(self.tokenAsString(lastToken));
-                    if (linkInfo.inComment()) {
-                        std.debug.assert(linkTextLen2 == linkTextLen);
-
-                        //std.debug.print("    222 linkText = {s}\n", .{revisedLinkText.asString()});
-
-                        //std.debug.print("==== /{s}/, {}\n", .{ str, AttributeParserisValidLinkURL(str) });
-
-                        break AttributeParser.isValidLinkURL(str);
-                    } else {
-                        std.debug.assert(!AttributeParser.isValidLinkURL(str));
-
-                        // For a link whose url is not built-in determined,
-                        // all of its text tokens are used as link texts.
-
-                        linkTextLen2 = copyLinkText(&realLinkText, linkTextLen2, str);
-                        std.debug.assert(linkTextLen2 == linkTextLen);
-
-                        //std.debug.print("    111 linkText = {s}\n", .{revisedLinkText.asString()});
-
-                        try normalPatricia.putLinkInfo(revisedLinkText, &linkForTree.linkInfoElementNormal);
-                        try invertedPatricia.putLinkInfo(revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
-                        break :blk;
-                    }
+            const confirmed = while (true) { // ToDo: use a labled non-loop block
+                var realLinkText = RealLinkText{
+                    .text = textPtr, // == revisedLinkText.text,
                 };
 
-                std.debug.assert(linkInfo.inComment());
+                var linkTextLen2: u32 = 0;
+                lastToken = firstTextToken;
+                // build text data without the last text token
+                while (lastToken.tokenType.content.nextInLink) |nextToken| {
+                    defer lastToken = nextToken;
+                    const str = self.tokenAsString(lastToken);
+                    linkTextLen2 = copyLinkText(&realLinkText, linkTextLen2, str);
+                }
 
-                linkInfo.setSourceOfURL(lastToken, confirmed);
-                matcher.doForLinkDefinition(linkForTree);
-            },
+                // handle the last text token
+                const str = LineScanner.trim_blanks(self.tokenAsString(lastToken));
+                if (linkInfo.inComment()) {
+                    std.debug.assert(linkTextLen2 == linkTextLen);
+
+                    //std.debug.print("    222 linkText = {s}\n", .{revisedLinkText.asString()});
+
+                    //std.debug.print("==== /{s}/, {}\n", .{ str, AttributeParserisValidLinkURL(str) });
+
+                    break AttributeParser.isValidLinkURL(str);
+                } else {
+                    std.debug.assert(!AttributeParser.isValidLinkURL(str));
+
+                    // For a link whose url is not built-in determined,
+                    // all of its text tokens are used as link texts.
+
+                    linkTextLen2 = copyLinkText(&realLinkText, linkTextLen2, str);
+                    std.debug.assert(linkTextLen2 == linkTextLen);
+
+                    //std.debug.print("    111 linkText = {s}\n", .{revisedLinkText.asString()});
+
+                    try normalPatricia.putLinkInfo(revisedLinkText, &linkForTree.linkInfoElementNormal);
+                    try invertedPatricia.putLinkInfo(revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
+                    break :blk;
+                }
+            };
+
+            std.debug.assert(linkInfo.inComment());
+
+            linkInfo.setSourceOfURL(lastToken, confirmed);
+            matcher.doForLinkDefinition(linkForTree);
         }
 
         if (linkElement.next) |next| {
@@ -668,9 +639,9 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
             const linkForTree = &theElement.value;
             const theLinkInfo = linkForTree.info();
             if (theLinkInfo.inComment()) {
-                std.debug.assert(theLinkInfo.info == .urlSourceText);
+                std.debug.assert(theLinkInfo.urlSourceSet());
                 matcher.doForLinkDefinition(linkForTree);
-            } else if (theLinkInfo.info != .urlSourceText) {
+            } else if (!theLinkInfo.urlSourceSet()) {
                 try normalPatricia.putLinkInfo(linkForTree.revisedLinkText, &linkForTree.linkInfoElementNormal);
                 try invertedPatricia.putLinkInfo(linkForTree.revisedLinkText.invert(), &linkForTree.linkInfoElementInverted);
             }
@@ -683,7 +654,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
         var element = linksForTree.head;
         while (element) |theElement| {
             const theLinkInfo = theElement.value.info();
-            if (theLinkInfo.info != .urlSourceText) {
+            if (!theLinkInfo.urlSourceSet()) {
                 theLinkInfo.setSourceOfURL(theLinkInfo.info.firstPlainText, false);
             }
             element = theElement.next;

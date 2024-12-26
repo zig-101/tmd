@@ -1012,6 +1012,7 @@ pub const TokenType = union(enum) {
         blankSpan: bool, // enclose no texts (contents or evenBackticks or treatEndAsSpace)
 
         inComment: bool, // for .linkInfo
+        urlSourceSet: bool = false, // for .linkInfo
         urlConfirmed: bool = false, // for .linkInfo
         isFootnote: bool = false, // for .linkInfo
 
@@ -1021,13 +1022,7 @@ pub const TokenType = union(enum) {
     },
     // A linkInfo token is always before an open .link SpanMarkType token.
     linkInfo: struct {
-        //attrs: ?*ElementAttibutes = null,
-
-        // ToDo: Now the union size is 16 bytes anyway.
-        //       So maybe it is a good idea to expand the two fields here.
-        //       (Or, use packed union, same effect).
-
-        info: union(enum) {
+        info: packed union {
             // This is only used for link matching.
             firstPlainText: ?*TokenInfo, // null for a blank link span
 
@@ -1060,14 +1055,19 @@ pub const TokenType = union(enum) {
             return self.followingOpenLinkSpanMark().urlConfirmed;
         }
 
-        pub fn setSourceOfURL(self: *@This(), urlSource: ?*TokenInfo, confirmed: bool) void {
-            std.debug.assert(self.info != .urlSourceText);
+        pub fn urlSourceSet(self: *const @This()) bool {
+            return self.followingOpenLinkSpanMark().urlSourceSet;
+        }
 
+        pub fn setSourceOfURL(self: *@This(), urlSource: ?*TokenInfo, confirmed: bool) void {
+            std.debug.assert(!self.urlSourceSet());
+
+            self.followingOpenLinkSpanMark().urlConfirmed = confirmed;
             self.info = .{
                 .urlSourceText = urlSource,
             };
 
-            self.followingOpenLinkSpanMark().urlConfirmed = confirmed;
+            self.followingOpenLinkSpanMark().urlSourceSet = true;
         }
     },
     leadingSpanMark: struct {
