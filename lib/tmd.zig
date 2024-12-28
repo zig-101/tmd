@@ -13,7 +13,8 @@ const builtin = @import("builtin");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 
-pub const BlockRedBlack = tree.RedBlack(*Block, Block);
+pub const DocSize = u28; // max 256M (in practice, most TMD doc sizes < 1M)
+pub const MaxDocSize: u32 = 1 << @bitSizeOf(DocSize) - 1;
 
 pub const Doc = struct {
     data: []const u8,
@@ -39,6 +40,8 @@ pub const Doc = struct {
     _codeBlockAttibutes: list.List(CodeBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
     _customBlockAttibutes: list.List(CustomBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
     _contentStreamAttributes: list.List(ContentStreamAttributes) = .{}, // ToDo: use SinglyLinkedList
+
+    const BlockRedBlack = tree.RedBlack(*Block, Block);
 
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*Block {
         var a = ElementAttibutes{
@@ -532,7 +535,7 @@ pub const BlockType = union(enum) {
         // An empty header is used to insert toc.
         pub fn isBare(self: @This()) bool {
             //return self.startLine == self.endLine and self.startLine.tokens().?.empty();
-            return self.startLine == self.endLine and self.startLine.tokens.empty();
+            return self.startLine == self.endLine and self.startLine.lineTypeMarkToken().?.next() == null;
         }
     },
 
@@ -666,8 +669,6 @@ fn identify(T: type) type {
     };
 }
 
-pub const LineStartAtType = std.meta.FieldType(Line, .startAt);
-
 pub const Line = struct {
     pub const Type = enum(u4) {
         blank,
@@ -697,7 +698,7 @@ pub const Line = struct {
             return @tagName(self);
         }
 
-        pub fn len(self: @This()) u32 {
+        pub fn len(self: @This()) u2 {
             return switch (self) {
                 .void => 0,
                 .n => 1,
@@ -709,14 +710,24 @@ pub const Line = struct {
     index: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
     atomBlockIndex: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
 
-    startAt: voidOr(u32) = undefined,
+    startAt: voidOr(DocSize) = undefined,
+
+    // ToDo: it looks packing the following 6 fields doesn't reduce size at all.
+    //       They use totally 91 bits, so 12 bytes (96 bits) are sufficient.
+    //       But zig compiler will use 16 bytes for the packed struct anyway.
+    //       Because the compiler always thinks the alignment of the packed struct is 16.
+    //
+    //       So maybe it is best to manually pack these fields.
+    //       Use three u32 fields ...
+    //       This can save 4 bytes.
+    //       (Or use 3 packed structs instead? Each is composed of two origial fields.)
 
     // This is the end pos of the line end token.
     // It is also the start pos of the next line.
-    endAt: u32 = undefined,
+    endAt: DocSize = undefined,
 
-    prefixBlankEnd: u32 = undefined,
-    suffixBlankStart: u32 = undefined,
+    prefixBlankEnd: DocSize = undefined,
+    suffixBlankStart: DocSize = undefined,
 
     endType: EndType = undefined,
 
@@ -785,12 +796,12 @@ pub const Line = struct {
         return null;
     }
 
-    fn startPos(self: *const @This()) u32 {
+    fn startPos(self: *const @This()) DocSize {
         if (builtin.mode == .Debug) return self.startAt.get();
         return if (self.prev()) |prevLine| prevLine.endAt else 0;
     }
 
-    pub fn start(self: *const @This(), trimOption: enum { none, trimContainerMark, trimLeadingSpaces }) u32 {
+    pub fn start(self: *const @This(), trimOption: enum { none, trimContainerMark, trimLeadingSpaces }) DocSize {
         switch (trimOption) {
             .none => return self.startPos(),
             .trimLeadingSpaces => return self.prefixBlankEnd,
@@ -806,7 +817,7 @@ pub const Line = struct {
         }
     }
 
-    pub fn end(self: *const @This(), trimOption: enum { none, trimLineEnd, trimTrailingSpaces }) u32 {
+    pub fn end(self: *const @This(), trimOption: enum { none, trimLineEnd, trimTrailingSpaces }) DocSize {
         return switch (trimOption) {
             .none => self.endAt,
             .trimLineEnd => self.endAt - self.endType.len(),
@@ -850,6 +861,34 @@ pub const Line = struct {
     }
 };
 
+// Tokens consume most memory after a doc is parsed.
+// So try to keep the size of TokenType small and use as few tokens as possible.
+//
+// Try to keep the size of each TokenType field <= (4 + 4 + NativeWordSize) bytes.
+//
+// It is possible to make size of TokenType be 8 on 32-bit systems? (By discarding
+// the .start property of each TokenType).
+//
+// Now, even all the fields of a union type reserved enough bits for the union tag,
+// the compiler will still use extra alignment bytes for the union tag.
+// So the size of TokenType is 24 bytes now.
+// Maybe future zig compiler will make optimization to reduce the size to 16 bytes.
+//
+// An unmature idea is to add an extra enum field which only use
+// the reserved bits to emulate the union tag manually.
+// I'm nore sure how safe this way is now.
+//
+//     tag: struct {
+//        _: uN,
+//        _type: enum(uM) { // M == 16*8 - N
+//            content,
+//            commentText,
+//            ...
+//        },
+//     },
+//     content: ...,
+//     commentText: ...,
+
 pub const Token = union(enum) {
     pub const PlainText = std.meta.FieldType(Token, .content);
     pub const CommentText = std.meta.FieldType(Token, .commentText);
@@ -862,19 +901,19 @@ pub const Token = union(enum) {
     pub const Extra = std.meta.FieldType(Token, .extra);
 
     content: struct {
-        start: u32,
+        start: DocSize,
         // The value should be the same as the start of the next token, or end of line.
         // But it is good to keep it here, to verify the this value is the same as ....
-        end: u32,
+        end: DocSize,
 
         // Finally, the list will exclude the last one if
         // it is only used for self-defined URL.
         nextInLink: ?*Token = null,
     },
     commentText: struct {
-        start: u32,
+        start: DocSize,
         // The value should be the same as the end of line.
-        end: u32,
+        end: DocSize,
 
         inAttributesLine: bool, // ToDo: don't use commentText tokens for attributes lines.
     },
@@ -883,8 +922,8 @@ pub const Token = union(enum) {
     //    attrs: *MediaAttributes,
     //},
     evenBackticks: struct {
-        start: u32,
-        pairCount: u32,
+        start: DocSize,
+        pairCount: DocSize,
         secondary: bool,
 
         // `` means a void char.
@@ -894,19 +933,22 @@ pub const Token = union(enum) {
     spanMark: struct {
         // For a close mark, this might be the start of the attached blanks.
         // For a open mark, this might be the position of the secondary sign.
-        start: u32,
-        blankLen: u32, // blank char count after open-mark or before close-mark in a line.
+        start: DocSize,
+        blankLen: DocSize, // blank char count after open-mark or before close-mark in a line.
 
-        open: bool,
-        secondary: bool = false,
         markType: SpanMarkType, // might
         markLen: u8, // without the secondary char
-        blankSpan: bool, // enclose no texts (contents or evenBackticks or treatEndAsSpace)
 
-        inComment: bool, // for .linkInfo
-        urlSourceSet: bool = false, // for .linkInfo
-        urlConfirmed: bool = false, // for .linkInfo
-        isFootnote: bool = false, // for .linkInfo
+        more: packed struct {
+            open: bool,
+            secondary: bool = false,
+            blankSpan: bool, // enclose no texts (contents or evenBackticks or treatEndAsSpace)
+
+            inComment: bool, // for .linkInfo
+            urlSourceSet: bool = false, // for .linkInfo
+            urlConfirmed: bool = false, // for .linkInfo
+            isFootnote: bool = false, // for .linkInfo
+        },
 
         pub fn typeName(self: @This()) []const u8 {
             return @tagName(self.markType);
@@ -926,66 +968,70 @@ pub const Token = union(enum) {
         fn followingOpenLinkSpanMark(self: *const @This()) *SpanMark {
             const token: *const Token = @alignCast(@fieldParentPtr("linkInfo", self));
             const m = token.followingSpanMark();
-            std.debug.assert(m.markType == .link and m.open == true);
+            std.debug.assert(m.markType == .link and m.more.open == true);
             return m;
         }
 
         pub fn isFootnote(self: *const @This()) bool {
-            return self.followingOpenLinkSpanMark().isFootnote;
+            return self.followingOpenLinkSpanMark().more.isFootnote;
         }
 
         pub fn setFootnote(self: *const @This(), is: bool) void {
-            self.followingOpenLinkSpanMark().isFootnote = is;
+            self.followingOpenLinkSpanMark().more.isFootnote = is;
         }
 
         pub fn inComment(self: *const @This()) bool {
-            return self.followingOpenLinkSpanMark().inComment;
+            return self.followingOpenLinkSpanMark().more.inComment;
         }
 
         pub fn urlConfirmed(self: *const @This()) bool {
-            return self.followingOpenLinkSpanMark().urlConfirmed;
+            return self.followingOpenLinkSpanMark().more.urlConfirmed;
         }
 
         pub fn urlSourceSet(self: *const @This()) bool {
-            return self.followingOpenLinkSpanMark().urlSourceSet;
+            return self.followingOpenLinkSpanMark().more.urlSourceSet;
         }
 
         pub fn setSourceOfURL(self: *@This(), urlSource: ?*Token, confirmed: bool) void {
             std.debug.assert(!self.urlSourceSet());
 
-            self.followingOpenLinkSpanMark().urlConfirmed = confirmed;
+            self.followingOpenLinkSpanMark().more.urlConfirmed = confirmed;
             self.info = .{
                 .urlSourceText = urlSource,
             };
 
-            self.followingOpenLinkSpanMark().urlSourceSet = true;
+            self.followingOpenLinkSpanMark().more.urlSourceSet = true;
         }
     },
     leadingSpanMark: struct {
-        start: u32,
-        blankLen: u32, // blank char count after the mark.
-        markLen: u32,
-        markType: LineSpanMarkType,
+        start: DocSize,
+        blankLen: DocSize, // blank char count after the mark.
+        more: packed struct {
+            markLen: u2, // ToDo: remove it? It must be 2 now.
+            markType: LineSpanMarkType,
 
-        // when isBare is false,
-        // * for .media, the next token is a .content token.
-        // * for .comment and .anchor, the next token is a .commentText token.
-        isBare: bool = false,
+            // when isBare is false,
+            // * for .media, the next token is a .content token.
+            // * for .comment and .anchor, the next token is a .commentText token.
+            isBare: bool = false,
+        },
 
         pub fn typeName(self: @This()) []const u8 {
             return @tagName(self.markType);
         }
     },
     containerMark: struct {
-        start: u32,
-        blankLen: u32,
-        markLen: u32,
-        //markType: ContainerType, // can be determined by the start char
+        start: DocSize,
+        blankLen: DocSize,
+        more: packed struct {
+            markLen: u2,
+            //markType: ContainerType, // can be determined by the start char
+        },
     },
     lineTypeMark: struct { // excluding container marks
-        start: u32,
-        blankLen: u32,
-        markLen: u32,
+        start: DocSize,
+        blankLen: DocSize,
+        markLen: DocSize,
 
         // For containing line with certain lien types,
         // an extra token is followed by this .lineTypeMark token.
@@ -1015,14 +1061,14 @@ pub const Token = union(enum) {
         return .{ .start = self.start(), .end = self.end() };
     }
 
-    pub fn start(self: *const @This()) u32 {
+    pub fn start(self: *const @This()) DocSize {
         switch (self.*) {
             .linkInfo => {
                 if (self.next()) |nextToken| {
                     if (builtin.mode == .Debug) {
                         std.debug.assert(nextToken.* == .spanMark);
                         const m = nextToken.spanMark;
-                        std.debug.assert(m.markType == .link and m.open == true);
+                        std.debug.assert(m.markType == .link and m.more.open == true);
                     }
                     return nextToken.start();
                 } else unreachable;
@@ -1041,7 +1087,7 @@ pub const Token = union(enum) {
         }
     }
 
-    pub fn end(self: *const @This()) u32 {
+    pub fn end(self: *const @This()) DocSize {
         switch (self.*) {
             .commentText => |t| {
                 return t.end;
@@ -1056,20 +1102,23 @@ pub const Token = union(enum) {
             },
             .spanMark => |m| {
                 var e = self.start() + m.markLen + m.blankLen;
-                if (m.secondary) e += 1;
+                if (m.more.secondary) e += 1;
                 return e;
             },
             .linkInfo, .extra => {
                 return self.start();
             },
-            inline .leadingSpanMark, .lineTypeMark, .containerMark => |m| {
+            inline .leadingSpanMark, .containerMark => |m| {
+                return self.start() + m.more.markLen + m.blankLen;
+            },
+            .lineTypeMark => |m| {
                 return self.start() + m.markLen + m.blankLen;
             },
         }
     }
 
     // Debug purpose. Used to verify end() == end2(line).
-    pub fn end2(self: *@This(), _: *Line) u32 {
+    pub fn end2(self: *@This(), _: *Line) DocSize {
         if (self.next()) |nextToken| {
             return nextToken.start();
         }
@@ -1138,31 +1187,3 @@ pub const LineSpanMarkType = enum(u3) {
     escape, // !!
     spoiler, // ??
 };
-
-// Tokens consume most memory after a doc is parsed.
-// So try to keep the size of TokenType small and use as few tokens as possible.
-//
-// Try to keep the size of each TokenType field <= (4 + 4 + NativeWordSize) bytes.
-//
-// It is possible to make size of TokenType be 8 on 32-bit systems? (By discarding
-// the .start property of each TokenType).
-//
-// Now, even all the fields of a union type reserved enough bits for the union tag,
-// the compiler will still use extra alignment bytes for the union tag.
-// So the size of TokenType is 24 bytes now.
-// Maybe future zig compiler will make optimization to reduce the size to 16 bytes.
-//
-// An unmature idea is to add an extra enum field which only use
-// the reserved bits to emulate the union tag manually.
-// I'm nore sure how safe this way is now.
-//
-//     tag: struct {
-//        _: uN,
-//        _type: enum(uM) { // M == 16*8 - N
-//            content,
-//            commentText,
-//            ...
-//        },
-//     },
-//     content: ...,
-//     commentText: ...,

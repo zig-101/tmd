@@ -6,6 +6,7 @@ const config = @import("config");
 
 const tmd = @import("tmd.zig");
 const list = @import("list.zig");
+const tree = @import("tree.zig");
 
 const AttributeParser = @import("tmd_parser-attribute_parser.zig");
 const LineScanner = @import("tmd_parser-line_scanner.zig");
@@ -35,7 +36,8 @@ pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
     list.destroyListElements(tmd.CustomBlockAttibutes, tmdDoc._customBlockAttibutes, null, allocator);
     list.destroyListElements(tmd.ContentStreamAttributes, tmdDoc._contentStreamAttributes, null, allocator);
 
-    list.destroyListElements(tmd.BlockRedBlack.Node, tmdDoc._blockTreeNodes, null, allocator);
+    const BlockRedBlack = tree.RedBlack(*tmd.Block, tmd.Block);
+    list.destroyListElements(BlockRedBlack.Node, tmdDoc._blockTreeNodes, null, allocator);
 
     list.destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
     list.destroyListElements(*tmd.Block, tmdDoc.tocHeaders, null, allocator);
@@ -44,10 +46,13 @@ pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
 }
 
 pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
+    if (tmdData.len > tmd.MaxDocSize) return error.DocSizeTooLarge;
+
     var tmdDoc = tmd.Doc{ .data = tmdData };
     errdefer destroy_tmd_doc(&tmdDoc, allocator);
 
-    const nilBlockTreeNodeElement = try list.createListElement(tmd.BlockRedBlack.Node, allocator);
+    const BlockRedBlack = tree.RedBlack(*tmd.Block, tmd.Block);
+    const nilBlockTreeNodeElement = try list.createListElement(BlockRedBlack.Node, allocator);
     tmdDoc._blockTreeNodes.push(nilBlockTreeNodeElement);
     const nilBlockTreeNode = &nilBlockTreeNodeElement.value;
     nilBlockTreeNode.* = .{

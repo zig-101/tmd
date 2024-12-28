@@ -1077,14 +1077,14 @@ pub const TmdRender = struct {
                         }
                     },
                     .spanMark => |*m| {
-                        if (m.blankSpan) {
+                        if (m.more.blankSpan) {
                             // skipped
-                        } else if (m.open) {
+                        } else if (m.more.open) {
                             const markElement = &tracker.markStatusElements[m.markType.asInt()];
                             std.debug.assert(markElement.value.mark == null);
 
                             markElement.value.mark = m;
-                            if (m.markType == .link and !m.secondary) {
+                            if (m.markType == .link and !m.more.secondary) {
                                 std.debug.assert(tracker.activeLinkInfo != null);
 
                                 tracker.marksStack.pushHead(markElement);
@@ -1137,7 +1137,7 @@ pub const TmdRender = struct {
                         } else try closeMark(w, m, &tracker, writeTags);
                     },
                     .leadingSpanMark => |m| {
-                        switch (m.markType) {
+                        switch (m.more.markType) {
                             .lineBreak => {
                                 if (writeTags) _ = try w.write("<br/>");
                             },
@@ -1153,7 +1153,7 @@ pub const TmdRender = struct {
                                 if (tracker.activeLinkInfo) |_| {
                                     tracker.firstPlainTextInLink = false;
                                 }
-                                if (m.isBare) {
+                                if (m.more.isBare) {
                                     _ = try w.write(" ");
                                     break :blk;
                                 }
@@ -1258,7 +1258,7 @@ pub const TmdRender = struct {
                     break :done;
                 },
                 .code => {
-                    if (!markElement.value.mark.?.secondary) {
+                    if (!markElement.value.mark.?.more.secondary) {
                         if (tracker.marksStack.pop()) |tail| {
                             std.debug.assert(tail == markElement);
                         } else unreachable;
@@ -1305,13 +1305,13 @@ pub const TmdRender = struct {
 
         switch (spanMark.markType) {
             .link => {
-                std.debug.assert(spanMark.secondary);
+                std.debug.assert(spanMark.more.secondary);
                 _ = try w.write(
                     \\<span class="tmd-underlined">
                 );
             },
             .fontWeight => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write(
                         \\<span class="tmd-dimmed">
                     );
@@ -1322,7 +1322,7 @@ pub const TmdRender = struct {
                 }
             },
             .fontStyle => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write(
                         \\<span class="tmd-revert-italic">
                     );
@@ -1333,7 +1333,7 @@ pub const TmdRender = struct {
                 }
             },
             .fontSize => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write(
                         \\<span class="tmd-larger-size">
                     );
@@ -1344,7 +1344,7 @@ pub const TmdRender = struct {
                 }
             },
             .deleted => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write(
                         \\<span class="tmd-invisible">
                     );
@@ -1355,7 +1355,7 @@ pub const TmdRender = struct {
                 }
             },
             .marked => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write(
                         \\<mark class="tmd-marked-2">
                     );
@@ -1366,14 +1366,14 @@ pub const TmdRender = struct {
                 }
             },
             .supsub => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write("<sup>");
                 } else {
                     _ = try w.write("<sub>");
                 }
             },
             .code => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write(
                         \\<code class="tmd-mono-font">
                     );
@@ -1398,7 +1398,7 @@ pub const TmdRender = struct {
                 _ = try w.write("</mark>");
             },
             .supsub => {
-                if (spanMark.secondary) {
+                if (spanMark.more.secondary) {
                     _ = try w.write("</sup>");
                 } else {
                     _ = try w.write("</sub>");

@@ -9,8 +9,8 @@ fn logMessage(msg: []const u8, extraMsg: []const u8, extraInt: isize) void {
     print(@intFromPtr(msg.ptr), msg.len, @intFromPtr(extraMsg.ptr), extraMsg.len, extraInt);
 }
 
-const maxInFileSize = 1 << 20; // 1M
-const bufferSize = maxInFileSize * 10;
+const maxInFileSize = 2 << 20; // 2M
+const bufferSize = maxInFileSize * 7;
 
 var buffer: []u8 = "";
 
@@ -72,10 +72,19 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
 
     // render file
 
-    logMessage(@typeName(tmd.LineStartAtType), " size: ", @sizeOf(tmd.LineStartAtType));
+    //logMessage(@typeName(tmd.Token), " size: ", @sizeOf(tmd.Token));
+    //logMessage(@typeName(tmd.Token.PlainText), " size: ", @sizeOf(tmd.Token.PlainText));
+    //logMessage(@typeName(tmd.Token.CommentText), " size: ", @sizeOf(tmd.Token.CommentText));
+    //logMessage(@typeName(tmd.Token.EvenBackticks), " size: ", @sizeOf(tmd.Token.EvenBackticks));
+    //logMessage(@typeName(tmd.Token.SpanMark), " size: ", @sizeOf(tmd.Token.SpanMark));
+    //logMessage(@typeName(tmd.Token.LinkInfo), " size: ", @sizeOf(tmd.Token.LinkInfo));
+    //logMessage(@typeName(tmd.Token.LeadingSpanMark), " size: ", @sizeOf(tmd.Token.LeadingSpanMark));
+    //logMessage(@typeName(tmd.Token.ContainerMark), " size: ", @sizeOf(tmd.Token.ContainerMark));
+    //logMessage(@typeName(tmd.Token.LineTypeMark), " size: ", @sizeOf(tmd.Token.LineTypeMark));
+    //logMessage(@typeName(tmd.Token.Extra), " size: ", @sizeOf(tmd.Token.Extra));
 
-    logMessage("", "tmdDataLength: ", @intCast(tmdDataLength));
-    logMessage("", "fba.end_index: ", @intCast(fba.end_index));
+    //logMessage("", "tmdDataLength: ", @intCast(tmdDataLength));
+    //logMessage("", "fba.end_index: ", @intCast(fba.end_index));
 
     const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
     fbs = std.io.fixedBufferStream(renderBuffer);
@@ -86,7 +95,7 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
     try fbs.seekTo(0);
     try fbs.writer().writeInt(u32, htmlWithLengthHeader.len - 4, .little);
 
-    logMessage("", "htmlWithLengthHeader.len: ", @intCast(htmlWithLengthHeader.len));
+    //logMessage("", "htmlWithLengthHeader.len: ", @intCast(htmlWithLengthHeader.len));
 
     return htmlWithLengthHeader;
 }

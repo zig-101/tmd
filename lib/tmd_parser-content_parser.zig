@@ -125,8 +125,8 @@ fn create_comment_text_token(self: *ContentParser, start: u32, end: u32, inAttri
     const token = try self.create_token();
     token.* = .{
         .commentText = .{
-            .start = start,
-            .end = end,
+            .start = @intCast(start),
+            .end = @intCast(end),
             .inAttributesLine = inAttributesLine, // self.lineSession.currentLine.isAttributes(),
         },
     };
@@ -137,8 +137,8 @@ fn create_plain_text_token(self: *ContentParser, start: u32, end: u32) !*tmd.Tok
     const token = try self.create_token();
     token.* = .{
         .content = .{
-            .start = start,
-            .end = end,
+            .start = @intCast(start),
+            .end = @intCast(end),
         },
     };
 
@@ -166,10 +166,12 @@ fn create_leading_mark(self: *ContentParser, markType: tmd.LineSpanMarkType, mar
     var token = try self.create_token();
     token.* = .{
         .leadingSpanMark = .{
-            .start = markStart,
-            .markType = markType,
-            .markLen = markLen,
-            .blankLen = undefined, // might be modified later
+            .start = @intCast(markStart),
+            .blankLen = undefined, // will be modified later
+            .more = .{
+                .markType = markType,
+                .markLen = @intCast(markLen),
+            },
         },
     };
 
@@ -210,14 +212,16 @@ fn open_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, m
     var token = try self.create_token();
     token.* = .{
         .spanMark = .{
-            .start = markStart,
-            .open = true,
-            .secondary = isSecondary,
+            .start = @intCast(markStart),
             .markType = markType,
             .markLen = @intCast(markLen),
             .blankLen = undefined, // will be modified later
-            .inComment = self.isCommentLineParser(),
-            .blankSpan = false, // will be determined finally later
+            .more = .{
+                .open = true,
+                .secondary = isSecondary,
+                .inComment = self.isCommentLineParser(),
+                .blankSpan = false, // will be determined finally later
+            },
         },
     };
 
@@ -244,19 +248,21 @@ fn close_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, 
     std.debug.assert(spanStatus.openMark == openMark);
     spanStatus.openMark = null;
     const isBlankSpan = self.blockSession.currentTextNumber <= spanStatus.openTextNumber;
-    openMark.blankSpan = isBlankSpan;
+    openMark.more.blankSpan = isBlankSpan;
 
     // Create the close mark.
     var token = try self.create_token();
     token.* = .{
         .spanMark = .{
-            .start = markStart,
-            .open = false,
+            .start = @intCast(markStart),
             .markType = markType,
             .markLen = @intCast(markLen),
             .blankLen = undefined, // will be modified later
-            .inComment = self.isCommentLineParser(),
-            .blankSpan = isBlankSpan,
+            .more = .{
+                .open = false,
+                .inComment = self.isCommentLineParser(),
+                .blankSpan = isBlankSpan,
+            },
         },
     };
 
@@ -270,9 +276,9 @@ fn create_even_backticks_span(self: *ContentParser, markStart: u32, pairCount: u
     var token = try self.create_token();
     token.* = .{
         .evenBackticks = .{
-            .start = markStart,
+            .start = @intCast(markStart),
             .secondary = isSecondary,
-            .pairCount = pairCount,
+            .pairCount = @intCast(pairCount),
         },
     };
 
@@ -291,7 +297,7 @@ fn close_opening_spans(self: *ContentParser) void {
     for (self.blockSession.spanStatuses[0..]) |spanStatus| {
         if (spanStatus.openMark) |openMark| {
             std.debug.assert(self.blockSession.currentTextNumber >= spanStatus.openTextNumber);
-            openMark.blankSpan = self.blockSession.currentTextNumber <= spanStatus.openTextNumber;
+            openMark.more.blankSpan = self.blockSession.currentTextNumber <= spanStatus.openTextNumber;
         }
     }
 }
@@ -362,7 +368,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
             };
 
             const leadingSpanMark = try self.create_leading_mark(leadingMarkType, textStart, markLen);
-            leadingSpanMark.isBare = isBare;
+            leadingSpanMark.more.isBare = isBare;
 
             if (isBare) {
                 leadingSpanMark.blankLen = 0;
@@ -370,7 +376,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
             }
 
             textStart = lineScanner.cursor;
-            leadingSpanMark.blankLen = textStart - markEnd;
+            leadingSpanMark.blankLen = @intCast(textStart - markEnd);
 
             switch (leadingMarkType) {
                 .lineBreak => break :handle_leading_mark,
@@ -424,7 +430,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
             std.debug.assert(lineScanner.lineEnd == null);
 
             const inPrimaryCodeSpan = if (codeSpanStatus.openMark) |m| blk: {
-                break :blk if (m.secondary) false else true;
+                break :blk if (m.more.secondary) false else true;
             } else false;
 
             const numBlanks = lineScanner.readUntilSpanMarkChar(if (inPrimaryCodeSpan) '`' else null);
@@ -487,7 +493,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                             } else std.debug.assert(textEnd == textStart);
 
                             const closeCodeSpanMark = try self.close_span(.code, textEnd, 1, openMark);
-                            closeCodeSpanMark.blankLen = numBlanks;
+                            closeCodeSpanMark.blankLen = @intCast(numBlanks);
                         } else {
                             const closeCodeSpanMark = try self.close_span(.code, codeMarkStart, 1, openMark);
                             closeCodeSpanMark.blankLen = 0;
@@ -519,7 +525,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
 
-                        openCodeSpanMark.blankLen = lineScanner.cursor - markEnd;
+                        openCodeSpanMark.blankLen = @intCast(lineScanner.cursor - markEnd);
 
                         textStart = lineScanner.cursor;
                         continue :parse_span_marks;
@@ -542,7 +548,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                             } else std.debug.assert(textEnd == textStart);
 
                             const closeMark = try self.close_span(spanMarkType, textEnd, markLen, openMark);
-                            closeMark.blankLen = numBlanks;
+                            closeMark.blankLen = @intCast(numBlanks);
 
                             if (lineScanner.lineEnd != null) break :parse_tokens markEnd;
 
@@ -573,7 +579,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                                 break :parse_tokens markEnd;
                             }
 
-                            openMark.blankLen = lineScanner.cursor - markEnd;
+                            openMark.blankLen = @intCast(lineScanner.cursor - markEnd);
 
                             textStart = lineScanner.cursor;
                             continue :parse_span_marks;
@@ -606,7 +612,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
         var tryToPendLine = true;
         var cancelPeading = false;
         switch (head.value) {
-            .leadingSpanMark => |m| switch (m.markType) {
+            .leadingSpanMark => |m| switch (m.more.markType) {
                 .media => {
                     notMediaLine = false;
                     tryToPendLine = false;
@@ -616,12 +622,12 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                 .lineBreak => cancelPeading = true,
                 .escape, .spoiler => if (head.next) |next| {
                     const first = &next.value;
-                    cancelPeading = first.* == .spanMark and !first.spanMark.open;
+                    cancelPeading = first.* == .spanMark and !first.spanMark.more.open;
                 },
             },
             else => {
                 const first = &head.value;
-                cancelPeading = first.* == .spanMark and !first.spanMark.open;
+                cancelPeading = first.* == .spanMark and !first.spanMark.more.open;
             },
         }
 
@@ -652,7 +658,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
         }
 
         if (tryToPendLine) handle: {
-            if (lastToken.* == .spanMark and lastToken.spanMark.open) break :handle;
+            if (lastToken.* == .spanMark and lastToken.spanMark.more.open) break :handle;
 
             const contentToken = self.lineSession.lastContentToken orelse break :handle;
 

@@ -3,6 +3,7 @@ const mem = std.mem;
 
 const tmd = @import("tmd.zig");
 const list = @import("list.zig");
+const tree = @import("tree.zig");
 
 const BlockArranger = @import("tmd_parser-block_manager.zig");
 const ContentParser = @import("tmd_parser-content_parser.zig");
@@ -91,7 +92,8 @@ fn setBlockAttributes(parser: *DocParser, block: *tmd.Block, as: tmd.ElementAtti
             parser.tmdDoc._freeBlockTreeNodeElement = null;
             break :blk e;
         } else blk: {
-            const element = try list.createListElement(tmd.BlockRedBlack.Node, parser.allocator);
+            const BlockRedBlack = tree.RedBlack(*tmd.Block, tmd.Block);
+            const element = try list.createListElement(BlockRedBlack.Node, parser.allocator);
             parser.tmdDoc._blockTreeNodes.push(element);
             break :blk element;
         };
@@ -249,16 +251,19 @@ fn parse(parser: *DocParser) !void {
         var line = &lineElement.value;
         line.* = .{};
 
-        const lineStart = lineScanner.cursor;
+        const lineStart: tmd.DocSize = @intCast(lineScanner.cursor);
         line.startAt.set(lineStart);
 
         //std.debug.print("--- line#{}\n", .{lineScanner.cursorLineIndex});
 
         line.lineType = .blank; // will be change below
 
+        var suffixBlankStart: u32 = undefined;
+        defer line.suffixBlankStart = @intCast(suffixBlankStart);
+
         parse_line: {
             _ = lineScanner.readUntilNotBlank();
-            const leadingBlankEnd = lineScanner.cursor;
+            const leadingBlankEnd: tmd.DocSize = @intCast(lineScanner.cursor);
 
             // handle code/custom block context.
             if (boundedBlockStartInfo) |boundedBlockStart| {
@@ -278,15 +283,15 @@ fn parse(parser: *DocParser) !void {
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        line.suffixBlankStart = playloadStart;
+                        suffixBlankStart = playloadStart;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            line.suffixBlankStart = playloadStart;
+                            suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                             const numTrailingBlanks = lineScanner.readUntilLineEnd();
-                            line.suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
+                            suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
                         }
                     }
 
@@ -295,7 +300,7 @@ fn parse(parser: *DocParser) !void {
                             line.lineType = .codeBlockEnd;
 
                             //const playloadRange = line.playloadRange();
-                            const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
+                            const playloadRange = tmd.Range{ .start = playloadStart, .end = suffixBlankStart };
                             const playload = parser.tmdDoc.rangeData(playloadRange);
                             const attrs = AttributeParser.parse_code_block_close_playload(playload);
                             if (!std.meta.eql(attrs, .{})) {
@@ -319,9 +324,9 @@ fn parse(parser: *DocParser) !void {
                     }
                     (try parser.createTokenForLine(line)).* = .{
                         .lineTypeMark = .{
-                            .start = leadingBlankEnd,
-                            .markLen = markLen,
-                            .blankLen = playloadStart - leadingBlankEnd - markLen,
+                            .start = @intCast(leadingBlankEnd),
+                            .markLen = @intCast(markLen),
+                            .blankLen = @intCast(playloadStart - leadingBlankEnd - markLen),
                         },
                     };
 
@@ -338,7 +343,7 @@ fn parse(parser: *DocParser) !void {
                         else => unreachable,
                     };
                     line.prefixBlankEnd = lineStart;
-                    line.suffixBlankStart = lineScanner.cursor;
+                    suffixBlankStart = lineScanner.cursor;
                 } else {
                     std.debug.assert(boundedBlockStartInfo == null);
 
@@ -353,7 +358,7 @@ fn parse(parser: *DocParser) !void {
             if (lineScanner.lineEnd) |_| {
                 // For a blank line, all blanks belongs to the line-end token.
                 line.prefixBlankEnd = lineStart;
-                line.suffixBlankStart = lineStart;
+                suffixBlankStart = lineStart;
 
                 line.lineType = .blank;
 
@@ -395,15 +400,17 @@ fn parse(parser: *DocParser) !void {
                     }
 
                     const markEndWithSpaces = if (lineScanner.lineEnd) |_| blk: {
-                        line.suffixBlankStart = markEnd;
+                        suffixBlankStart = markEnd;
                         break :blk markEnd;
                     } else lineScanner.cursor;
 
                     (try parser.createTokenForLine(line)).* = .{
                         .containerMark = .{
-                            .start = lineStartIgnoreLeadingBlanks,
-                            .markLen = markEnd - lineStartIgnoreLeadingBlanks,
-                            .blankLen = markEndWithSpaces - markEnd,
+                            .start = @intCast(lineStartIgnoreLeadingBlanks),
+                            .blankLen = @intCast(markEndWithSpaces - markEnd),
+                            .more = .{
+                                .markLen = @intCast(markEnd - lineStartIgnoreLeadingBlanks),
+                            },
                         },
                     };
 
@@ -446,7 +453,7 @@ fn parse(parser: *DocParser) !void {
                     }
 
                     const markEndWithSpaces = if (lineScanner.lineEnd) |_| blk: {
-                        line.suffixBlankStart = markEnd;
+                        suffixBlankStart = markEnd;
                         break :blk markEnd;
                     } else lineScanner.cursor;
 
@@ -483,9 +490,11 @@ fn parse(parser: *DocParser) !void {
 
                     (try parser.createTokenForLine(line)).* = .{
                         .containerMark = .{
-                            .start = lineStartIgnoreLeadingBlanks,
-                            .markLen = 1,
-                            .blankLen = markEndWithSpaces - markEnd,
+                            .start = @intCast(lineStartIgnoreLeadingBlanks),
+                            .blankLen = @intCast(markEndWithSpaces - markEnd),
+                            .more = .{
+                                .markLen = 1,
+                            },
                         },
                     };
 
@@ -518,8 +527,8 @@ fn parse(parser: *DocParser) !void {
                     line.lineType = .seperator;
                     (try parser.createTokenForLine(line)).* = .{
                         .lineTypeMark = .{
-                            .start = leadingBlankEnd,
-                            .markLen = markLen,
+                            .start = @intCast(leadingBlankEnd),
+                            .markLen = @intCast(markLen),
                             .blankLen = 0,
                         },
                     };
@@ -536,7 +545,7 @@ fn parse(parser: *DocParser) !void {
                     currentAtomBlock = lineBlock;
                     atomBlockCount += 1;
 
-                    line.suffixBlankStart = contentEnd;
+                    suffixBlankStart = contentEnd;
                 },
                 '{', '}' => |mark| handle: {
                     const isOpenMark = mark == '{';
@@ -551,15 +560,15 @@ fn parse(parser: *DocParser) !void {
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        line.suffixBlankStart = playloadStart;
+                        suffixBlankStart = playloadStart;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            line.suffixBlankStart = playloadStart;
+                            suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                             const numTrailingBlanks = lineScanner.readUntilLineEnd();
-                            line.suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
+                            suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
                         }
                     }
 
@@ -574,7 +583,7 @@ fn parse(parser: *DocParser) !void {
                         };
 
                         //const playloadRange = baseBlock.blockType.base.openPlayloadRange();
-                        const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
+                        const playloadRange = tmd.Range{ .start = playloadStart, .end = suffixBlankStart };
                         const playload = parser.tmdDoc.rangeData(playloadRange);
                         const attrs = AttributeParser.parse_base_block_open_playload(playload);
                         if (!std.meta.eql(attrs, .{})) {
@@ -617,9 +626,9 @@ fn parse(parser: *DocParser) !void {
 
                     (try parser.createTokenForLine(line)).* = .{
                         .lineTypeMark = .{
-                            .start = contentStart,
-                            .markLen = markLen,
-                            .blankLen = playloadStart - contentStart - markLen,
+                            .start = @intCast(contentStart),
+                            .markLen = @intCast(markLen),
+                            .blankLen = @intCast(playloadStart - contentStart - markLen),
                         },
                     };
                 },
@@ -633,15 +642,15 @@ fn parse(parser: *DocParser) !void {
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        line.suffixBlankStart = playloadStart;
+                        suffixBlankStart = playloadStart;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            line.suffixBlankStart = playloadStart;
+                            suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                             const numTrailingBlanks = lineScanner.readUntilLineEnd();
-                            line.suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
+                            suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
                         }
                     }
 
@@ -656,7 +665,7 @@ fn parse(parser: *DocParser) !void {
                         };
 
                         //const playloadRange = codeBlock.blockType.code.startPlayloadRange();
-                        const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
+                        const playloadRange = tmd.Range{ .start = playloadStart, .end = suffixBlankStart };
                         const playload = parser.tmdDoc.rangeData(playloadRange);
                         const attrs = AttributeParser.parse_code_block_open_playload(playload);
                         if (!std.meta.eql(attrs, .{})) {
@@ -687,7 +696,7 @@ fn parse(parser: *DocParser) !void {
                         };
 
                         //const playloadRange = customBlock.blockType.custom.startPlayloadRange();
-                        const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
+                        const playloadRange = tmd.Range{ .start = playloadStart, .end = suffixBlankStart };
                         const playload = parser.tmdDoc.rangeData(playloadRange);
                         const attrs = AttributeParser.parse_custom_block_open_playload(playload);
                         if (!std.meta.eql(attrs, .{})) {
@@ -709,9 +718,9 @@ fn parse(parser: *DocParser) !void {
 
                     (try parser.createTokenForLine(line)).* = .{
                         .lineTypeMark = .{
-                            .start = contentStart,
-                            .markLen = markLen,
-                            .blankLen = playloadStart - contentStart - markLen,
+                            .start = @intCast(contentStart),
+                            .markLen = @intCast(markLen),
+                            .blankLen = @intCast(playloadStart - contentStart - markLen),
                         },
                     };
 
@@ -756,20 +765,20 @@ fn parse(parser: *DocParser) !void {
 
                     const markEnd = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        line.suffixBlankStart = markEnd;
+                        suffixBlankStart = markEnd;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            line.suffixBlankStart = markEnd;
+                            suffixBlankStart = markEnd;
                         }
                     }
 
                     line.lineType = .header;
                     (try parser.createTokenForLine(line)).* = .{
                         .lineTypeMark = .{
-                            .start = contentStart,
-                            .markLen = markLen,
-                            .blankLen = lineScanner.cursor - markEnd,
+                            .start = @intCast(contentStart),
+                            .markLen = @intCast(markLen),
+                            .blankLen = @intCast(lineScanner.cursor - markEnd),
                         },
                     };
 
@@ -798,13 +807,13 @@ fn parse(parser: *DocParser) !void {
                     contentParser.on_new_atom_block(currentAtomBlock);
 
                     if (lineScanner.lineEnd != null) {
-                        // line.suffixBlankStart has been determined.
+                        // suffixBlankStart has been determined.
                         // And no data for parsing tokens.
                         break :handle;
                     }
 
                     const contentEnd = try contentParser.parse_header_line_tokens(line, lineScanner.cursor);
-                    line.suffixBlankStart = contentEnd;
+                    suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
                 },
                 ';' => |mark| handle: {
@@ -817,20 +826,20 @@ fn parse(parser: *DocParser) !void {
 
                     const markEnd = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        line.suffixBlankStart = markEnd;
+                        suffixBlankStart = markEnd;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            line.suffixBlankStart = markEnd;
+                            suffixBlankStart = markEnd;
                         }
                     }
 
                     line.lineType = .usual;
                     (try parser.createTokenForLine(line)).* = .{
                         .lineTypeMark = .{
-                            .start = contentStart,
-                            .markLen = markLen,
-                            .blankLen = lineScanner.cursor - markEnd,
+                            .start = @intCast(contentStart),
+                            .markLen = @intCast(markLen),
+                            .blankLen = @intCast(lineScanner.cursor - markEnd),
                         },
                     };
 
@@ -851,13 +860,13 @@ fn parse(parser: *DocParser) !void {
                     contentParser.on_new_atom_block(currentAtomBlock);
 
                     if (lineScanner.lineEnd != null) {
-                        // line.suffixBlankStart has been determined.
+                        // suffixBlankStart has been determined.
                         // And no data for parsing tokens.
                         break :handle;
                     }
 
                     const contentEnd = try contentParser.parse_usual_line_tokens(line, lineScanner.cursor, true);
-                    line.suffixBlankStart = contentEnd;
+                    suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
                 },
                 '@' => |mark| handle: {
@@ -875,7 +884,7 @@ fn parse(parser: *DocParser) !void {
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        line.suffixBlankStart = playloadStart;
+                        suffixBlankStart = playloadStart;
                     } else {
                         //if (line.containerMark) |m| {
                         //    if (m == .item and lineScanner.peekCursor() == '<') {
@@ -886,7 +895,7 @@ fn parse(parser: *DocParser) !void {
 
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            line.suffixBlankStart = playloadStart;
+                            suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                         }
@@ -895,9 +904,9 @@ fn parse(parser: *DocParser) !void {
                     line.lineType = .attributes;
                     (try parser.createTokenForLine(line)).* = .{
                         .lineTypeMark = .{
-                            .start = contentStart,
-                            .markLen = markLen,
-                            .blankLen = playloadStart - contentStart - markLen,
+                            .start = @intCast(contentStart),
+                            .markLen = @intCast(markLen),
+                            .blankLen = @intCast(playloadStart - contentStart - markLen),
                         },
                     };
 
@@ -928,14 +937,14 @@ fn parse(parser: *DocParser) !void {
                     //defer contentParser.on_new_atom_block(); // ToDo: might be unnecessary
 
                     if (lineScanner.lineEnd != null) {
-                        // line.suffixBlankStart has been determined.
+                        // suffixBlankStart has been determined.
                         // And no data for parsing tokens.
                         break :handle;
                     }
 
                     const contentEnd = try contentParser.parse_attributes_line_tokens(line, lineScanner.cursor);
 
-                    line.suffixBlankStart = contentEnd;
+                    suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
 
                     //try parser.onNewAttributesLine(line, forBulletContainer);
@@ -974,7 +983,7 @@ fn parse(parser: *DocParser) !void {
                         //currentAtomBlock.blockType != .header and
                         contentStart == lineScanner.cursor,
                     );
-                    line.suffixBlankStart = contentEnd;
+                    suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
                 }
             }
@@ -982,7 +991,7 @@ fn parse(parser: *DocParser) !void {
 
         if (lineScanner.lineEnd) |end| {
             line.endType = end;
-            line.endAt = lineScanner.cursor + end.len();
+            line.endAt = @intCast(lineScanner.cursor + end.len());
         } else unreachable;
 
         line.atomBlockIndex.set(atomBlockCount);
