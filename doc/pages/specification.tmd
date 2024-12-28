@@ -792,7 +792,7 @@ A content token is a valid URL if its text
 ! ### NOTE:
   ;;; The URL validation rules might be adjuested with more details later.
 
-If a hyperlink span is in the `#fragment` token,
+If a hyperlink span only contains a `#fragment` token,
 then the hyperlink span is viewed as a footnote reference.
 The corresponding footnote is defined in the block specified with ID as `fragment`.
 Generally, footnote definition blocks should be placed in an explcit base block
@@ -946,8 +946,8 @@ The remaining un-parsed texts are ignored.
 Currently, user plugins are not supported yet.
 And `html` is the only supported built-in application.
 
-! Warning!
-  Be careful when using the built-in `html` application.
+! ### ⚠ Warning!
+  ;;; Be careful when using the built-in `html` application.
   All the data lines in a `html` custom block will be written as is
   in HTML output.
 
@@ -1286,7 +1286,7 @@ the header of the notice block.
   * ### Render Result
     @@@ #notice-examples-2
     {
-    ! ### ⚠ WARNING!
+    ! ### WARNING!
       ;;; The specification is not yet stable.
     }
   

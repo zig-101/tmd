@@ -11,7 +11,7 @@ cursorLineIndex: u32 = 0, // for debug
 
 // When lineEnd != null, cursor is the start of lineEnd.
 // That means, for a .rn line end, cursor is the index of '\r'.
-lineEnd: ?tmd.LineEndType = null,
+lineEnd: ?tmd.Line.EndType = null,
 
 pub const bytesKindTable = blk: {
     var table = [1]union(enum) {

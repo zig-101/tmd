@@ -13,38 +13,38 @@ const builtin = @import("builtin");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 
-pub const BlockInfoRedBlack = tree.RedBlack(*BlockInfo, BlockInfo);
+pub const BlockRedBlack = tree.RedBlack(*Block, Block);
 
 pub const Doc = struct {
     data: []const u8,
-    blocks: list.List(BlockInfo) = .{},
-    lines: list.List(LineInfo) = .{},
+    blocks: list.List(Block) = .{},
+    lines: list.List(Line) = .{},
 
-    tocHeaders: list.List(*BlockInfo) = .{},
-    titleHeader: ?*BlockInfo = null,
+    tocHeaders: list.List(*Block) = .{},
+    titleHeader: ?*Block = null,
     // User should use the headerLevelNeedAdjusted method instead.
     _headerLevelNeedAdjusted: [MaxHeaderLevel]bool = .{false} ** MaxHeaderLevel,
 
-    blocksByID: BlockInfoRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
+    blocksByID: BlockRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
 
     // The followings are used to track allocations for destroying.
     // ToDo: prefix them with _?
 
     links: list.List(Link) = .{}, // ToDo: use Link.next
-    blockTreeNodes: list.List(BlockInfoRedBlack.Node) = .{}, // ToDo: use SinglyLinkedList
-    // It is in blockTreeNodes when exists. So no need to destroy it solely in the end.
-    freeBlockTreeNodeElement: ?*list.Element(BlockInfoRedBlack.Node) = null, // ToDo: use SinglyLinkedList
-    elementAttributes: list.List(ElementAttibutes) = .{}, // ToDo: use SinglyLinkedList
-    baseBlockAttibutes: list.List(BaseBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
-    codeBlockAttibutes: list.List(CodeBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
-    customBlockAttibutes: list.List(CustomBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
-    contentStreamAttributes: list.List(ContentStreamAttributes) = .{}, // ToDo: use SinglyLinkedList
+    _blockTreeNodes: list.List(BlockRedBlack.Node) = .{}, // ToDo: use SinglyLinkedList
+    // It is in _blockTreeNodes when exists. So no need to destroy it solely in the end.
+    _freeBlockTreeNodeElement: ?*list.Element(BlockRedBlack.Node) = null,
+    _elementAttributes: list.List(ElementAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    _baseBlockAttibutes: list.List(BaseBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    _codeBlockAttibutes: list.List(CodeBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    _customBlockAttibutes: list.List(CustomBlockAttibutes) = .{}, // ToDo: use SinglyLinkedList
+    _contentStreamAttributes: list.List(ContentStreamAttributes) = .{}, // ToDo: use SinglyLinkedList
 
-    pub fn getBlockByID(self: *const @This(), id: []const u8) ?*BlockInfo {
+    pub fn getBlockByID(self: *const @This(), id: []const u8) ?*Block {
         var a = ElementAttibutes{
             .id = id,
         };
-        var b = BlockInfo{
+        var b = Block{
             .blockType = undefined,
             .attributes = &a,
         };
@@ -142,7 +142,7 @@ pub const Link = struct {
     // ToDo: now this field is never set.
     // attrs: ElementAttibutes = .{},
 
-    info: *LinkInfo,
+    info: *Token.LinkInfo,
 };
 
 pub const BaseBlockAttibutes = struct {
@@ -192,7 +192,7 @@ pub const MediaAttributes = struct {
 pub const MaxBlockNestingDepth = 64; // should be 2^N
 pub const BlockNestingDepthType = u6; // must be capable of storing MaxBlockNestingDepth-1
 
-pub const BlockInfo = struct {
+pub const Block = struct {
     index: u32 = undefined, // one basedd (for debug purpose only)
     nestingDepth: u32 = 0,
 
@@ -220,7 +220,7 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn getStartLine(self: *const @This()) *LineInfo {
+    pub fn getStartLine(self: *const @This()) *Line {
         return switch (self.blockType) {
             inline else => |bt| {
                 if (@hasDecl(@TypeOf(bt), "Atom")) {
@@ -231,11 +231,11 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn setStartLine(self: *@This(), lineInfo: *LineInfo) void {
+    pub fn setStartLine(self: *@This(), line: *Line) void {
         return switch (self.blockType) {
             inline else => |*bt| {
                 if (@hasDecl(@TypeOf(bt.*), "Atom")) {
-                    bt.startLine = lineInfo;
+                    bt.startLine = line;
                     return;
                 }
                 unreachable;
@@ -243,7 +243,7 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn getEndLine(self: *const @This()) *LineInfo {
+    pub fn getEndLine(self: *const @This()) *Line {
         return switch (self.blockType) {
             inline else => |bt| {
                 if (@hasDecl(@TypeOf(bt), "Atom")) {
@@ -254,11 +254,11 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn setEndLine(self: *@This(), lineInfo: *LineInfo) void {
+    pub fn setEndLine(self: *@This(), line: *Line) void {
         return switch (self.blockType) {
             inline else => |*bt| {
                 if (@hasDecl(@TypeOf(bt.*), "Atom")) {
-                    bt.endLine = lineInfo;
+                    bt.endLine = line;
                     return;
                 }
                 unreachable;
@@ -279,7 +279,7 @@ pub const BlockInfo = struct {
     }
 
     // Only atom blocks and base blocks can call this method.
-    pub fn getFooterSibling(self: *const @This()) ?*BlockInfo {
+    pub fn getFooterSibling(self: *const @This()) ?*Block {
         //if (self.isContainer()) unreachable;
         if (self.isContainer()) return null;
 
@@ -297,15 +297,15 @@ pub const BlockInfo = struct {
         return @alignCast(@fieldParentPtr("value", @constCast(self)));
     }
 
-    pub fn next(self: *const @This()) ?*BlockInfo {
+    pub fn next(self: *const @This()) ?*Block {
         return &(self.ownerListElement().next orelse return null).value;
     }
 
-    pub fn prev(self: *const @This()) ?*BlockInfo {
+    pub fn prev(self: *const @This()) ?*Block {
         return &(self.ownerListElement().prev orelse return null).value;
     }
 
-    pub fn firstChild(self: *const @This()) ?*const BlockInfo {
+    pub fn firstChild(self: *const @This()) ?*const Block {
         switch (self.blockType) {
             .root, .base => if (self.next()) |nextBlock| {
                 if (nextBlock.nestingDepth > self.nestingDepth) return nextBlock;
@@ -318,12 +318,12 @@ pub const BlockInfo = struct {
         return null;
     }
 
-    pub fn nextSibling(self: *const @This()) ?*BlockInfo {
+    pub fn nextSibling(self: *const @This()) ?*Block {
         return switch (self.blockType) {
             .root => null,
             .base => |base| blk: {
                 const closeLine = base.closeLine orelse break :blk null;
-                const nextBlock = closeLine.lineType.baseBlockClose.baseNextSibling orelse break :blk null;
+                const nextBlock = closeLine.extraInfo().?.blockRef orelse break :blk null;
                 // The assurence is necessary.
                 break :blk if (nextBlock.nestingDepth == self.nestingDepth) nextBlock else null;
             },
@@ -331,7 +331,7 @@ pub const BlockInfo = struct {
                 std.debug.assert(itemList._lastItemConfirmed);
                 break :blk itemList.lastBullet.blockType.item.nextSibling;
             },
-            .item => |*item| if (item.ownerBlockInfo() == item.list.blockType.list.lastBullet) null else item.nextSibling,
+            .item => |*item| if (item.ownerBlock() == item.list.blockType.list.lastBullet) null else item.nextSibling,
             inline .table, .quotation, .notice, .reveal, .plain => |container| blk: {
                 const nextBlock = container.nextSibling orelse break :blk null;
                 // ToDo: the assurence might be unnecessary.
@@ -339,7 +339,7 @@ pub const BlockInfo = struct {
             },
             inline else => blk: {
                 std.debug.assert(self.isAtom());
-                if (self.blockType.ownerBlockInfo().next()) |nextBlock| {
+                if (self.blockType.ownerBlock().next()) |nextBlock| {
                     std.debug.assert(nextBlock.nestingDepth <= self.nestingDepth);
                     if (nextBlock.nestingDepth == self.nestingDepth)
                         break :blk nextBlock;
@@ -349,12 +349,14 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn setNextSibling(self: *@This(), sibling: *BlockInfo) void {
+    // Note, for .base, it is a potential sibling.
+    pub fn setNextSibling(self: *@This(), sibling: *Block) void {
         return switch (self.blockType) {
             .root => unreachable,
             .base => |base| {
-                if (base.closeLine) |closeLine|
-                    closeLine.lineType.baseBlockClose.baseNextSibling = sibling;
+                if (base.closeLine) |closeLine| {
+                    if (closeLine.extraInfo()) |info| info.blockRef = sibling;
+                }
             },
             .list => |itemList| {
                 std.debug.assert(itemList._lastItemConfirmed);
@@ -371,7 +373,7 @@ pub const BlockInfo = struct {
         };
     }
 
-    pub fn getSpecialHeaderChild(self: *const @This(), tmdData: []const u8) ?*const BlockInfo {
+    pub fn getSpecialHeaderChild(self: *const @This(), tmdData: []const u8) ?*const Block {
         std.debug.assert(self.isContainer() or self.blockType == .base);
         var child = self.firstChild() orelse return null;
         while (true) {
@@ -403,22 +405,22 @@ pub const BlockType = union(enum) {
         //isFirst: bool, // ToDo: can be saved
         //isLast: bool, // ToDo: can be saved (need .list.lastItem)
 
-        list: *BlockInfo, // a .list
-        nextSibling: ?*BlockInfo = null, // for .list.lastBullet, it is .list's sibling.
+        list: *Block, // a .list
+        nextSibling: ?*Block = null, // for .list.lastBullet, it is .list's sibling.
 
         const Container = void;
 
         pub fn isFirst(self: *const @This()) bool {
-            return self.list.next().? == self.ownerBlockInfo();
+            return self.list.next().? == self.ownerBlock();
         }
 
         pub fn isLast(self: *const @This()) bool {
-            return self.list.blockType.list.lastBullet == self.ownerBlockInfo();
+            return self.list.blockType.list.lastBullet == self.ownerBlock();
         }
 
-        pub fn ownerBlockInfo(self: *const @This()) *BlockInfo {
+        pub fn ownerBlock(self: *const @This()) *Block {
             const blockType: *BlockType = @alignCast(@fieldParentPtr("item", @constCast(self)));
-            return blockType.ownerBlockInfo();
+            return blockType.ownerBlock();
         }
     },
 
@@ -430,8 +432,8 @@ pub const BlockType = union(enum) {
         secondMode: bool, // for .bullets: unordered/ordered, for .definitions, one-line or not
         index: u32, // for debug purpose
 
-        lastBullet: *BlockInfo = undefined,
-        // nextSibling: ?*BlockInfo, // .lastBullet.nextSibling
+        lastBullet: *Block = undefined,
+        // nextSibling: ?*Block, // .lastBullet.nextSibling
 
         // Note: the depth of the list is the same as its children
 
@@ -449,23 +451,23 @@ pub const BlockType = union(enum) {
 
     table: struct {
         const Container = void;
-        nextSibling: ?*BlockInfo = null,
+        nextSibling: ?*Block = null,
     },
     quotation: struct {
         const Container = void;
-        nextSibling: ?*BlockInfo = null,
+        nextSibling: ?*Block = null,
     },
     notice: struct {
         const Container = void;
-        nextSibling: ?*BlockInfo = null,
+        nextSibling: ?*Block = null,
     },
     reveal: struct {
         const Container = void;
-        nextSibling: ?*BlockInfo = null,
+        nextSibling: ?*Block = null,
     },
     plain: struct {
         const Container = void;
-        nextSibling: ?*BlockInfo = null,
+        nextSibling: ?*Block = null,
     },
 
     // base context block
@@ -475,12 +477,15 @@ pub const BlockType = union(enum) {
     },
 
     base: struct {
-        openLine: *LineInfo,
-        closeLine: ?*LineInfo = null,
-        // nextSibling: ?*BlockInfo, // openLine.baseNextSibling
+        openLine: *Line,
+        closeLine: ?*Line = null,
+        // nextSibling: ?*Block, // openLine.baseNextSibling
 
         pub fn attributes(self: @This()) BaseBlockAttibutes {
-            return if (self.openLine.lineType.baseBlockOpen.attrs) |attrs| attrs.* else .{};
+            if (self.openLine.extraInfo()) |info| {
+                if (info.baseBlockAttrs) |attrs| return attrs.*;
+            }
+            return .{};
         }
 
         pub fn openPlayloadRange(self: @This()) Range {
@@ -495,44 +500,45 @@ pub const BlockType = union(enum) {
     // atom block types
 
     blank: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
+        startLine: *Line = undefined,
+        endLine: *Line = undefined,
 
         // traits:
         const Atom = void;
     },
 
     seperator: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
+        startLine: *Line = undefined,
+        endLine: *Line = undefined,
 
         // traits:
         const Atom = void;
     },
 
     header: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
+        startLine: *Line = undefined,
+        endLine: *Line = undefined,
 
         // traits:
         const Atom = void;
 
         pub fn level(self: @This(), tmdData: []const u8) u8 {
             const headerLine = self.startLine;
-            const start = headerLine.containerMarkEnd();
-            const end = start + headerLine.lineType.header.markLen;
+            const start = headerLine.start(.trimContainerMark);
+            const end = start + headerLine.firstNonContainerMarkToken().?.lineTypeMark.markLen;
             return headerLevel(tmdData[start..end]) orelse unreachable;
         }
 
         // An empty header is used to insert toc.
         pub fn isBare(self: @This()) bool {
-            return self.startLine == self.endLine and self.startLine.tokens().?.empty();
+            //return self.startLine == self.endLine and self.startLine.tokens().?.empty();
+            return self.startLine == self.endLine and self.startLine.tokens.empty();
         }
     },
 
     usual: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
+        startLine: *Line = undefined,
+        endLine: *Line = undefined,
 
         // ToDo: when false, no need to render.
         //       So a block with a singal ` will outout nothing.
@@ -544,16 +550,16 @@ pub const BlockType = union(enum) {
     },
 
     attributes: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
+        startLine: *Line = undefined,
+        endLine: *Line = undefined,
 
         // traits:
         const Atom = void;
     },
 
     code: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
+        startLine: *Line = undefined,
+        endLine: *Line = undefined,
 
         // Note: the block end tag line might be missing.
         //       The endLine might not be a .codeBlockEnd line.
@@ -563,14 +569,22 @@ pub const BlockType = union(enum) {
         const Atom = void;
 
         pub fn attributes(self: @This()) CodeBlockAttibutes {
-            return if (self.startLine.lineType.codeBlockStart.attrs) |attrs| attrs.* else .{};
+            if (self.startLine.extraInfo()) |info| {
+                if (info.codeBlockAttrs) |attrs| return attrs.*;
+            }
+            return .{};
         }
 
-        pub fn contentStreamAttributes(self: @This()) ContentStreamAttributes {
-            return switch (self.endLine.lineType) {
-                .codeBlockEnd => |end| if (end.streamAttrs) |attrs| attrs.* else .{},
-                else => .{},
-            };
+        pub fn _contentStreamAttributes(self: @This()) ContentStreamAttributes {
+            switch (self.endLine.lineType) {
+                .codeBlockEnd => {
+                    if (self.endLine.extraInfo()) |info| {
+                        if (info.streamAttrs) |attrs| return attrs.*;
+                    }
+                },
+                else => {},
+            }
+            return .{};
         }
 
         pub fn startPlayloadRange(self: @This()) Range {
@@ -586,8 +600,8 @@ pub const BlockType = union(enum) {
     },
 
     custom: struct {
-        startLine: *LineInfo = undefined,
-        endLine: *LineInfo = undefined,
+        startLine: *Line = undefined,
+        endLine: *Line = undefined,
 
         // Note: the block end tag line might be missing.
         //       And the endLine might not be a .customBlockEnd line.
@@ -597,7 +611,10 @@ pub const BlockType = union(enum) {
         const Atom = void;
 
         pub fn attributes(self: @This()) CustomBlockAttibutes {
-            return if (self.startLine.lineType.customBlockStart.attrs) |attrs| attrs.* else .{};
+            if (self.startLine.extraInfo()) |info| {
+                if (info.customBlockAttrs) |attrs| return attrs.*;
+            }
+            return .{};
         }
 
         pub fn startPlayloadRange(self: @This()) Range {
@@ -612,29 +629,102 @@ pub const BlockType = union(enum) {
         }
     },
 
-    pub fn ownerBlockInfo(self: *const @This()) *BlockInfo {
+    pub fn ownerBlock(self: *const @This()) *Block {
         return @alignCast(@fieldParentPtr("blockType", @constCast(self)));
     }
 };
 
-pub const LineInfo = struct {
-    index: u32 = undefined, // one basedd (for debug purpose only)
-    atomBlockIndex: u32 = undefined, // one based (for debug purpose only)
+fn voidOr(T: type) type {
+    const ValueType = if (builtin.mode == .Debug) T else void;
 
-    range: Range = undefined, // ToDo: save memory. The end is the same as the start of the next line. (Remove the start).
-    rangeTrimmed: Range = undefined, // without leanding and traling blanks (except .code lines)
+    return struct {
+        value: ValueType,
 
-    endType: LineEndType = undefined,
+        pub fn get(self: @This()) T {
+            if (builtin.mode != .Debug) return 0;
+            return self.value;
+        }
+
+        pub fn set(self: *@This(), v: T) void {
+            if (builtin.mode != .Debug) return;
+            self.value = v;
+        }
+    };
+}
+
+fn identify(T: type) type {
+    return struct {
+        value: T,
+
+        pub fn get(self: @This()) T {
+            return self.value;
+        }
+
+        pub fn set(self: *@This(), v: T) void {
+            self.value = v;
+        }
+    };
+}
+
+pub const LineStartAtType = std.meta.FieldType(Line, .startAt);
+
+pub const Line = struct {
+    pub const Type = enum(u4) {
+        blank,
+        usual,
+        header,
+        seperator,
+        attributes,
+
+        baseBlockOpen,
+        baseBlockClose,
+
+        codeBlockStart,
+        codeBlockEnd,
+        code,
+
+        customBlockStart,
+        customBlockEnd,
+        data,
+    };
+
+    pub const EndType = enum(u2) {
+        void, // doc end
+        n, // \n
+        rn, // \r\n
+
+        pub fn typeName(self: @This()) []const u8 {
+            return @tagName(self);
+        }
+
+        pub fn len(self: @This()) u32 {
+            return switch (self) {
+                .void => 0,
+                .n => 1,
+                .rn => 2,
+            };
+        }
+    };
+
+    index: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
+    atomBlockIndex: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
+
+    startAt: voidOr(u32) = undefined,
+
+    // This is the end pos of the line end token.
+    // It is also the start pos of the next line.
+    endAt: u32 = undefined,
+
+    prefixBlankEnd: u32 = undefined,
+    suffixBlankStart: u32 = undefined,
+
+    endType: EndType = undefined,
 
     treatEndAsSpace: bool = false,
 
-    // ...
-    containerMark: ?ContainerLeadingMark = null, // !!! remember init it after alloc
-    lineType: LineType = undefined, // ToDo: renamed to lineType
+    lineType: Type = undefined,
 
-    pub fn number(self: @This()) usize {
-        return @intCast(self.index); // + 1;
-    }
+    tokens: list.List(Token) = .{},
 
     pub fn typeName(self: @This()) []const u8 {
         return @tagName(self.lineType);
@@ -645,79 +735,114 @@ pub const LineInfo = struct {
     }
 
     pub fn isAttributes(self: @This()) bool {
-        return switch (self.lineType) {
-            .attributes => true,
-            else => false,
-        };
-    }
-
-    pub fn containerMarkEnd(self: @This()) u32 {
-        return if (self.containerMark) |containerMark| blk: {
-            switch (containerMark) {
-                inline else => |m| break :blk m.markEndWithSpaces,
-            }
-        } else blk: {
-            break :blk self.rangeTrimmed.start;
-        };
-    }
-
-    pub fn tokens(self: *@This()) ?*list.List(TokenInfo) {
-        return switch (self.lineType) {
-            inline else => |*lt| {
-                if (@hasField(@TypeOf(lt.*), "tokens")) {
-                    return &lt.tokens;
-                }
-                return null;
-            },
-        };
+        return self.lineType == .attributes;
     }
 
     pub fn ownerListElement(self: *const @This()) *list.Element(@This()) {
         return @alignCast(@fieldParentPtr("value", @constCast(self)));
     }
 
-    pub fn next(self: *const @This()) ?*LineInfo {
+    pub fn next(self: *const @This()) ?*Line {
         return &(self.ownerListElement().next orelse return null).value;
     }
 
-    pub fn prev(self: *const @This()) ?*LineInfo {
+    pub fn prev(self: *const @This()) ?*Line {
         return &(self.ownerListElement().prev orelse return null).value;
     }
 
-    pub fn start(self: *const @This(), trimContainerMark: bool, trimLeadingSpaces: bool) u32 {
-        if (trimContainerMark) {
-            if (self.containerMark) |mark| switch (mark) {
-                inline else => |m| {
-                    return m.markEndWithSpaces;
-                },
-            };
-        }
-        return if (trimLeadingSpaces) self.rangeTrimmed.start else self.range.start;
+    pub fn hasContainerMark(self: *const @This()) bool {
+        return if (self.tokens.head) |tokenElement| tokenElement.value == .containerMark else false;
     }
 
-    pub fn end(self: *const @This(), trimmTrailingSpaces: bool) u32 {
-        return if (trimmTrailingSpaces) self.rangeTrimmed.end else self.range.end;
+    pub fn firstNonContainerMarkToken(self: *const @This()) ?*Token {
+        if (self.tokens.head) |tokenElement| {
+            if (tokenElement.value != .containerMark) return &tokenElement.value;
+            if (tokenElement.next) |nextElement| {
+                return &nextElement.value;
+            }
+        }
+        return null;
+    }
+
+    pub fn lineTypeMarkToken(self: *const @This()) ?*Token {
+        if (self.firstNonContainerMarkToken()) |token| {
+            if (token.* == .lineTypeMark) return token;
+            if (token.* == .extra) {
+                std.debug.assert(token.next().?.* == .lineTypeMark);
+                return token.next().?;
+            }
+        }
+        return null;
+    }
+
+    pub fn extraInfo(self: *const @This()) ?*Token.Extra.Info {
+        if (self.firstNonContainerMarkToken()) |token| {
+            if (token.* == .extra) {
+                std.debug.assert(token.next().?.* == .lineTypeMark);
+                return &token.extra.info;
+            }
+        }
+        return null;
+    }
+
+    fn startPos(self: *const @This()) u32 {
+        if (builtin.mode == .Debug) return self.startAt.get();
+        return if (self.prev()) |prevLine| prevLine.endAt else 0;
+    }
+
+    pub fn start(self: *const @This(), trimOption: enum { none, trimContainerMark, trimLeadingSpaces }) u32 {
+        switch (trimOption) {
+            .none => return self.startPos(),
+            .trimLeadingSpaces => return self.prefixBlankEnd,
+            .trimContainerMark => {
+                if (self.tokens.head) |tokenElement| {
+                    switch (tokenElement.value) {
+                        .containerMark => return tokenElement.value.end(),
+                        else => {},
+                    }
+                }
+                return self.prefixBlankEnd;
+            },
+        }
+    }
+
+    pub fn end(self: *const @This(), trimOption: enum { none, trimLineEnd, trimTrailingSpaces }) u32 {
+        return switch (trimOption) {
+            .none => self.endAt,
+            .trimLineEnd => self.endAt - self.endType.len(),
+            .trimTrailingSpaces => self.suffixBlankStart,
+        };
+    }
+
+    pub fn range(self: *const @This(), trimOtion: enum { none, trimLineEnd, trimSpaces }) Range {
+        return switch (trimOtion) {
+            .none => .{ .start = self.startPos(), .end = self.endAt },
+            .trimLineEnd => .{ .start = self.startPos(), .end = self.endAt - self.endType.len() },
+            .trimSpaces => .{ .start = self.prefixBlankEnd, .end = self.suffixBlankStart },
+        };
     }
 
     // ToDo: to opotimize, don't let parser use this method to
     //       get playload data for parsing.
-    pub fn playloadRange(self: @This()) Range {
-        return switch (self.lineType) {
+    pub fn playloadRange(self: *const @This()) Range {
+        std.debug.print("======= 000\n", .{});
+        switch (self.lineType) {
             inline .baseBlockOpen,
             .baseBlockClose,
             .codeBlockStart,
             .codeBlockEnd,
             .customBlockStart,
             .customBlockEnd,
-            => |lineType| blk: {
-                std.debug.assert(lineType.markEndWithSpaces <= self.rangeTrimmed.end);
-                break :blk Range{ .start = lineType.markEndWithSpaces, .end = self.rangeTrimmed.end };
+            => {
+                const playloadStart = self.lineTypeMarkToken().?.end();
+                std.debug.assert(playloadStart <= self.suffixBlankStart);
+                return Range{ .start = playloadStart, .end = self.suffixBlankStart };
             },
             else => unreachable,
-        };
+        }
     }
 
-    pub fn isBoundary(self: @This()) bool {
+    pub fn isBoundary(self: *const @This()) bool {
         return switch (self.lineType) {
             inline .baseBlockOpen, .baseBlockClose, .codeBlockStart, .codeBlockEnd, .customBlockStart, .customBlockEnd => true,
             else => false,
@@ -725,250 +850,17 @@ pub const LineInfo = struct {
     }
 };
 
-pub const LineEndType = enum(u2) {
-    void, // doc end
-    n, // \n
-    rn, // \r\n
+pub const Token = union(enum) {
+    pub const PlainText = std.meta.FieldType(Token, .content);
+    pub const CommentText = std.meta.FieldType(Token, .commentText);
+    pub const EvenBackticks = std.meta.FieldType(Token, .evenBackticks);
+    pub const SpanMark = std.meta.FieldType(Token, .spanMark);
+    pub const LinkInfo = std.meta.FieldType(Token, .linkInfo);
+    pub const LeadingSpanMark = std.meta.FieldType(Token, .leadingSpanMark);
+    pub const ContainerMark = std.meta.FieldType(Token, .containerMark);
+    pub const LineTypeMark = std.meta.FieldType(Token, .lineTypeMark);
+    pub const Extra = std.meta.FieldType(Token, .extra);
 
-    pub fn typeName(self: @This()) []const u8 {
-        return @tagName(self);
-    }
-
-    pub fn len(self: @This()) u32 {
-        return switch (self) {
-            .void => 0,
-            .n => 1,
-            .rn => 2,
-        };
-    }
-};
-
-// ToDo: use an enum filed + common fileds.
-//       And use u30 for cursor values.
-pub const ContainerLeadingMark = union(enum) {
-    item: struct {
-        markEnd: u32,
-        markEndWithSpaces: u32,
-    },
-    table: struct {
-        markEnd: u32,
-        markEndWithSpaces: u32,
-    },
-    quotation: struct {
-        markEnd: u32,
-        markEndWithSpaces: u32,
-    },
-    notice: struct {
-        markEnd: u32,
-        markEndWithSpaces: u32,
-    },
-    reveal: struct {
-        markEnd: u32,
-        markEndWithSpaces: u32,
-    },
-    plain: struct {
-        markEnd: u32,
-        markEndWithSpaces: u32,
-    },
-
-    pub fn typeName(self: @This()) []const u8 {
-        return @tagName(self);
-    }
-};
-
-pub const LineType = union(enum) {
-    blank: struct {},
-    usual: struct {
-        // A usual line might start with 3+ semicolon or nothing.
-        // So either markLen == 0, or markLen >= 3.
-        markLen: u32,
-        markEndWithSpaces: u32,
-        tokens: list.List(TokenInfo) = .{},
-    },
-    header: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-        tokens: list.List(TokenInfo) = .{},
-    },
-    seperator: struct {
-        markLen: u32,
-    },
-
-    baseBlockOpen: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-
-        attrs: ?*BaseBlockAttibutes = null, // ToDo
-    },
-    baseBlockClose: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-
-        baseNextSibling: ?*BlockInfo = null,
-    },
-
-    codeBlockStart: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-
-        attrs: ?*CodeBlockAttibutes = null, // ToDo
-    },
-    codeBlockEnd: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-
-        streamAttrs: ?*ContentStreamAttributes = null, // ToDo
-    },
-    code: struct {},
-
-    customBlockStart: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-
-        attrs: ?*CustomBlockAttibutes = null, // ToDo
-    },
-    customBlockEnd: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-    },
-    data: struct {},
-
-    attributes: struct {
-        markLen: u32,
-        markEndWithSpaces: u32,
-        tokens: list.List(TokenInfo) = .{},
-    },
-};
-
-pub const TokenInfo = struct {
-    tokenType: TokenType,
-
-    pub fn typeName(self: @This()) []const u8 {
-        return @tagName(self.tokenType);
-    }
-
-    pub fn range(self: *const @This()) Range {
-        return .{ .start = self.start(), .end = self.end() };
-    }
-
-    pub fn start(self: *const @This()) u32 {
-        switch (self.tokenType) {
-            .linkInfo => {
-                if (self.next()) |nextTokenInfo| {
-                    if (builtin.mode == .Debug) {
-                        std.debug.assert(nextTokenInfo.tokenType == .spanMark);
-                        const m = nextTokenInfo.tokenType.spanMark;
-                        std.debug.assert(m.markType == .link and m.open == true);
-                    }
-                    return nextTokenInfo.start();
-                } else unreachable;
-            },
-            inline else => |token| {
-                return token.start;
-            },
-        }
-    }
-
-    pub fn end(self: *const @This()) u32 {
-        switch (self.tokenType) {
-            .commentText => |t| {
-                return t.end;
-            },
-            .content => |t| {
-                return t.end;
-            },
-            .evenBackticks => |s| {
-                var e = self.start() + (s.pairCount << 1);
-                if (s.secondary) e += 1;
-                return e;
-            },
-            .spanMark => |m| {
-                var e = self.start() + m.markLen + m.blankLen;
-                if (m.secondary) e += 1;
-                return e;
-            },
-            .linkInfo => {
-                return self.start();
-            },
-            .leadingSpanMark => |m| {
-                return self.start() + m.markLen + m.blankLen;
-            },
-        }
-    }
-
-    // Used to verify end() == end2(lineInfo).
-    pub fn end2(self: *@This(), lineInfo: *LineInfo) u32 {
-        if (self.next()) |nextTokenInfo| {
-            return nextTokenInfo.start();
-        }
-        return lineInfo.rangeTrimmed.end;
-    }
-
-    // ToDo: if self is const, return const. Possible?
-    fn next(self: *const @This()) ?*TokenInfo {
-        const tokenElement: *const list.Element(TokenInfo) = @alignCast(@fieldParentPtr("value", self));
-        if (tokenElement.next) |te| {
-            return &te.value;
-        }
-        return null;
-    }
-
-    fn prev(self: *const @This()) ?*TokenInfo {
-        const tokenElement: *const list.Element(TokenInfo) = @alignCast(@fieldParentPtr("value", self));
-        if (tokenElement.prev) |te| {
-            return &te.value;
-        }
-        return null;
-    }
-
-    fn followingSpanMark(self: *const @This()) *SpanMark {
-        if (self.next()) |nextTokenInfo| {
-            switch (nextTokenInfo.tokenType) {
-                .spanMark => |*m| {
-                    return m;
-                },
-                else => unreachable,
-            }
-        } else unreachable;
-    }
-};
-
-// Tokens consume most memory after a doc is parsed.
-// So try to keep the size of TokenType small and use as few tokens as possible.
-//
-// Try to keep the size of each TokenType field <= (4 + 4 + NativeWordSize) bytes.
-//
-// It is possible to make size of TokenType be 8 on 32-bit systems? (By discarding
-// the .start property of each TokenType).
-//
-// Now, even all the fields of a union type reserved enough bits for the union tag,
-// the compiler will still use extra alignment bytes for the union tag.
-// So the size of TokenType is 24 bytes now.
-// Maybe future zig compiler will make optimization to reduce the size to 16 bytes.
-//
-// An unmature idea is to add an extra enum field which only use
-// the reserved bits to emulate the union tag manually.
-// I'm nore sure how safe this way is now.
-//
-//     tag: struct {
-//        _: uN,
-//        _type: enum(uM) { // M == 16*8 - N
-//            content,
-//            commentText,
-//            ...
-//        },
-//     },
-//     content: ...,
-//     commentText: ...,
-
-pub const PlainText = std.meta.FieldType(TokenType, .content);
-pub const CommentText = std.meta.FieldType(TokenType, .commentText);
-pub const EvenBackticks = std.meta.FieldType(TokenType, .evenBackticks);
-pub const SpanMark = std.meta.FieldType(TokenType, .spanMark);
-pub const LeadingSpanMark = std.meta.FieldType(TokenType, .leadingSpanMark);
-pub const LinkInfo = std.meta.FieldType(TokenType, .linkInfo);
-
-pub const TokenType = union(enum) {
     content: struct {
         start: u32,
         // The value should be the same as the start of the next token, or end of line.
@@ -977,7 +869,7 @@ pub const TokenType = union(enum) {
 
         // Finally, the list will exclude the last one if
         // it is only used for self-defined URL.
-        nextInLink: ?*TokenInfo = null,
+        nextInLink: ?*Token = null,
     },
     commentText: struct {
         start: u32,
@@ -1024,17 +916,16 @@ pub const TokenType = union(enum) {
     linkInfo: struct {
         info: packed union {
             // This is only used for link matching.
-            firstPlainText: ?*TokenInfo, // null for a blank link span
+            firstPlainText: ?*Token, // null for a blank link span
 
             // This is a list, it is the head.
             // Surely, if urlConfirmed, it is the only one in the list.
-            urlSourceText: ?*TokenInfo, // null for a blank link span
+            urlSourceText: ?*Token, // null for a blank link span
         },
 
         fn followingOpenLinkSpanMark(self: *const @This()) *SpanMark {
-            const tokenType: *const TokenType = @alignCast(@fieldParentPtr("linkInfo", self));
-            const tokenInfo: *const TokenInfo = @alignCast(@fieldParentPtr("tokenType", tokenType));
-            const m = tokenInfo.followingSpanMark();
+            const token: *const Token = @alignCast(@fieldParentPtr("linkInfo", self));
+            const m = token.followingSpanMark();
             std.debug.assert(m.markType == .link and m.open == true);
             return m;
         }
@@ -1059,7 +950,7 @@ pub const TokenType = union(enum) {
             return self.followingOpenLinkSpanMark().urlSourceSet;
         }
 
-        pub fn setSourceOfURL(self: *@This(), urlSource: ?*TokenInfo, confirmed: bool) void {
+        pub fn setSourceOfURL(self: *@This(), urlSource: ?*Token, confirmed: bool) void {
             std.debug.assert(!self.urlSourceSet());
 
             self.followingOpenLinkSpanMark().urlConfirmed = confirmed;
@@ -1085,9 +976,136 @@ pub const TokenType = union(enum) {
             return @tagName(self.markType);
         }
     },
+    containerMark: struct {
+        start: u32,
+        blankLen: u32,
+        markLen: u32,
+        //markType: ContainerType, // can be determined by the start char
+    },
+    lineTypeMark: struct { // excluding container marks
+        start: u32,
+        blankLen: u32,
+        markLen: u32,
+
+        // For containing line with certain lien types,
+        // an extra token is followed by this .lineTypeMark token.
+    },
+    extra: struct {
+        pub const Info = std.meta.FieldType(@This(), .info);
+
+        info: packed union {
+            // followed by a .lineTypeMark token in a .baseBlockClose line
+            blockRef: ?*Block,
+            // followed by a .lineTypeMark token in a .baseBlockOpen line
+            baseBlockAttrs: ?*BaseBlockAttibutes,
+            // followed by a .lineTypeMark token in a .codeBlockStart line
+            codeBlockAttrs: ?*CodeBlockAttibutes,
+            // followed by a .lineTypeMark token in a .codeBlockEnd line
+            streamAttrs: ?*ContentStreamAttributes,
+            // followed by a .lineTypeMark token in a .customBlockStart line
+            customBlockAttrs: ?*CustomBlockAttibutes,
+        },
+    },
 
     pub fn typeName(self: @This()) []const u8 {
         return @tagName(self);
+    }
+
+    pub fn range(self: *const @This()) Range {
+        return .{ .start = self.start(), .end = self.end() };
+    }
+
+    pub fn start(self: *const @This()) u32 {
+        switch (self.*) {
+            .linkInfo => {
+                if (self.next()) |nextToken| {
+                    if (builtin.mode == .Debug) {
+                        std.debug.assert(nextToken.* == .spanMark);
+                        const m = nextToken.spanMark;
+                        std.debug.assert(m.markType == .link and m.open == true);
+                    }
+                    return nextToken.start();
+                } else unreachable;
+            },
+            .extra => {
+                if (self.next()) |nextToken| {
+                    if (builtin.mode == .Debug) {
+                        std.debug.assert(nextToken.* == .lineTypeMark);
+                    }
+                    return nextToken.start();
+                } else unreachable;
+            },
+            inline else => |token| {
+                return token.start;
+            },
+        }
+    }
+
+    pub fn end(self: *const @This()) u32 {
+        switch (self.*) {
+            .commentText => |t| {
+                return t.end;
+            },
+            .content => |t| {
+                return t.end;
+            },
+            .evenBackticks => |s| {
+                var e = self.start() + (s.pairCount << 1);
+                if (s.secondary) e += 1;
+                return e;
+            },
+            .spanMark => |m| {
+                var e = self.start() + m.markLen + m.blankLen;
+                if (m.secondary) e += 1;
+                return e;
+            },
+            .linkInfo, .extra => {
+                return self.start();
+            },
+            inline .leadingSpanMark, .lineTypeMark, .containerMark => |m| {
+                return self.start() + m.markLen + m.blankLen;
+            },
+        }
+    }
+
+    // Debug purpose. Used to verify end() == end2(line).
+    pub fn end2(self: *@This(), _: *Line) u32 {
+        if (self.next()) |nextToken| {
+            return nextToken.start();
+        }
+        // The old implementation.
+        // ToDo: now, the assumption is false for some lines with playload.
+        // return line.suffixBlankStart;
+        // The current temp implementation.
+        return self.end();
+    }
+
+    // ToDo: if self is const, return const. Possible?
+    pub fn next(self: *const @This()) ?*Token {
+        const tokenElement: *const list.Element(Token) = @alignCast(@fieldParentPtr("value", self));
+        if (tokenElement.next) |te| {
+            return &te.value;
+        }
+        return null;
+    }
+
+    pub fn prev(self: *const @This()) ?*Token {
+        const tokenElement: *const list.Element(Token) = @alignCast(@fieldParentPtr("value", self));
+        if (tokenElement.prev) |te| {
+            return &te.value;
+        }
+        return null;
+    }
+
+    fn followingSpanMark(self: *const @This()) *SpanMark {
+        if (self.next()) |nextToken| {
+            switch (nextToken.*) {
+                .spanMark => |*m| {
+                    return m;
+                },
+                else => unreachable,
+            }
+        } else unreachable;
     }
 };
 
@@ -1120,3 +1138,31 @@ pub const LineSpanMarkType = enum(u3) {
     escape, // !!
     spoiler, // ??
 };
+
+// Tokens consume most memory after a doc is parsed.
+// So try to keep the size of TokenType small and use as few tokens as possible.
+//
+// Try to keep the size of each TokenType field <= (4 + 4 + NativeWordSize) bytes.
+//
+// It is possible to make size of TokenType be 8 on 32-bit systems? (By discarding
+// the .start property of each TokenType).
+//
+// Now, even all the fields of a union type reserved enough bits for the union tag,
+// the compiler will still use extra alignment bytes for the union tag.
+// So the size of TokenType is 24 bytes now.
+// Maybe future zig compiler will make optimization to reduce the size to 16 bytes.
+//
+// An unmature idea is to add an extra enum field which only use
+// the reserved bits to emulate the union tag manually.
+// I'm nore sure how safe this way is now.
+//
+//     tag: struct {
+//        _: uN,
+//        _type: enum(uM) { // M == 16*8 - N
+//            content,
+//            commentText,
+//            ...
+//        },
+//     },
+//     content: ...,
+//     commentText: ...,

@@ -17,8 +17,8 @@ allocator: mem.Allocator,
 
 // Match link definitions.
 
-fn tokenAsString(self: *const LinkMatcher, contentTokenInfo: *const tmd.TokenInfo) []const u8 {
-    return self.tmdData[contentTokenInfo.start()..contentTokenInfo.end()];
+fn tokenAsString(self: *const LinkMatcher, contentToken: *const tmd.Token) []const u8 {
+    return self.tmdData[contentToken.start()..contentToken.end()];
 }
 
 fn copyLinkText(dst: anytype, from: u32, src: []const u8) u32 {
@@ -230,7 +230,7 @@ fn Patricia(comptime TextType: type) type {
 
         const NodeValue = struct {
             textSegment: TextType = undefined,
-            linkInfos: list.List(*tmd.LinkInfo) = .{},
+            linkInfos: list.List(*tmd.Token.LinkInfo) = .{},
             deeperTree: Tree = .{},
 
             fn init(self: *@This(), nilNodePtr: *Node) void {
@@ -260,7 +260,7 @@ fn Patricia(comptime TextType: type) type {
             }
         };
 
-        fn putLinkInfo(self: *@This(), text: TextType, linkInfoElement: *list.Element(*tmd.LinkInfo)) !void {
+        fn putLinkInfo(self: *@This(), text: TextType, linkInfoElement: *list.Element(*tmd.Token.LinkInfo)) !void {
             var node = try self.getFreeNode();
             node.value.textSegment = text;
 
@@ -377,7 +377,7 @@ fn Patricia(comptime TextType: type) type {
             return null;
         }
 
-        fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
+        fn setUrlSourceForNode(node: *Node, urlSource: ?*tmd.Token, confirmed: bool) void {
             var le = node.value.linkInfos.head;
             while (le) |linkInfoElement| {
                 if (!linkInfoElement.value.urlSourceSet()) {
@@ -391,9 +391,9 @@ fn Patricia(comptime TextType: type) type {
             }
         }
 
-        fn setUrlSourceForTreeNodes(theTree: *Tree, urlSource: ?*tmd.TokenInfo, confirmed: bool) void {
+        fn setUrlSourceForTreeNodes(theTree: *Tree, urlSource: ?*tmd.Token, confirmed: bool) void {
             const NodeHandler = struct {
-                urlSource: ?*tmd.TokenInfo,
+                urlSource: ?*tmd.Token,
                 confirmed: bool,
 
                 pub fn onNode(h: @This(), node: *Node) void {
@@ -409,17 +409,17 @@ fn Patricia(comptime TextType: type) type {
 }
 
 const LinkForTree = struct {
-    linkInfoElementNormal: list.Element(*tmd.LinkInfo),
-    linkInfoElementInverted: list.Element(*tmd.LinkInfo),
+    linkInfoElementNormal: list.Element(*tmd.Token.LinkInfo),
+    linkInfoElementInverted: list.Element(*tmd.Token.LinkInfo),
     revisedLinkText: RevisedLinkText,
 
-    fn setInfoAndText(self: *@This(), linkInfo: *tmd.LinkInfo, text: RevisedLinkText) void {
+    fn setInfoAndText(self: *@This(), linkInfo: *tmd.Token.LinkInfo, text: RevisedLinkText) void {
         self.linkInfoElementNormal.value = linkInfo;
         self.linkInfoElementInverted.value = linkInfo;
         self.revisedLinkText = text;
     }
 
-    fn info(self: *const @This()) *tmd.LinkInfo {
+    fn info(self: *const @This()) *tmd.Token.LinkInfo {
         std.debug.assert(self.linkInfoElementNormal.value == self.linkInfoElementInverted.value);
         return self.linkInfoElementNormal.value;
     }
@@ -522,7 +522,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
             var lastToken = firstTextToken;
             // count sum length without the last text token
             var dummyLinkText = DummyLinkText{};
-            while (lastToken.tokenType.content.nextInLink) |nextToken| {
+            while (lastToken.content.nextInLink) |nextToken| {
                 defer lastToken = nextToken;
                 const str = self.tokenAsString(lastToken);
                 linkTextLen = copyLinkText(&dummyLinkText, linkTextLen, str);
@@ -585,7 +585,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                 var linkTextLen2: u32 = 0;
                 lastToken = firstTextToken;
                 // build text data without the last text token
-                while (lastToken.tokenType.content.nextInLink) |nextToken| {
+                while (lastToken.content.nextInLink) |nextToken| {
                     defer lastToken = nextToken;
                     const str = self.tokenAsString(lastToken);
                     linkTextLen2 = copyLinkText(&realLinkText, linkTextLen2, str);

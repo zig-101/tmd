@@ -16,28 +16,29 @@ pub const trim_blanks = LineScanner.trim_blanks;
 pub const parse_custom_block_open_playload = AttributeParser.parse_custom_block_open_playload;
 
 pub fn destroy_tmd_doc(tmdDoc: *tmd.Doc, allocator: mem.Allocator) void {
-    list.destroyListElements(tmd.BlockInfo, tmdDoc.blocks, null, allocator);
+    list.destroyListElements(tmd.Block, tmdDoc.blocks, null, allocator);
 
     const T = struct {
-        fn destroyLineTokens(lineInfo: *tmd.LineInfo, a: mem.Allocator) void {
-            if (lineInfo.tokens()) |tokens| {
-                list.destroyListElements(tmd.TokenInfo, tokens.*, null, a);
-            }
+        fn destroyLineTokens(line: *tmd.Line, a: mem.Allocator) void {
+            //if (line.tokens()) |tokens| {
+            //    list.destroyListElements(tmd.Token, tokens.*, null, a);
+            //}
+            list.destroyListElements(tmd.Token, line.tokens, null, a);
         }
     };
 
-    list.destroyListElements(tmd.LineInfo, tmdDoc.lines, T.destroyLineTokens, allocator);
+    list.destroyListElements(tmd.Line, tmdDoc.lines, T.destroyLineTokens, allocator);
 
-    list.destroyListElements(tmd.ElementAttibutes, tmdDoc.elementAttributes, null, allocator);
-    list.destroyListElements(tmd.BaseBlockAttibutes, tmdDoc.baseBlockAttibutes, null, allocator);
-    list.destroyListElements(tmd.CodeBlockAttibutes, tmdDoc.codeBlockAttibutes, null, allocator);
-    list.destroyListElements(tmd.CustomBlockAttibutes, tmdDoc.customBlockAttibutes, null, allocator);
-    list.destroyListElements(tmd.ContentStreamAttributes, tmdDoc.contentStreamAttributes, null, allocator);
+    list.destroyListElements(tmd.ElementAttibutes, tmdDoc._elementAttributes, null, allocator);
+    list.destroyListElements(tmd.BaseBlockAttibutes, tmdDoc._baseBlockAttibutes, null, allocator);
+    list.destroyListElements(tmd.CodeBlockAttibutes, tmdDoc._codeBlockAttibutes, null, allocator);
+    list.destroyListElements(tmd.CustomBlockAttibutes, tmdDoc._customBlockAttibutes, null, allocator);
+    list.destroyListElements(tmd.ContentStreamAttributes, tmdDoc._contentStreamAttributes, null, allocator);
 
-    list.destroyListElements(tmd.BlockInfoRedBlack.Node, tmdDoc.blockTreeNodes, null, allocator);
+    list.destroyListElements(tmd.BlockRedBlack.Node, tmdDoc._blockTreeNodes, null, allocator);
 
     list.destroyListElements(tmd.Link, tmdDoc.links, null, allocator);
-    list.destroyListElements(*tmd.BlockInfo, tmdDoc.tocHeaders, null, allocator);
+    list.destroyListElements(*tmd.Block, tmdDoc.tocHeaders, null, allocator);
 
     tmdDoc.* = .{ .data = "" };
 }
@@ -46,8 +47,8 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     var tmdDoc = tmd.Doc{ .data = tmdData };
     errdefer destroy_tmd_doc(&tmdDoc, allocator);
 
-    const nilBlockTreeNodeElement = try list.createListElement(tmd.BlockInfoRedBlack.Node, allocator);
-    tmdDoc.blockTreeNodes.push(nilBlockTreeNodeElement);
+    const nilBlockTreeNodeElement = try list.createListElement(tmd.BlockRedBlack.Node, allocator);
+    tmdDoc._blockTreeNodes.push(nilBlockTreeNodeElement);
     const nilBlockTreeNode = &nilBlockTreeNodeElement.value;
     nilBlockTreeNode.* = .{
         .color = .black,

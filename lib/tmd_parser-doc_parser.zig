@@ -22,29 +22,29 @@ commentLineParser: *ContentParser = undefined,
 lineScanner: LineScanner = undefined,
 
 nextElementAttributes: ?tmd.ElementAttibutes = null,
-lastBlockInfo: *tmd.BlockInfo = undefined,
+lastBlock: *tmd.Block = undefined,
 
-pendingTocHeaderBlock: ?*tmd.BlockInfo = null,
+pendingTocHeaderBlock: ?*tmd.Block = null,
 
-fn createAndPushBlockInfoElement(parser: *DocParser) !*tmd.BlockInfo {
-    var blockInfoElement = try list.createListElement(tmd.BlockInfo, parser.allocator);
-    parser.tmdDoc.blocks.push(blockInfoElement);
-    const blockInfo = &blockInfoElement.value;
-    blockInfo.attributes = null; // !important
+fn createAndPushBlockElement(parser: *DocParser) !*tmd.Block {
+    var blockElement = try list.createListElement(tmd.Block, parser.allocator);
+    parser.tmdDoc.blocks.push(blockElement);
+    const block = &blockElement.value;
+    block.attributes = null; // !important
     parser.numBlocks += 1;
-    blockInfo.index = parser.numBlocks;
+    block.index = parser.numBlocks;
 
-    parser.lastBlockInfo = blockInfo;
+    parser.lastBlock = block;
 
-    return blockInfo;
+    return block;
 }
 
-fn tryToAttributeBlock(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !void {
-    // std.debug.assert(oldLastBlockInfo != parser.lastBlockInfo); // possible equal in the end
+fn tryToAttributeBlock(parser: *DocParser, oldLastBlock: *tmd.Block) !void {
+    // std.debug.assert(oldLastBlock != parser.lastBlock); // possible equal in the end
 
-    if (oldLastBlockInfo.blockType != .attributes) {
+    if (oldLastBlock.blockType != .attributes) {
         if (parser.nextElementAttributes) |as| {
-            var block = oldLastBlockInfo;
+            var block = oldLastBlock;
             const attributesBlock = while (block.prev()) |prevBlock| {
                 switch (prevBlock.blockType) {
                     .attributes => break prevBlock,
@@ -64,55 +64,57 @@ fn tryToAttributeBlock(parser: *DocParser, oldLastBlockInfo: *tmd.BlockInfo) !vo
         }
     }
 
-    // oldLastBlockInfo.attributes = null; // moved to createAndPushBlockInfoElement
+    // oldLastBlock.attributes = null; // moved to createAndPushBlockElement
 }
 
 fn tryToAttributeTheLastBlock(parser: *DocParser) !void {
-    std.debug.assert(parser.lastBlockInfo == &parser.tmdDoc.blocks.tail.?.value);
-    switch (parser.lastBlockInfo.blockType) {
+    std.debug.assert(parser.lastBlock == &parser.tmdDoc.blocks.tail.?.value);
+    switch (parser.lastBlock.blockType) {
         .attributes => if (parser.nextElementAttributes) |as| {
-            try parser.setBlockAttributes(parser.lastBlockInfo, as); // a footer attributes
+            try parser.setBlockAttributes(parser.lastBlock, as); // a footer attributes
         },
-        else => try parser.tryToAttributeBlock(parser.lastBlockInfo),
+        else => try parser.tryToAttributeBlock(parser.lastBlock),
     }
 }
 
-fn setBlockAttributes(parser: *DocParser, blockInfo: *tmd.BlockInfo, as: tmd.ElementAttibutes) !void {
+fn setBlockAttributes(parser: *DocParser, block: *tmd.Block, as: tmd.ElementAttibutes) !void {
     var blockAttributesElement = try list.createListElement(tmd.ElementAttibutes, parser.allocator);
-    parser.tmdDoc.elementAttributes.push(blockAttributesElement);
+    parser.tmdDoc._elementAttributes.push(blockAttributesElement);
 
     const attrs = &blockAttributesElement.value;
     attrs.* = as;
 
-    blockInfo.attributes = attrs;
+    block.attributes = attrs;
 
     if (attrs.id.len > 0) {
-        const blockTreeNodeElement = if (parser.tmdDoc.freeBlockTreeNodeElement) |e| blk: {
-            parser.tmdDoc.freeBlockTreeNodeElement = null;
+        const blockTreeNodeElement = if (parser.tmdDoc._freeBlockTreeNodeElement) |e| blk: {
+            parser.tmdDoc._freeBlockTreeNodeElement = null;
             break :blk e;
         } else blk: {
-            const element = try list.createListElement(tmd.BlockInfoRedBlack.Node, parser.allocator);
-            parser.tmdDoc.blockTreeNodes.push(element);
+            const element = try list.createListElement(tmd.BlockRedBlack.Node, parser.allocator);
+            parser.tmdDoc._blockTreeNodes.push(element);
             break :blk element;
         };
 
         const blockTreeNode = &blockTreeNodeElement.value;
-        blockTreeNode.value = blockInfo;
+        blockTreeNode.value = block;
         const n = parser.tmdDoc.blocksByID.insert(blockTreeNode);
         if (n != blockTreeNode) {
-            parser.tmdDoc.freeBlockTreeNodeElement = blockTreeNodeElement;
+            parser.tmdDoc._freeBlockTreeNodeElement = blockTreeNodeElement;
         }
     }
 }
 
-//fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo, forBulletContainer: bool) !void {
-fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void {
-    std.debug.assert(lineInfo.lineType == .attributes);
-    const tokens = lineInfo.lineType.attributes.tokens;
-    const headElement = tokens.head orelse return;
-    if (headElement.value.tokenType != .commentText) return;
-    std.debug.assert(headElement.next == null);
-    const commentToken = &headElement.value;
+//fn onNewAttributesLine(parser: *DocParser, line: *const tmd.Line, forBulletContainer: bool) !void {
+fn onNewAttributesLine(parser: *DocParser, line: *const tmd.Line) !void {
+    std.debug.assert(line.lineType == .attributes);
+    //const tokens = line.lineType.attributes.tokens;
+    //const commentElement = tokens.head orelse return;
+    const lineTypeToken = line.lineTypeMarkToken() orelse unreachable;
+    const commentToken = lineTypeToken.next() orelse return;
+    if (commentToken.* != .commentText) return;
+    std.debug.assert(commentToken.next() == null);
+    //const commentToken = &commentElement.value;
     const comment = parser.tmdDoc.rangeData(commentToken.range());
     const attrs = AttributeParser.parse_element_attributes(comment);
 
@@ -141,17 +143,17 @@ fn onNewAttributesLine(parser: *DocParser, lineInfo: *const tmd.LineInfo) !void 
     }
 }
 
-// atomBlockInfo is an atom block, or a base/root block.
-fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) !void {
-    if (parser.tmdDoc.lines.tail) |lastLineInfoElement| {
+// atomBlock is an atom block, or a base/root block.
+fn setEndLineForAtomBlock(parser: *DocParser, atomBlock: *tmd.Block) !void {
+    if (parser.tmdDoc.lines.tail) |lastLineElement| {
         std.debug.assert(!parser.tmdDoc.blocks.empty());
-        std.debug.assert(atomBlockInfo.blockType != .root);
-        if (atomBlockInfo.blockType != .base) handle: {
-            atomBlockInfo.setEndLine(&lastLineInfoElement.value);
+        std.debug.assert(atomBlock.blockType != .root);
+        if (atomBlock.blockType != .base) handle: {
+            atomBlock.setEndLine(&lastLineElement.value);
 
             if (parser.pendingTocHeaderBlock) |headerBlock| {
-                std.debug.assert(atomBlockInfo.blockType == .header);
-                std.debug.assert(headerBlock == atomBlockInfo);
+                std.debug.assert(atomBlock.blockType == .header);
+                std.debug.assert(headerBlock == atomBlock);
 
                 if (headerBlock.blockType.header.isBare()) break :handle;
 
@@ -168,14 +170,20 @@ fn setEndLineForAtomBlock(parser: *DocParser, atomBlockInfo: *tmd.BlockInfo) !vo
                 // Will correct it at the end of parsing.
                 parser.tmdDoc._headerLevelNeedAdjusted[level - 1] = true;
 
-                const element = try list.createListElement(*tmd.BlockInfo, parser.allocator);
+                const element = try list.createListElement(*tmd.Block, parser.allocator);
                 parser.tmdDoc.tocHeaders.push(element);
                 element.value = headerBlock;
             }
         }
-    } else std.debug.assert(atomBlockInfo.blockType == .root);
+    } else std.debug.assert(atomBlock.blockType == .root);
 
     parser.pendingTocHeaderBlock = null;
+}
+
+pub fn createTokenForLine(self: *@This(), line: *tmd.Line) !*tmd.Token {
+    var tokenElement = try list.createListElement(tmd.Token, self.allocator);
+    line.tokens.push(tokenElement);
+    return &tokenElement.value;
 }
 
 fn onParseEnd(parser: *DocParser) !void {
@@ -207,8 +215,8 @@ fn parse(parser: *DocParser) !void {
     const tmdData = parser.tmdDoc.data;
     parser.lineScanner = .{ .data = tmdData };
 
-    const rootBlockInfo = try parser.createAndPushBlockInfoElement();
-    var blockArranger = BlockArranger.start(rootBlockInfo, parser.tmdDoc);
+    const rootBlock = try parser.createAndPushBlockElement();
+    var blockArranger = BlockArranger.start(rootBlock, parser.tmdDoc);
     // defer blockArranger.end(); // should not be called deferredly. Put in the end of the function now.
 
     var commentLineParser = ContentParser.make(parser);
@@ -224,40 +232,29 @@ fn parse(parser: *DocParser) !void {
 
     var listCount: u32 = 0;
 
-    var boundedBlockStartInfo: ?union(enum) {
-        codeBlockStart: *std.meta.FieldType(tmd.LineType, .codeBlockStart),
-        customBlockStart: *std.meta.FieldType(tmd.LineType, .customBlockStart),
-
-        fn markLen(self: @This()) u32 {
-            return switch (self) {
-                inline else => |t| t.markLen,
-            };
-        }
-
-        fn markChar(self: @This()) u8 {
-            return switch (self) {
-                .codeBlockStart => '\'',
-                .customBlockStart => '"',
-            };
-        }
+    var boundedBlockStartInfo: ?struct {
+        lineType: tmd.Line.Type,
+        markChar: u8,
+        markLen: u32,
     } = null;
 
     // An atom block, or a base/root block.
-    var currentAtomBlockInfo = rootBlockInfo;
+    var currentAtomBlock = rootBlock;
     var atomBlockCount: u32 = 0;
 
     while (lineScanner.proceedToNextLine()) {
-        var oldLastBlockInfo = parser.lastBlockInfo;
+        var oldLastBlock = parser.lastBlock;
 
-        var lineInfoElement = try list.createListElement(tmd.LineInfo, parser.allocator);
-        var lineInfo = &lineInfoElement.value;
-        lineInfo.* = .{};
+        var lineElement = try list.createListElement(tmd.Line, parser.allocator);
+        var line = &lineElement.value;
+        line.* = .{};
 
-        lineInfo.range.start = lineScanner.cursor;
+        const lineStart = lineScanner.cursor;
+        line.startAt.set(lineStart);
 
         //std.debug.print("--- line#{}\n", .{lineScanner.cursorLineIndex});
 
-        lineInfo.lineType = .{ .blank = .{} }; // will be change below
+        line.lineType = .blank; // will be change below
 
         parse_line: {
             _ = lineScanner.readUntilNotBlank();
@@ -265,81 +262,88 @@ fn parse(parser: *DocParser) !void {
 
             // handle code/custom block context.
             if (boundedBlockStartInfo) |boundedBlockStart| {
-                const markChar = boundedBlockStart.markChar();
+                const markChar = boundedBlockStart.markChar;
                 if (lineScanner.lineEnd) |_| {} else if (lineScanner.peekCursor() != markChar) {
                     _ = lineScanner.readUntilLineEnd();
                 } else handle: {
                     lineScanner.advance(1);
                     const markLen = lineScanner.readUntilNotChar(markChar) + 1;
 
-                    //const codeBlockStartLineType: *tmd.LineType = @alignCast(@fieldParentPtr("codeBlockStart", codeBlockStart));
-                    //const codeBlockStartLineInfo: *tmd.LineInfo = @alignCast(@fieldParentPtr("lineType", codeBlockStartLineType));
-                    //std.debug.print("=== {}, {}, {s}\n", .{boundedBlockStart.markLen(), markLen, tmdData[lineInfo.rangeTrimmed.start..lineInfo.rangeTrimmed.end]});
-
-                    if (markLen != boundedBlockStart.markLen()) {
+                    if (markLen != boundedBlockStart.markLen) {
                         if (lineScanner.lineEnd == null) _ = lineScanner.readUntilLineEnd();
                         break :handle;
                     }
 
-                    lineInfo.rangeTrimmed.start = leadingBlankEnd;
+                    line.prefixBlankEnd = leadingBlankEnd;
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        lineInfo.rangeTrimmed.end = playloadStart;
+                        line.suffixBlankStart = playloadStart;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            lineInfo.rangeTrimmed.end = playloadStart;
+                            line.suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                             const numTrailingBlanks = lineScanner.readUntilLineEnd();
-                            lineInfo.rangeTrimmed.end = lineScanner.cursor - numTrailingBlanks;
+                            line.suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
                         }
                     }
 
-                    switch (boundedBlockStart) {
+                    switch (boundedBlockStart.lineType) {
                         .codeBlockStart => {
-                            lineInfo.lineType = .{ .codeBlockEnd = .{
-                                .markLen = markLen,
-                                .markEndWithSpaces = playloadStart,
-                            } };
+                            line.lineType = .codeBlockEnd;
 
-                            const playloadRange = lineInfo.playloadRange();
+                            //const playloadRange = line.playloadRange();
+                            const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
                             const playload = parser.tmdDoc.rangeData(playloadRange);
                             const attrs = AttributeParser.parse_code_block_close_playload(playload);
                             if (!std.meta.eql(attrs, .{})) {
-                                var contentStreamAttributesElement = try list.createListElement(tmd.ContentStreamAttributes, parser.allocator);
-                                parser.tmdDoc.contentStreamAttributes.push(contentStreamAttributesElement);
-                                contentStreamAttributesElement.value = attrs;
-                                lineInfo.lineType.codeBlockEnd.streamAttrs = &contentStreamAttributesElement.value;
+                                var _contentStreamAttributesElement = try list.createListElement(tmd.ContentStreamAttributes, parser.allocator);
+                                parser.tmdDoc._contentStreamAttributes.push(_contentStreamAttributesElement);
+                                _contentStreamAttributesElement.value = attrs;
+                                //line.lineType.codeBlockEnd.streamAttrs = &_contentStreamAttributesElement.value;
+                                (try parser.createTokenForLine(line)).* = .{
+                                    .extra = .{
+                                        .info = .{
+                                            .streamAttrs = &_contentStreamAttributesElement.value,
+                                        },
+                                    },
+                                };
                             }
                         },
                         .customBlockStart => {
-                            lineInfo.lineType = .{ .customBlockEnd = .{
-                                .markLen = markLen,
-                                .markEndWithSpaces = playloadStart,
-                            } };
+                            line.lineType = .customBlockEnd;
                         },
+                        else => unreachable,
                     }
+                    (try parser.createTokenForLine(line)).* = .{
+                        .lineTypeMark = .{
+                            .start = leadingBlankEnd,
+                            .markLen = markLen,
+                            .blankLen = playloadStart - leadingBlankEnd - markLen,
+                        },
+                    };
 
                     boundedBlockStartInfo = null;
                 }
 
-                if (lineInfo.lineType == .blank) {
+                if (line.lineType == .blank) {
                     std.debug.assert(lineScanner.lineEnd != null);
                     std.debug.assert(boundedBlockStartInfo != null);
 
-                    lineInfo.lineType = switch (boundedBlockStart) {
-                        .codeBlockStart => .{ .code = .{} },
-                        .customBlockStart => .{ .data = .{} },
+                    line.lineType = switch (boundedBlockStart.lineType) {
+                        .codeBlockStart => .code,
+                        .customBlockStart => .data,
+                        else => unreachable,
                     };
-                    lineInfo.rangeTrimmed.start = lineInfo.range.start;
-                    lineInfo.rangeTrimmed.end = lineScanner.cursor;
+                    line.prefixBlankEnd = lineStart;
+                    line.suffixBlankStart = lineScanner.cursor;
                 } else {
                     std.debug.assert(boundedBlockStartInfo == null);
 
-                    std.debug.assert(lineInfo.lineType == .codeBlockEnd or
-                        lineInfo.lineType == .customBlockEnd);
+                    std.debug.assert(line.lineType == .codeBlockEnd or
+                        line.lineType == .customBlockEnd);
                 }
 
                 break :parse_line;
@@ -348,31 +352,31 @@ fn parse(parser: *DocParser) !void {
             // handle blank line.
             if (lineScanner.lineEnd) |_| {
                 // For a blank line, all blanks belongs to the line-end token.
-                lineInfo.rangeTrimmed.start = lineInfo.range.start;
-                lineInfo.rangeTrimmed.end = lineInfo.range.start;
+                line.prefixBlankEnd = lineStart;
+                line.suffixBlankStart = lineStart;
 
-                lineInfo.lineType = .{ .blank = .{} };
+                line.lineType = .blank;
 
-                if (currentAtomBlockInfo.blockType != .blank) {
-                    const blankBlockInfo = try parser.createAndPushBlockInfoElement();
-                    blankBlockInfo.blockType = .{
+                if (currentAtomBlock.blockType != .blank) {
+                    const blankBlock = try parser.createAndPushBlockElement();
+                    blankBlock.blockType = .{
                         .blank = .{
-                            .startLine = lineInfo,
+                            .startLine = line,
                         },
                     };
-                    try blockArranger.stackAtomBlock(blankBlockInfo, false);
+                    try blockArranger.stackAtomBlock(blankBlock, false);
 
-                    try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                    currentAtomBlockInfo = blankBlockInfo;
+                    try parser.setEndLineForAtomBlock(currentAtomBlock);
+                    currentAtomBlock = blankBlock;
                     atomBlockCount += 1;
                 }
 
                 break :parse_line;
             }
 
-            lineInfo.rangeTrimmed.start = leadingBlankEnd;
+            line.prefixBlankEnd = leadingBlankEnd;
 
-            const lineStart = lineScanner.cursor;
+            const lineStartIgnoreLeadingBlanks = lineScanner.cursor;
             // try to parse leading container mark.
             switch (lineScanner.peekCursor()) {
                 '*', '+', '-', '~', ':' => |mark| handle: {
@@ -386,28 +390,30 @@ fn parse(parser: *DocParser) !void {
                     const markEnd = lineScanner.cursor;
                     const numSpaces = lineScanner.readUntilNotBlank();
                     if (numSpaces == 0 and lineScanner.lineEnd == null) { // not list item
-                        lineScanner.setCursor(lineStart);
-                        lineInfo.containerMark = null;
+                        lineScanner.setCursor(lineStartIgnoreLeadingBlanks);
                         break :handle;
                     }
 
                     const markEndWithSpaces = if (lineScanner.lineEnd) |_| blk: {
-                        lineInfo.rangeTrimmed.end = markEnd;
+                        line.suffixBlankStart = markEnd;
                         break :blk markEnd;
                     } else lineScanner.cursor;
 
-                    lineInfo.containerMark = .{ .item = .{
-                        .markEnd = markEnd,
-                        .markEndWithSpaces = markEndWithSpaces,
-                    } };
+                    (try parser.createTokenForLine(line)).* = .{
+                        .containerMark = .{
+                            .start = lineStartIgnoreLeadingBlanks,
+                            .markLen = markEnd - lineStartIgnoreLeadingBlanks,
+                            .blankLen = markEndWithSpaces - markEnd,
+                        },
+                    };
 
                     std.debug.assert(markEnd - leadingBlankEnd == 1 or markEnd - leadingBlankEnd == 2);
                     const markStr = tmdData[leadingBlankEnd..markEnd];
                     const markTypeIndex = tmd.listItemTypeIndex(markStr);
                     const createNewList = blockArranger.shouldCreateNewList(markTypeIndex);
-                    const listBlockInfo: ?*tmd.BlockInfo = if (createNewList) blk: {
-                        const listBlockInfo = try parser.createAndPushBlockInfoElement();
-                        listBlockInfo.blockType = .{
+                    const listBlock: ?*tmd.Block = if (createNewList) blk: {
+                        const listBlock = try parser.createAndPushBlockElement();
+                        listBlock.blockType = .{
                             .list = .{
                                 ._itemTypeIndex = markTypeIndex,
                                 .listType = tmd.listType(markStr), // if .bullets, might be adjusted to .tabs later
@@ -416,11 +422,11 @@ fn parse(parser: *DocParser) !void {
                             },
                         };
                         listCount += 1;
-                        break :blk listBlockInfo;
+                        break :blk listBlock;
                     } else null;
 
-                    const listItemBlockInfo = try parser.createAndPushBlockInfoElement();
-                    listItemBlockInfo.blockType = .{
+                    const listItemBlock = try parser.createAndPushBlockElement();
+                    listItemBlock.blockType = .{
                         .item = .{
                             //.isFirst = false, // will be modified eventually
                             //.isLast = false, // will be modified eventually
@@ -428,79 +434,67 @@ fn parse(parser: *DocParser) !void {
                         },
                     };
 
-                    try blockArranger.stackListItemBlock(listItemBlockInfo, markTypeIndex, listBlockInfo);
+                    try blockArranger.stackListItemBlock(listItemBlock, markTypeIndex, listBlock);
                 },
                 '#', '>', '!', '?', '.' => |mark| handle: {
                     lineScanner.advance(1);
                     const markEnd = lineScanner.cursor;
                     const numSpaces = lineScanner.readUntilNotBlank();
                     if (numSpaces == 0 and lineScanner.lineEnd == null) { // not container
-                        lineScanner.setCursor(lineStart);
-                        lineInfo.containerMark = null;
+                        lineScanner.setCursor(lineStartIgnoreLeadingBlanks);
                         break :handle;
                     }
 
                     const markEndWithSpaces = if (lineScanner.lineEnd) |_| blk: {
-                        lineInfo.rangeTrimmed.end = markEnd;
+                        line.suffixBlankStart = markEnd;
                         break :blk markEnd;
                     } else lineScanner.cursor;
 
-                    const containerBlockInfo = try parser.createAndPushBlockInfoElement();
+                    const containerBlock = try parser.createAndPushBlockElement();
+
                     switch (mark) {
                         '#' => {
-                            lineInfo.containerMark = .{ .table = .{
-                                .markEnd = markEnd,
-                                .markEndWithSpaces = markEndWithSpaces,
-                            } };
-                            containerBlockInfo.blockType = .{
+                            containerBlock.blockType = .{
                                 .table = .{},
                             };
                         },
                         '>' => {
-                            lineInfo.containerMark = .{ .quotation = .{
-                                .markEnd = markEnd,
-                                .markEndWithSpaces = markEndWithSpaces,
-                            } };
-                            containerBlockInfo.blockType = .{
+                            containerBlock.blockType = .{
                                 .quotation = .{},
                             };
                         },
                         '!' => {
-                            lineInfo.containerMark = .{ .notice = .{
-                                .markEnd = markEnd,
-                                .markEndWithSpaces = markEndWithSpaces,
-                            } };
-                            containerBlockInfo.blockType = .{
+                            containerBlock.blockType = .{
                                 .notice = .{},
                             };
                         },
                         '?' => {
-                            lineInfo.containerMark = .{ .reveal = .{
-                                .markEnd = markEnd,
-                                .markEndWithSpaces = markEndWithSpaces,
-                            } };
-                            containerBlockInfo.blockType = .{
+                            containerBlock.blockType = .{
                                 .reveal = .{},
                             };
                         },
                         '.' => {
-                            lineInfo.containerMark = .{ .plain = .{
-                                .markEnd = markEnd,
-                                .markEndWithSpaces = markEndWithSpaces,
-                            } };
-                            containerBlockInfo.blockType = .{
+                            containerBlock.blockType = .{
                                 .plain = .{},
                             };
                         },
                         else => unreachable,
                     }
-                    try blockArranger.stackContainerBlock(containerBlockInfo);
+
+                    (try parser.createTokenForLine(line)).* = .{
+                        .containerMark = .{
+                            .start = lineStartIgnoreLeadingBlanks,
+                            .markLen = 1,
+                            .blankLen = markEndWithSpaces - markEnd,
+                        },
+                    };
+
+                    try blockArranger.stackContainerBlock(containerBlock);
                 },
-                else => {
-                    lineInfo.containerMark = null;
-                },
+                else => {},
             }
 
+            const hasContainerMark = line.hasContainerMark();
             const contentStart = lineScanner.cursor;
 
             // try to parse atom block mark.
@@ -521,23 +515,28 @@ fn parse(parser: *DocParser) !void {
                         if (lineScanner.lineEnd == null) break :handle;
                     }
 
-                    lineInfo.lineType = .{ .seperator = .{
-                        .markLen = markLen,
-                    } };
-
-                    const lineBlockInfo = try parser.createAndPushBlockInfoElement();
-                    lineBlockInfo.blockType = .{
-                        .seperator = .{
-                            .startLine = lineInfo,
+                    line.lineType = .seperator;
+                    (try parser.createTokenForLine(line)).* = .{
+                        .lineTypeMark = .{
+                            .start = leadingBlankEnd,
+                            .markLen = markLen,
+                            .blankLen = 0,
                         },
                     };
-                    try blockArranger.stackAtomBlock(lineBlockInfo, lineInfo.containerMark != null);
 
-                    try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                    currentAtomBlockInfo = lineBlockInfo;
+                    const lineBlock = try parser.createAndPushBlockElement();
+                    lineBlock.blockType = .{
+                        .seperator = .{
+                            .startLine = line,
+                        },
+                    };
+                    try blockArranger.stackAtomBlock(lineBlock, hasContainerMark);
+
+                    try parser.setEndLineForAtomBlock(currentAtomBlock);
+                    currentAtomBlock = lineBlock;
                     atomBlockCount += 1;
 
-                    lineInfo.rangeTrimmed.end = contentEnd;
+                    line.suffixBlankStart = contentEnd;
                 },
                 '{', '}' => |mark| handle: {
                     const isOpenMark = mark == '{';
@@ -552,59 +551,77 @@ fn parse(parser: *DocParser) !void {
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        lineInfo.rangeTrimmed.end = playloadStart;
+                        line.suffixBlankStart = playloadStart;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            lineInfo.rangeTrimmed.end = playloadStart;
+                            line.suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                             const numTrailingBlanks = lineScanner.readUntilLineEnd();
-                            lineInfo.rangeTrimmed.end = lineScanner.cursor - numTrailingBlanks;
+                            line.suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
                         }
                     }
 
                     if (isOpenMark) {
-                        lineInfo.lineType = .{ .baseBlockOpen = .{
-                            .markLen = markLen,
-                            .markEndWithSpaces = playloadStart,
-                        } };
+                        line.lineType = .baseBlockOpen;
 
-                        const baseBlockInfo = try parser.createAndPushBlockInfoElement();
-                        baseBlockInfo.blockType = .{
+                        const baseBlock = try parser.createAndPushBlockElement();
+                        baseBlock.blockType = .{
                             .base = .{
-                                .openLine = lineInfo,
+                                .openLine = line,
                             },
                         };
 
-                        const playloadRange = baseBlockInfo.blockType.base.openPlayloadRange();
+                        //const playloadRange = baseBlock.blockType.base.openPlayloadRange();
+                        const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
                         const playload = parser.tmdDoc.rangeData(playloadRange);
                         const attrs = AttributeParser.parse_base_block_open_playload(playload);
                         if (!std.meta.eql(attrs, .{})) {
-                            var baseBlockAttibutesElement = try list.createListElement(tmd.BaseBlockAttibutes, parser.allocator);
-                            parser.tmdDoc.baseBlockAttibutes.push(baseBlockAttibutesElement);
-                            baseBlockAttibutesElement.value = attrs;
-                            baseBlockInfo.blockType.base.openLine.lineType.baseBlockOpen.attrs = &baseBlockAttibutesElement.value;
+                            var _baseBlockAttibutesElement = try list.createListElement(tmd.BaseBlockAttibutes, parser.allocator);
+                            parser.tmdDoc._baseBlockAttibutes.push(_baseBlockAttibutesElement);
+                            _baseBlockAttibutesElement.value = attrs;
+                            //baseBlock.blockType.base.openLine.lineType.baseBlockOpen.attrs = &_baseBlockAttibutesElement.value;
+                            (try parser.createTokenForLine(line)).* = .{
+                                .extra = .{
+                                    .info = .{
+                                        .baseBlockAttrs = &_baseBlockAttibutesElement.value,
+                                    },
+                                },
+                            };
                         }
 
-                        try blockArranger.openBaseBlock(baseBlockInfo, lineInfo.containerMark != null, attrs.commentedOut);
+                        try blockArranger.openBaseBlock(baseBlock, hasContainerMark, attrs.commentedOut);
 
-                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                        currentAtomBlockInfo = baseBlockInfo;
+                        try parser.setEndLineForAtomBlock(currentAtomBlock);
+                        currentAtomBlock = baseBlock;
                         atomBlockCount += 1;
                     } else {
-                        lineInfo.lineType = .{ .baseBlockClose = .{
-                            .markLen = markLen,
-                            .markEndWithSpaces = playloadStart,
-                        } };
+                        line.lineType = .baseBlockClose;
 
-                        const baseBlockInfo = try blockArranger.closeCurrentBaseBlock();
-                        baseBlockInfo.blockType.base.closeLine = lineInfo;
+                        const baseBlock = try blockArranger.closeCurrentBaseBlock();
+                        baseBlock.blockType.base.closeLine = line;
 
-                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                        currentAtomBlockInfo = baseBlockInfo;
+                        try parser.setEndLineForAtomBlock(currentAtomBlock);
+                        currentAtomBlock = baseBlock;
                         atomBlockCount += 1;
+
+                        (try parser.createTokenForLine(line)).* = .{
+                            .extra = .{
+                                .info = .{
+                                    .blockRef = null, // might be changed later
+                                },
+                            },
+                        };
                     }
+
+                    (try parser.createTokenForLine(line)).* = .{
+                        .lineTypeMark = .{
+                            .start = contentStart,
+                            .markLen = markLen,
+                            .blankLen = playloadStart - contentStart - markLen,
+                        },
+                    };
                 },
                 '\'', '"' => |mark| handle: {
                     lineScanner.advance(1);
@@ -616,82 +633,98 @@ fn parse(parser: *DocParser) !void {
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        lineInfo.rangeTrimmed.end = playloadStart;
+                        line.suffixBlankStart = playloadStart;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            lineInfo.rangeTrimmed.end = playloadStart;
+                            line.suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                             const numTrailingBlanks = lineScanner.readUntilLineEnd();
-                            lineInfo.rangeTrimmed.end = lineScanner.cursor - numTrailingBlanks;
+                            line.suffixBlankStart = lineScanner.cursor - numTrailingBlanks;
                         }
                     }
 
                     const atomBlock = if (mark == '\'') blk: {
-                        lineInfo.lineType = .{ .codeBlockStart = .{
-                            .markLen = markLen,
-                            .markEndWithSpaces = playloadStart,
-                        } };
+                        line.lineType = .codeBlockStart;
 
-                        boundedBlockStartInfo = .{
-                            .codeBlockStart = &lineInfo.lineType.codeBlockStart,
-                        };
-
-                        const codeBlockInfo = try parser.createAndPushBlockInfoElement();
-                        codeBlockInfo.blockType = .{
+                        const codeBlock = try parser.createAndPushBlockElement();
+                        codeBlock.blockType = .{
                             .code = .{
-                                .startLine = lineInfo,
+                                .startLine = line,
                             },
                         };
 
-                        const playloadRange = codeBlockInfo.blockType.code.startPlayloadRange();
+                        //const playloadRange = codeBlock.blockType.code.startPlayloadRange();
+                        const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
                         const playload = parser.tmdDoc.rangeData(playloadRange);
                         const attrs = AttributeParser.parse_code_block_open_playload(playload);
                         if (!std.meta.eql(attrs, .{})) {
-                            var codeBlockAttibutesElement = try list.createListElement(tmd.CodeBlockAttibutes, parser.allocator);
-                            parser.tmdDoc.codeBlockAttibutes.push(codeBlockAttibutesElement);
-                            codeBlockAttibutesElement.value = attrs;
-                            codeBlockInfo.blockType.code.startLine.lineType.codeBlockStart.attrs = &codeBlockAttibutesElement.value;
+                            var _codeBlockAttibutesElement = try list.createListElement(tmd.CodeBlockAttibutes, parser.allocator);
+                            parser.tmdDoc._codeBlockAttibutes.push(_codeBlockAttibutesElement);
+                            _codeBlockAttibutesElement.value = attrs;
+                            //codeBlock.blockType.code.startLine.lineType.codeBlockStart.attrs = &_codeBlockAttibutesElement.value;
+                            (try parser.createTokenForLine(line)).* = .{
+                                .extra = .{
+                                    .info = .{
+                                        .codeBlockAttrs = &_codeBlockAttibutesElement.value,
+                                    },
+                                },
+                            };
                         }
 
-                        break :blk codeBlockInfo;
+                        break :blk codeBlock;
                     } else blk: {
                         std.debug.assert(mark == '"');
 
-                        lineInfo.lineType = .{ .customBlockStart = .{
-                            .markLen = markLen,
-                            .markEndWithSpaces = playloadStart,
-                        } };
+                        line.lineType = .customBlockStart;
 
-                        boundedBlockStartInfo = .{
-                            .customBlockStart = &lineInfo.lineType.customBlockStart,
-                        };
-
-                        const customBlockInfo = try parser.createAndPushBlockInfoElement();
-                        customBlockInfo.blockType = .{
+                        const customBlock = try parser.createAndPushBlockElement();
+                        customBlock.blockType = .{
                             .custom = .{
-                                .startLine = lineInfo,
+                                .startLine = line,
                             },
                         };
 
-                        const playloadRange = customBlockInfo.blockType.custom.startPlayloadRange();
+                        //const playloadRange = customBlock.blockType.custom.startPlayloadRange();
+                        const playloadRange = tmd.Range{ .start = playloadStart, .end = line.suffixBlankStart };
                         const playload = parser.tmdDoc.rangeData(playloadRange);
                         const attrs = AttributeParser.parse_custom_block_open_playload(playload);
                         if (!std.meta.eql(attrs, .{})) {
-                            var customBlockAttibutesElement = try list.createListElement(tmd.CustomBlockAttibutes, parser.allocator);
-                            parser.tmdDoc.customBlockAttibutes.push(customBlockAttibutesElement);
-                            customBlockAttibutesElement.value = attrs;
-                            customBlockInfo.blockType.custom.startLine.lineType.customBlockStart.attrs = &customBlockAttibutesElement.value;
+                            var _customBlockAttibutesElement = try list.createListElement(tmd.CustomBlockAttibutes, parser.allocator);
+                            parser.tmdDoc._customBlockAttibutes.push(_customBlockAttibutesElement);
+                            _customBlockAttibutesElement.value = attrs;
+                            //customBlock.blockType.custom.startLine.lineType.customBlockStart.attrs = &_customBlockAttibutesElement.value;
+                            (try parser.createTokenForLine(line)).* = .{
+                                .extra = .{
+                                    .info = .{
+                                        .customBlockAttrs = &_customBlockAttibutesElement.value,
+                                    },
+                                },
+                            };
                         }
 
-                        break :blk customBlockInfo;
+                        break :blk customBlock;
                     };
 
-                    try blockArranger.stackAtomBlock(atomBlock, lineInfo.containerMark != null);
+                    (try parser.createTokenForLine(line)).* = .{
+                        .lineTypeMark = .{
+                            .start = contentStart,
+                            .markLen = markLen,
+                            .blankLen = playloadStart - contentStart - markLen,
+                        },
+                    };
 
-                    try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                    currentAtomBlockInfo = atomBlock;
+                    boundedBlockStartInfo = .{
+                        .lineType = line.lineType,
+                        .markChar = mark,
+                        .markLen = markLen,
+                    };
+
+                    try blockArranger.stackAtomBlock(atomBlock, hasContainerMark);
+
+                    try parser.setEndLineForAtomBlock(currentAtomBlock);
+                    currentAtomBlock = atomBlock;
                     atomBlockCount += 1;
                 },
                 '#' => handle: {
@@ -723,51 +756,55 @@ fn parse(parser: *DocParser) !void {
 
                     const markEnd = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        lineInfo.rangeTrimmed.end = markEnd;
+                        line.suffixBlankStart = markEnd;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            lineInfo.rangeTrimmed.end = markEnd;
+                            line.suffixBlankStart = markEnd;
                         }
                     }
 
-                    lineInfo.lineType = .{ .header = .{
-                        .markLen = markLen,
-                        .markEndWithSpaces = lineScanner.cursor,
-                    } };
+                    line.lineType = .header;
+                    (try parser.createTokenForLine(line)).* = .{
+                        .lineTypeMark = .{
+                            .start = contentStart,
+                            .markLen = markLen,
+                            .blankLen = lineScanner.cursor - markEnd,
+                        },
+                    };
 
-                    const headerBlockInfo = try parser.createAndPushBlockInfoElement();
-                    headerBlockInfo.blockType = .{
+                    const headerBlock = try parser.createAndPushBlockElement();
+                    headerBlock.blockType = .{
                         .header = .{
-                            .startLine = lineInfo,
+                            .startLine = line,
                         },
                     };
                     if (isFirstLevel) {
-                        try blockArranger.stackFirstLevelHeaderBlock(headerBlockInfo, lineInfo.containerMark != null);
+                        try blockArranger.stackFirstLevelHeaderBlock(headerBlock, hasContainerMark);
                     } else {
-                        try blockArranger.stackAtomBlock(headerBlockInfo, lineInfo.containerMark != null);
+                        try blockArranger.stackAtomBlock(headerBlock, hasContainerMark);
                     }
 
-                    try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                    currentAtomBlockInfo = headerBlockInfo;
+                    try parser.setEndLineForAtomBlock(currentAtomBlock);
+                    currentAtomBlock = headerBlock;
                     atomBlockCount += 1;
 
                     if (blockArranger.shouldHeaderChildBeInTOC()) {
                         // Will use the info in setEndLineForAtomBlock.
-                        // Note: whether or not headerBlockInfo is empty can't be determined now.
-                        parser.pendingTocHeaderBlock = headerBlockInfo;
+                        // Note: whether or not headerBlock is empty can't be determined now.
+                        parser.pendingTocHeaderBlock = headerBlock;
                     }
 
-                    contentParser.on_new_atom_block(currentAtomBlockInfo);
+                    contentParser.on_new_atom_block(currentAtomBlock);
 
                     if (lineScanner.lineEnd != null) {
-                        // lineInfo.rangeTrimmed.end has been determined.
+                        // line.suffixBlankStart has been determined.
                         // And no data for parsing tokens.
                         break :handle;
                     }
 
-                    const contentEnd = try contentParser.parse_header_line_tokens(lineInfo, lineScanner.cursor);
-                    lineInfo.rangeTrimmed.end = contentEnd;
+                    const contentEnd = try contentParser.parse_header_line_tokens(line, lineScanner.cursor);
+                    line.suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
                 },
                 ';' => |mark| handle: {
@@ -780,44 +817,47 @@ fn parse(parser: *DocParser) !void {
 
                     const markEnd = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        lineInfo.rangeTrimmed.end = markEnd;
+                        line.suffixBlankStart = markEnd;
                     } else {
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            lineInfo.rangeTrimmed.end = markEnd;
+                            line.suffixBlankStart = markEnd;
                         }
                     }
 
-                    //const newAtomBlock = if (mark == ';') blk: {
-                    lineInfo.lineType = .{ .usual = .{
-                        .markLen = markLen,
-                        .markEndWithSpaces = lineScanner.cursor,
-                    } };
-
-                    const usualBlockInfo = try parser.createAndPushBlockInfoElement();
-                    usualBlockInfo.blockType = .{
-                        .usual = .{
-                            .startLine = lineInfo,
+                    line.lineType = .usual;
+                    (try parser.createTokenForLine(line)).* = .{
+                        .lineTypeMark = .{
+                            .start = contentStart,
+                            .markLen = markLen,
+                            .blankLen = lineScanner.cursor - markEnd,
                         },
                     };
-                    const newAtomBlock = usualBlockInfo;
 
-                    try blockArranger.stackAtomBlock(newAtomBlock, lineInfo.containerMark != null);
+                    const usualBlock = try parser.createAndPushBlockElement();
+                    usualBlock.blockType = .{
+                        .usual = .{
+                            .startLine = line,
+                        },
+                    };
+                    const newAtomBlock = usualBlock;
 
-                    try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                    currentAtomBlockInfo = newAtomBlock;
+                    try blockArranger.stackAtomBlock(newAtomBlock, hasContainerMark);
+
+                    try parser.setEndLineForAtomBlock(currentAtomBlock);
+                    currentAtomBlock = newAtomBlock;
                     atomBlockCount += 1;
 
-                    contentParser.on_new_atom_block(currentAtomBlockInfo);
+                    contentParser.on_new_atom_block(currentAtomBlock);
 
                     if (lineScanner.lineEnd != null) {
-                        // lineInfo.rangeTrimmed.end has been determined.
+                        // line.suffixBlankStart has been determined.
                         // And no data for parsing tokens.
                         break :handle;
                     }
 
-                    const contentEnd = try contentParser.parse_usual_line_tokens(lineInfo, lineScanner.cursor, true);
-                    lineInfo.rangeTrimmed.end = contentEnd;
+                    const contentEnd = try contentParser.parse_usual_line_tokens(line, lineScanner.cursor, true);
+                    line.suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
                 },
                 '@' => |mark| handle: {
@@ -835,9 +875,9 @@ fn parse(parser: *DocParser) !void {
 
                     var playloadStart = lineScanner.cursor;
                     if (lineScanner.lineEnd) |_| {
-                        lineInfo.rangeTrimmed.end = playloadStart;
+                        line.suffixBlankStart = playloadStart;
                     } else {
-                        //if (lineInfo.containerMark) |m| {
+                        //if (line.containerMark) |m| {
                         //    if (m == .item and lineScanner.peekCursor() == '<') {
                         //        lineScanner.advance(1);
                         //        forBulletContainer = true;
@@ -846,119 +886,120 @@ fn parse(parser: *DocParser) !void {
 
                         _ = lineScanner.readUntilNotBlank();
                         if (lineScanner.lineEnd) |_| {
-                            lineInfo.rangeTrimmed.end = playloadStart;
+                            line.suffixBlankStart = playloadStart;
                         } else {
                             playloadStart = lineScanner.cursor;
                         }
                     }
 
-                    lineInfo.lineType = .{ .attributes = .{
-                        .markLen = markLen,
-                        .markEndWithSpaces = playloadStart,
-                    } };
+                    line.lineType = .attributes;
+                    (try parser.createTokenForLine(line)).* = .{
+                        .lineTypeMark = .{
+                            .start = contentStart,
+                            .markLen = markLen,
+                            .blankLen = playloadStart - contentStart - markLen,
+                        },
+                    };
 
-                    if (lineInfo.containerMark != null or currentAtomBlockInfo.blockType != .attributes) {
+                    if (hasContainerMark or currentAtomBlock.blockType != .attributes) {
                         // There might be some new blocks created in the current iteration.
-                        const realOldLast = parser.lastBlockInfo;
+                        const realOldLast = parser.lastBlock;
 
                         // ...
-                        const commentBlockInfo = try parser.createAndPushBlockInfoElement();
-                        commentBlockInfo.blockType = .{
+                        const commentBlock = try parser.createAndPushBlockElement();
+                        commentBlock.blockType = .{
                             .attributes = .{
-                                .startLine = lineInfo,
+                                .startLine = line,
                             },
                         };
 
-                        try blockArranger.stackAtomBlock(commentBlockInfo, lineInfo.containerMark != null);
+                        try blockArranger.stackAtomBlock(commentBlock, hasContainerMark);
 
-                        try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                        currentAtomBlockInfo = commentBlockInfo;
+                        try parser.setEndLineForAtomBlock(currentAtomBlock);
+                        currentAtomBlock = commentBlock;
                         atomBlockCount += 1;
 
                         // !! important
                         try parser.tryToAttributeBlock(realOldLast);
-                        oldLastBlockInfo = parser.lastBlockInfo;
+                        oldLastBlock = parser.lastBlock;
                     }
 
-                    contentParser.on_new_atom_block(currentAtomBlockInfo);
+                    contentParser.on_new_atom_block(currentAtomBlock);
                     //defer contentParser.on_new_atom_block(); // ToDo: might be unnecessary
 
                     if (lineScanner.lineEnd != null) {
-                        // lineInfo.rangeTrimmed.end has been determined.
+                        // line.suffixBlankStart has been determined.
                         // And no data for parsing tokens.
                         break :handle;
                     }
 
-                    const contentEnd = try contentParser.parse_attributes_line_tokens(lineInfo, lineScanner.cursor);
+                    const contentEnd = try contentParser.parse_attributes_line_tokens(line, lineScanner.cursor);
 
-                    lineInfo.rangeTrimmed.end = contentEnd;
+                    line.suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
 
-                    //try parser.onNewAttributesLine(lineInfo, forBulletContainer);
-                    try parser.onNewAttributesLine(lineInfo);
+                    //try parser.onNewAttributesLine(line, forBulletContainer);
+                    try parser.onNewAttributesLine(line);
                 },
                 else => {},
             }
 
             // If line type is still not determined, then it is just a usual line.
-            if (lineInfo.lineType == .blank) {
-                lineInfo.lineType = .{ .usual = .{
-                    .markLen = 0,
-                    .markEndWithSpaces = lineScanner.cursor,
-                } };
+            if (line.lineType == .blank) {
+                line.lineType = .usual;
 
-                if (lineInfo.containerMark != null or
-                    currentAtomBlockInfo.blockType != .usual and currentAtomBlockInfo.blockType != .header
-                //and currentAtomBlockInfo.blockType != .footer
+                if (hasContainerMark or
+                    currentAtomBlock.blockType != .usual and currentAtomBlock.blockType != .header
+                //and currentAtomBlock.blockType != .footer
                 ) {
-                    const usualBlockInfo = try parser.createAndPushBlockInfoElement();
-                    usualBlockInfo.blockType = .{
+                    const usualBlock = try parser.createAndPushBlockElement();
+                    usualBlock.blockType = .{
                         .usual = .{
-                            .startLine = lineInfo,
+                            .startLine = line,
                         },
                     };
-                    try blockArranger.stackAtomBlock(usualBlockInfo, lineInfo.containerMark != null);
+                    try blockArranger.stackAtomBlock(usualBlock, hasContainerMark);
 
-                    try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
-                    currentAtomBlockInfo = usualBlockInfo;
+                    try parser.setEndLineForAtomBlock(currentAtomBlock);
+                    currentAtomBlock = usualBlock;
                     atomBlockCount += 1;
 
-                    contentParser.on_new_atom_block(currentAtomBlockInfo);
+                    contentParser.on_new_atom_block(currentAtomBlock);
                 }
 
                 if (lineScanner.lineEnd == null) {
                     const contentEnd = try contentParser.parse_usual_line_tokens(
-                        lineInfo,
+                        line,
                         contentStart,
-                        //currentAtomBlockInfo.blockType != .header and
+                        //currentAtomBlock.blockType != .header and
                         contentStart == lineScanner.cursor,
                     );
-                    lineInfo.rangeTrimmed.end = contentEnd;
+                    line.suffixBlankStart = contentEnd;
                     std.debug.assert(lineScanner.lineEnd != null);
                 }
             }
         } // :parse_line
 
         if (lineScanner.lineEnd) |end| {
-            lineInfo.endType = end;
-            lineInfo.range.end = lineScanner.cursor;
+            line.endType = end;
+            line.endAt = lineScanner.cursor + end.len();
         } else unreachable;
 
-        lineInfo.atomBlockIndex = atomBlockCount;
-        lineInfo.index = lineScanner.cursorLineIndex;
+        line.atomBlockIndex.set(atomBlockCount);
+        line.index.set(lineScanner.cursorLineIndex);
 
-        parser.tmdDoc.lines.push(lineInfoElement);
+        parser.tmdDoc.lines.push(lineElement);
 
-        if (oldLastBlockInfo != parser.lastBlockInfo) {
-            try parser.tryToAttributeBlock(oldLastBlockInfo);
+        if (oldLastBlock != parser.lastBlock) {
+            try parser.tryToAttributeBlock(oldLastBlock);
         }
     }
 
     // Meaningful only for code snippet block (and popential later custom app block).
-    try parser.setEndLineForAtomBlock(currentAtomBlockInfo);
+    try parser.setEndLineForAtomBlock(currentAtomBlock);
 
     // ToDo: remove this line. (Forget the reason.;( )
-    contentParser.on_new_atom_block(currentAtomBlockInfo); // try to determine line-end render manner for the last coment line.
+    contentParser.on_new_atom_block(currentAtomBlock); // try to determine line-end render manner for the last coment line.
 
     blockArranger.end();
 

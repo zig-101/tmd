@@ -61,7 +61,7 @@ the offcial TapirMD commands locally.
         Then open your terminal or command prompt, and change directory to the go-tmd project folder,
         then run
     '''
-    go instlal
+    go install
     '''
 
   *. The `tmd` command binary file is installed in the Go binary installation path specified by the `GOBIN`

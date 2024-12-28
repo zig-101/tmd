@@ -72,8 +72,10 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
 
     // render file
 
-    //logMessage("", "tmdDataLength: ", @intCast(tmdDataLength));
-    //logMessage("", "fba.end_index: ", @intCast(fba.end_index));
+    logMessage(@typeName(tmd.LineStartAtType), " size: ", @sizeOf(tmd.LineStartAtType));
+
+    logMessage("", "tmdDataLength: ", @intCast(tmdDataLength));
+    logMessage("", "fba.end_index: ", @intCast(fba.end_index));
 
     const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
     fbs = std.io.fixedBufferStream(renderBuffer);
@@ -84,7 +86,7 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
     try fbs.seekTo(0);
     try fbs.writer().writeInt(u32, htmlWithLengthHeader.len - 4, .little);
 
-    //logMessage("", "htmlWithLengthHeader.len: ", @intCast(htmlWithLengthHeader.len));
+    logMessage("", "htmlWithLengthHeader.len: ", @intCast(htmlWithLengthHeader.len));
 
     return htmlWithLengthHeader;
 }

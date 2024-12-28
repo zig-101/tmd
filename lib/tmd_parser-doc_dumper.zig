@@ -7,15 +7,15 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
     var blockElement = tmdDoc.blocks.head;
     while (blockElement) |be| {
         defer blockElement = be.next;
-        const blockInfo = &be.value;
+        const block = &be.value;
         {
-            var depth = blockInfo.nestingDepth;
+            var depth = block.nestingDepth;
             while (depth > 0) : (depth -= 1) {
                 std.debug.print("  ", .{});
             }
         }
-        std.debug.print("+{}: #{} {s}", .{ blockInfo.nestingDepth, blockInfo.index, blockInfo.typeName() });
-        switch (blockInfo.blockType) {
+        std.debug.print("+{}: #{} {s}", .{ block.nestingDepth, block.index, block.typeName() });
+        switch (block.blockType) {
             .list => |itemList| {
                 std.debug.print(" (index: {}, type: {s}, 2nd mode: {})", .{ itemList.index, itemList.typeName(), itemList.secondMode });
             },
@@ -31,12 +31,12 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
             },
             else => {},
         }
-        if (blockInfo.nextSibling()) |sibling| {
+        if (block.nextSibling()) |sibling| {
             std.debug.print(" (next sibling: #{} {s})", .{ sibling.index, sibling.typeName() });
         } else {
             std.debug.print(" (next sibling: <null>)", .{});
         }
-        if (blockInfo.attributes) |attrs| {
+        if (block.attributes) |attrs| {
             if (attrs.id.len > 0) {
                 std.debug.print(" (id={s})", .{attrs.id});
             }
@@ -44,61 +44,63 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
 
         std.debug.print("\n", .{});
 
-        if (blockInfo.isAtom()) {
-            var lineInfo = blockInfo.getStartLine();
-            const end = blockInfo.getEndLine();
+        if (block.isAtom()) {
+            var line = block.getStartLine();
+            const end = block.getEndLine();
             while (true) {
-                var depth = blockInfo.nestingDepth + 1;
+                var depth = block.nestingDepth + 1;
                 while (depth > 0) : (depth -= 1) {
                     std.debug.print("  ", .{});
                 }
                 std.debug.print("- L{} @{}: <{s}> ({}..{}) ({}..{}) ({}..{}) <{s}> {}\n", .{
-                    lineInfo.number(),
-                    lineInfo.atomBlockIndex,
-                    lineInfo.typeName(),
-                    lineInfo.rangeTrimmed.start - lineInfo.range.start + 1,
-                    lineInfo.rangeTrimmed.end - lineInfo.range.start + 1,
-                    lineInfo.rangeTrimmed.start,
-                    lineInfo.rangeTrimmed.end,
-                    lineInfo.range.start,
-                    lineInfo.range.end,
-                    lineInfo.endTypeName(),
-                    lineInfo.treatEndAsSpace,
+                    line.index.get(),
+                    line.atomBlockIndex.get(),
+                    line.typeName(),
+                    line.prefixBlankEnd - line.start(.none) + 1,
+                    line.suffixBlankStart - line.start(.none) + 1,
+                    line.prefixBlankEnd,
+                    line.suffixBlankStart,
+                    line.start(.none),
+                    line.end(.trimLineEnd),
+                    line.endTypeName(),
+                    line.treatEndAsSpace,
                 });
 
-                if (lineInfo.tokens()) |tokens| {
-                    var tokenInfoElement = tokens.head;
-                    //if (true) tokenInfoElement = null; // debug switch
-                    while (tokenInfoElement) |element| {
-                        depth = blockInfo.nestingDepth + 2;
+                //if (line.tokens()) |tokens| {
+                {
+                    const tokens = &line.tokens;
+                    var tokenElement = tokens.head;
+                    //if (true) tokenElement = null; // debug switch
+                    while (tokenElement) |element| {
+                        depth = block.nestingDepth + 2;
                         while (depth > 0) : (depth -= 1) {
                             std.debug.print("  ", .{});
                         }
 
-                        const tokenInfo = &element.value;
-                        //defer std.debug.print("==== tokenInfo.end(): {}, tokenInfo.end2(lineInfo): {}\n", .{tokenInfo.end(), tokenInfo.end2(lineInfo)});
-                        std.debug.assert(tokenInfo.end() == tokenInfo.end2(lineInfo));
+                        const token = &element.value;
+                        //std.debug.print("==== <{s}>, token.end(): {}, token.end2(line): {}. {}\n", .{token.typeName(), token.end(), token.end2(line), token.end() == token.end2(line)});
+                        std.debug.assert(token.end() == token.end2(line));
 
-                        switch (tokenInfo.tokenType) {
+                        switch (token.*) {
                             .commentText => {
                                 std.debug.print("|{}-{}: [{s}]", .{
-                                    tokenInfo.start() - lineInfo.range.start + 1,
-                                    tokenInfo.end() - lineInfo.range.start + 1,
-                                    tokenInfo.typeName(),
+                                    token.start() - line.start(.none) + 1,
+                                    token.end() - line.start(.none) + 1,
+                                    token.typeName(),
                                 });
                             },
                             .content => {
                                 std.debug.print("|{}-{}: [{s}]", .{
-                                    tokenInfo.start() - lineInfo.range.start + 1,
-                                    tokenInfo.end() - lineInfo.range.start + 1,
-                                    tokenInfo.typeName(),
+                                    token.start() - line.start(.none) + 1,
+                                    token.end() - line.start(.none) + 1,
+                                    token.typeName(),
                                 });
                             },
                             .leadingSpanMark => |m| {
                                 std.debug.print("|{}-{}: {s}:{s}", .{
-                                    tokenInfo.start() - lineInfo.range.start + 1,
-                                    tokenInfo.end() - lineInfo.range.start + 1,
-                                    tokenInfo.typeName(),
+                                    token.start() - line.start(.none) + 1,
+                                    token.end() - line.start(.none) + 1,
+                                    token.typeName(),
                                     m.typeName(),
                                 });
                             },
@@ -109,11 +111,11 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                                 if (m.open) close = "" else open = " ";
                                 if (m.secondary) secondary = "^";
                                 std.debug.print("|{}-{}: {s}{s}{s}:{s}{s}", .{
-                                    tokenInfo.start() - lineInfo.range.start + 1,
-                                    tokenInfo.end() - lineInfo.range.start + 1,
+                                    token.start() - line.start(.none) + 1,
+                                    token.end() - line.start(.none) + 1,
                                     secondary,
                                     open,
-                                    tokenInfo.typeName(),
+                                    token.typeName(),
                                     m.typeName(),
                                     close,
                                 });
@@ -122,34 +124,41 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                                 var secondary: []const u8 = "";
                                 if (s.secondary) secondary = "^";
                                 std.debug.print("|{}-{}: {s}<{s}>", .{
-                                    tokenInfo.start() - lineInfo.range.start + 1,
-                                    tokenInfo.end() - lineInfo.range.start + 1,
+                                    token.start() - line.start(.none) + 1,
+                                    token.end() - line.start(.none) + 1,
                                     secondary,
-                                    tokenInfo.typeName(),
+                                    token.typeName(),
                                 });
                             },
-                            .linkInfo => {
+                            inline .linkInfo, .extra => {
                                 std.debug.print("|{}-{}: __{s}", .{
-                                    tokenInfo.start() - lineInfo.range.start + 1,
-                                    tokenInfo.end() - lineInfo.range.start + 1,
-                                    tokenInfo.typeName(),
+                                    token.start() - line.start(.none) + 1,
+                                    token.end() - line.start(.none) + 1,
+                                    token.typeName(),
+                                });
+                            },
+                            inline .lineTypeMark, .containerMark => |_| {
+                                std.debug.print("|{}-{}: {s}", .{
+                                    token.start() - line.start(.none) + 1,
+                                    token.end() - line.start(.none) + 1,
+                                    token.typeName(),
                                 });
                             },
                         }
 
                         std.debug.print("\n", .{});
 
-                        tokenInfoElement = element.next;
+                        tokenElement = element.next;
                     }
                 }
 
-                if (lineInfo == end) {
+                if (line == end) {
                     break;
                 }
 
-                const lineElement: *list.Element(tmd.LineInfo) = @alignCast(@fieldParentPtr("value", lineInfo));
+                const lineElement: *list.Element(tmd.Line) = @alignCast(@fieldParentPtr("value", line));
                 if (lineElement.next) |le| {
-                    lineInfo = &le.value;
+                    line = &le.value;
                 } else unreachable; // should always break from above
             }
         }

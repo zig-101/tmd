@@ -146,7 +146,6 @@ pub fn build(b: *std.Build) !void {
 
             const binPathName = @tagName(self.wasmInstallArtifact.dest_dir.?);
             const wasmFileName = self.wasmInstallArtifact.dest_sub_path;
-
             const theBuild = step.owner;
             const oldContent = try self.docPagesPath.readFileAlloc(theBuild.allocator, "play.html", 1 << 19);
             if (std.mem.indexOf(u8, oldContent, needle)) |k| {
@@ -167,6 +166,16 @@ pub fn build(b: *std.Build) !void {
 
     const buildDoc = b.step("doc", "Build doc");
     buildDoc.dependOn(&completePlayPage.step);
+
+    RequireOptimizeMode_ReleaseSmall.current = optimize;
+    // ToDo: it looks only the root steps (specified in "go build" commands)
+    //       will call their .makeFn functions. Dependency steps will not call.
+    //       So, here, set .makeFn for both of the two steps.
+    //       And it looks, the "make" methods of custom steps (like CompletePlayPage)
+    //       will always be called. So an alternative way is not add
+    //       RequireOptimizeMode custom step and let the "wasm" step depend on it.
+    buildDoc.makeFn = RequireOptimizeMode_ReleaseSmall.check;
+    wasmStep.makeFn = RequireOptimizeMode_ReleaseSmall.check;
 }
 
 const Config = struct {
@@ -181,3 +190,18 @@ fn collectConfig(b: *std.Build) Config {
 
     return c;
 }
+
+const RequireOptimizeMode_ReleaseSmall = struct {
+    const required: std.builtin.OptimizeMode = .ReleaseSmall;
+    var current: std.builtin.OptimizeMode = undefined;
+
+    fn check(step: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
+        if (current == required) return;
+
+        std.debug.print(
+            \\The "{s}" step requires "{s}" optimization mode (-Doptimize={s}), but it is "{s}" now.
+            \\
+            , .{step.name, @tagName(required), @tagName(required), @tagName(current)} );
+        return error.InvalidOptimizeMode;
+    }
+};
