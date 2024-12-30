@@ -20,7 +20,7 @@ pub fn List(comptime Value: type) type {
         }
 
         // e must not be in any list.
-        pub fn push(self: *Self, e: *Element(Value)) void {
+        pub fn pushTail(self: *Self, e: *Element(Value)) void {
             if (self.tail) |tail| {
                 tail.next = e;
                 e.prev = tail;
@@ -33,8 +33,7 @@ pub fn List(comptime Value: type) type {
             e.next = null;
         }
 
-        // ToDo: renamed tp popTail/pushTail
-        pub fn pop(self: *Self) ?*Element(Value) {
+        pub fn popTail(self: *Self) ?*Element(Value) {
             if (self.tail) |tail| {
                 if (tail.prev) |prev| {
                     prev.next = null;
@@ -85,7 +84,7 @@ pub fn List(comptime Value: type) type {
                     return;
                 }
                 if (e == self.tail) {
-                    _ = self.pop();
+                    _ = self.popTail();
                     return;
                 }
                 e.prev.?.next = e.next;

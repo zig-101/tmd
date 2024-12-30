@@ -271,7 +271,7 @@ fn Patricia(comptime TextType: type) type {
 
             //var element = try self.getFreeLinkInfoElement();
             //element.value = linkInfo;
-            n.value.linkInfos.push(linkInfoElement);
+            n.value.linkInfos.pushTail(linkInfoElement);
         }
 
         fn putNodeIntoTree(self: *@This(), theTree: *Tree, node: *Node) !*Node {
@@ -573,7 +573,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
             //defer std.debug.print("====={}: ||{s}||\n", .{linkInfo.inComment(), revisedLinkText.asString()});
 
             const theElement = try self.allocator.create(list.Element(LinkForTree));
-            linksForTree.push(theElement);
+            linksForTree.pushTail(theElement);
             theElement.value.setInfoAndText(linkInfo, revisedLinkText);
             const linkForTree = &theElement.value;
 

@@ -75,7 +75,7 @@ pub const TmdRender = struct {
         };
 
         const nodeElement = try list.createListElement(FootnoteRedBlack.Node, self.allocator);
-        self.footnoteNodes.push(nodeElement);
+        self.footnoteNodes.pushTail(nodeElement);
 
         const node = &nodeElement.value;
         node.value = footnote;
@@ -448,7 +448,7 @@ pub const TmdRender = struct {
             .usual => |usual| {
                 //const usualLine = usual.startLine.lineType.usual;
                 //const writeBlank = usualLine.markLen > 0 and usualLine.tokens.empty();
-                const writeBlank = if (usual.startLine.firstNonContainerMarkToken()) |token|
+                const writeBlank = if (usual.startLine.firstTokenOf(.lineTypeMark_or_others)) |token|
                     token.* == .lineTypeMark and token.next() == null
                 else
                     false;
@@ -807,7 +807,7 @@ pub const TmdRender = struct {
             .usual => |usual| blk: {
                 if (usual.startLine != usual.endLine) break :blk false;
                 //break :blk if (usual.startLine.tokens()) |tokens| tokens.empty() else false;
-                break :blk usual.startLine.firstNonContainerMarkToken() == null;
+                break :blk usual.startLine.firstTokenOf(.lineTypeMark_or_others) == null;
             },
             else => false,
         };
@@ -1131,7 +1131,7 @@ pub const TmdRender = struct {
 
                                 try writeOpenMarks(w, markElement, writeTags);
                             } else {
-                                tracker.marksStack.push(markElement);
+                                tracker.marksStack.pushTail(markElement);
                                 try writeOpenMark(w, markElement.value.mark.?, writeTags);
                             }
                         } else try closeMark(w, m, &tracker, writeTags);
@@ -1259,7 +1259,7 @@ pub const TmdRender = struct {
                 },
                 .code => {
                     if (!markElement.value.mark.?.more.secondary) {
-                        if (tracker.marksStack.pop()) |tail| {
+                        if (tracker.marksStack.popTail()) |tail| {
                             std.debug.assert(tail == markElement);
                         } else unreachable;
 

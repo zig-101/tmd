@@ -528,14 +528,14 @@ pub const BlockType = union(enum) {
         pub fn level(self: @This(), tmdData: []const u8) u8 {
             const headerLine = self.startLine;
             const start = headerLine.start(.trimContainerMark);
-            const end = start + headerLine.firstNonContainerMarkToken().?.lineTypeMark.markLen;
+            const end = start + headerLine.lineTypeMarkToken().?.lineTypeMark.markLen;
             return headerLevel(tmdData[start..end]) orelse unreachable;
         }
 
         // An empty header is used to insert toc.
         pub fn isBare(self: @This()) bool {
             //return self.startLine == self.endLine and self.startLine.tokens().?.empty();
-            return self.startLine == self.endLine and self.startLine.lineTypeMarkToken().?.next() == null;
+            return self.startLine == self.endLine and self.startLine.firstTokenOf(.others) == null;
         }
     },
 
@@ -761,37 +761,67 @@ pub const Line = struct {
         return &(self.ownerListElement().prev orelse return null).value;
     }
 
-    pub fn hasContainerMark(self: *const @This()) bool {
-        return if (self.tokens.head) |tokenElement| tokenElement.value == .containerMark else false;
-    }
-
-    pub fn firstNonContainerMarkToken(self: *const @This()) ?*Token {
-        if (self.tokens.head) |tokenElement| {
-            if (tokenElement.value != .containerMark) return &tokenElement.value;
-            if (tokenElement.next) |nextElement| {
-                return &nextElement.value;
-            }
+    pub fn containerMarkToken(self: *const @This()) ?*Token {
+        if (self.firstTokenOf(.containerMark_or_others)) |token| {
+            if (token.* == .containerMark) return token;
         }
         return null;
     }
 
     pub fn lineTypeMarkToken(self: *const @This()) ?*Token {
-        if (self.firstNonContainerMarkToken()) |token| {
+        if (self.firstTokenOf(.lineTypeMark_or_others)) |token| {
             if (token.* == .lineTypeMark) return token;
-            if (token.* == .extra) {
-                std.debug.assert(token.next().?.* == .lineTypeMark);
-                return token.next().?;
-            }
         }
         return null;
     }
 
     pub fn extraInfo(self: *const @This()) ?*Token.Extra.Info {
-        if (self.firstNonContainerMarkToken()) |token| {
+        if (self.firstTokenOf(.extra_or_others)) |token| {
             if (token.* == .extra) {
                 std.debug.assert(token.next().?.* == .lineTypeMark);
                 return &token.extra.info;
             }
+        }
+        return null;
+    }
+
+    pub fn firstTokenOf(self: *const @This(), tokenKind: enum { any, containerMark_or_others, extra_or_others, lineTypeMark_or_others, others }) ?*Token {
+        var tokenElement = self.tokens.head;
+        switch (tokenKind) {
+            .any, .containerMark_or_others => {
+                if (tokenElement) |e| return &e.value;
+            },
+            .extra_or_others => {
+                if (tokenElement) |e| {
+                    if (e.value == .containerMark) tokenElement = e.next;
+                }
+                if (tokenElement) |e| return &e.value;
+            },
+            .lineTypeMark_or_others => {
+                if (tokenElement) |e| {
+                    if (e.value == .containerMark) tokenElement = e.next;
+                }
+                if (tokenElement) |e| {
+                    if (e.value == .extra) {
+                        tokenElement = e.next;
+                        std.debug.assert(tokenElement.?.value == .lineTypeMark);
+                        return &tokenElement.?.value;
+                    } else return &e.value;
+                }
+            },
+            .others => {
+                if (tokenElement) |e| {
+                    if (e.value == .containerMark) tokenElement = e.next;
+                }
+                if (tokenElement) |e| {
+                    tokenElement = switch (e.value) {
+                        .extra => e.next.?.next,
+                        .lineTypeMark => e.next,
+                        else => return &e.value,
+                    };
+                }
+                if (tokenElement) |e| return &e.value;
+            },
         }
         return null;
     }

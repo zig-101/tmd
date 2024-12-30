@@ -194,7 +194,7 @@ fn open_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, m
         self.blockSession.lastLinkInfoToken = token;
 
         var linkElement = try list.createListElement(tmd.Link, self.docParser.allocator);
-        self.docParser.tmdDoc.links.push(linkElement);
+        self.docParser.tmdDoc.links.pushTail(linkElement);
         const link = &linkElement.value;
         link.* = .{
             .info = &token.linkInfo,
