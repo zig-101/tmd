@@ -1066,7 +1066,7 @@ pub const TmdRender = struct {
                         tracker.onLinkInfo(l);
                     },
                     .evenBackticks => |m| {
-                        if (m.secondary) {
+                        if (m.more.secondary) {
                             //_ = try w.write("&ZeroWidthSpace;"); // ToDo: write the code utf value instead
 
                             for (0..m.pairCount) |_| {
@@ -1232,7 +1232,6 @@ pub const TmdRender = struct {
         done: {
             switch (m.markType) {
                 .link => blk: {
-                    //if (m.secondary) break :blk;
                     const linkInfo = tracker.activeLinkInfo orelse break :blk;
                     tracker.activeLinkInfo = null;
 

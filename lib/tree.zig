@@ -423,6 +423,8 @@ pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
             }
 
             pub fn debugPrint(t: *Tree, comptime printValue: fn (Value) void) void {
+                if (builtin.mode != .Debug) return;
+
                 _debugPrint(t, t.root, 0, printValue);
             }
 

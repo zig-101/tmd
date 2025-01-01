@@ -391,6 +391,6 @@ pub fn isValidMediaURL(src: []const u8) bool {
 }
 
 test "isValidMediaURL" {
-    std.debug.assert(isValidMediaURL("foo.png"));
-    std.debug.assert(false == isValidMediaURL("foo.xxxxx"));
+    std.testing.expect(isValidMediaURL("foo.png"));
+    std.testing.expect(!isValidMediaURL("foo.xxxxx"));
 }

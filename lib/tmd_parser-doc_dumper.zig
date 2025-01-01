@@ -1,9 +1,15 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 
+const config = @import("config");
+
 pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
+    if (!config.dump_ast) return;
+    std.debug.assert(builtin.mode == .Debug);
+
     var blockElement = tmdDoc.blocks.head;
     while (blockElement) |be| {
         defer blockElement = be.next;
@@ -108,8 +114,8 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                                 var open: []const u8 = "<";
                                 var close: []const u8 = ">";
                                 var secondary: []const u8 = "";
-                                if (m.open) close = "" else open = " ";
-                                if (m.secondary) secondary = "^";
+                                if (m.more.open) close = "" else open = " ";
+                                if (m.more.secondary) secondary = "^";
                                 std.debug.print("|{}-{}: {s}{s}{s}:{s}{s}", .{
                                     token.start() - line.start(.none) + 1,
                                     token.end() - line.start(.none) + 1,
@@ -122,7 +128,7 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                             },
                             .evenBackticks => |s| {
                                 var secondary: []const u8 = "";
-                                if (s.secondary) secondary = "^";
+                                if (s.more.secondary) secondary = "^";
                                 std.debug.print("|{}-{}: {s}<{s}>", .{
                                     token.start() - line.start(.none) + 1,
                                     token.end() - line.start(.none) + 1,

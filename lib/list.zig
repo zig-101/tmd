@@ -117,6 +117,8 @@ pub fn createListElement(comptime Node: type, allocator: std.mem.Allocator) !*El
     return try allocator.create(Element(Node));
 }
 
+// Note, this function doesn't clear the list argument.
+// Please make sure all list elements are created by the allocator.
 pub fn destroyListElements(comptime NodeValue: type, l: List(NodeValue), comptime onNodeValue: ?fn (*NodeValue, std.mem.Allocator) void, allocator: std.mem.Allocator) void {
     var element = l.head;
     if (onNodeValue) |f| {
@@ -131,4 +133,39 @@ pub fn destroyListElements(comptime NodeValue: type, l: List(NodeValue), comptim
         allocator.destroy(e);
         element = next;
     }
+}
+
+test "list" {
+    var l: List(u32) = .{};
+    try std.testing.expect(l.empty());
+    try std.testing.expect(l.head == null);
+    try std.testing.expect(l.tail == null);
+
+    var elements: [3]Element(u32) = .{ .{ .value = 0 }, .{ .value = 1 }, .{ .value = 2 } };
+    l.pushTail(&elements[0]);
+    try std.testing.expect(!l.empty());
+    try std.testing.expect(l.head != null);
+    try std.testing.expect(l.tail != null);
+
+    l.pushHead(&elements[1]);
+    l.pushTail(&elements[2]);
+    try std.testing.expect(l.head.?.value == 1);
+    try std.testing.expect(l.tail.?.value == 2);
+
+    try std.testing.expect(l.popHead().?.value == 1);
+    try std.testing.expect(l.popTail().?.value == 2);
+    try std.testing.expect(l.head != null);
+    try std.testing.expect(l.tail != null);
+    try std.testing.expect(l.head == l.tail);
+    try std.testing.expect(l.head.?.value == 0);
+    try std.testing.expect(l.tail.?.value == 0);
+    try std.testing.expect(l.popTail().?.value == 0);
+    try std.testing.expect(l.empty());
+    try std.testing.expect(l.head == null);
+    try std.testing.expect(l.tail == null);
+
+    l.pushTail(&elements[0]);
+    try std.testing.expect(!l.empty());
+    l.delete(&elements[0]);
+    try std.testing.expect(l.empty());
 }

@@ -277,8 +277,10 @@ fn create_even_backticks_span(self: *ContentParser, markStart: u32, pairCount: u
     token.* = .{
         .evenBackticks = .{
             .start = @intCast(markStart),
-            .secondary = isSecondary,
             .pairCount = @intCast(pairCount),
+            .more = .{
+                .secondary = isSecondary,
+            },
         },
     };
 
@@ -648,7 +650,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                     std.debug.assert(text.len > 0);
                     break :blk !(utf8.begins_with_CJK_rune(text) or LineScanner.begins_with_blank(text));
                 },
-                .evenBackticks => |evenBackticks| if (evenBackticks.secondary) true else false,
+                .evenBackticks => |evenBackticks| if (evenBackticks.more.secondary) true else false,
                 else => unreachable,
             };
 
@@ -670,7 +672,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                     std.debug.assert(text.len > 0);
                     break :blk !(utf8.ends_with_CJK_rune(text) or LineScanner.ends_with_blank(text));
                 },
-                .evenBackticks => |evenBackticks| if (evenBackticks.secondary) true else false,
+                .evenBackticks => |evenBackticks| if (evenBackticks.more.secondary) true else false,
                 else => unreachable,
             };
 

@@ -2,8 +2,6 @@ const std = @import("std");
 const mem = std.mem;
 const builtin = @import("builtin");
 
-const config = @import("config");
-
 const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
@@ -67,9 +65,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     };
     try docParser.parseAll();
 
-    if (config.dump_ast and builtin.mode == .Debug) {
-        DocDumper.dumpTmdDoc(&tmdDoc);
-    }
+    DocDumper.dumpTmdDoc(&tmdDoc);
 
     return tmdDoc;
 }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const tmd = @import("tmd.zig");
 
@@ -26,6 +27,7 @@ pub const bytesKindTable = blk: {
 
         // ToDo: Now, for zig design limitaiton: https://ziggit.dev/t/6726,
         //       The best effort is make @sizeOf(ByteKind) == 2.
+        //       It can be 1 in fact.
         comptime {
             std.debug.assert(@sizeOf(ByteKind) <= 2);
         }
@@ -71,6 +73,8 @@ pub const bytesKindTable = blk: {
 //}
 
 pub fn debugPrint(ls: *LineScanner, opName: []const u8, customValue: u32) void {
+    if (builtin.mode != .Debug) return;
+
     std.debug.print("------- {s}, {}, {}\n", .{ opName, ls.cursorLineIndex, ls.cursor });
     std.debug.print("custom:  {}\n", .{customValue});
     if (ls.lineEnd) |end|

@@ -1,10 +1,10 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) !void {
-    const config = collectConfig(b);
-
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    const config = collectConfig(b, optimize);
 
     // lib (ToDo: something not right here, the output is only 4.4k?
     //     Need to export the pub elements?)
@@ -34,19 +34,34 @@ pub fn build(b: *std.Build) !void {
 
     // test
 
-    const unitTest = b.addTest(.{
-        .name = "unit_test",
-        .root_source_file = b.path("test/all.zig"),
+    const libTest = b.addTest(.{
+        .name = "lib unit test",
+        .root_source_file = b.path("lib/tests.zig"),
         .target = b.host,
     });
-    unitTest.root_module.addImport("tmd", tmdLibModule);
-    const installTest = b.addInstallArtifact(unitTest, .{});
+    //libTest.root_module.addImport("tmd", tmdLibModule); // just use file imports instead of module import
+    //const installTest = b.addInstallArtifact(libTest, .{});
+    const runLibTest = b.addRunArtifact(libTest);
+    //runLibTest.step.dependOn(&installTest.step); // The last line has built this relation.
 
-    const runtTests = b.addRunArtifact(unitTest);
-    runtTests.step.dependOn(&installTest.step);
+    const cmdTest = b.addTest(.{
+        .name = "cmd unit test",
+        .root_source_file = b.path("cmd/tests.zig"),
+        .target = b.host,
+    });
+    const runCmdTest = b.addRunArtifact(cmdTest);
+
+    const wasmTest = b.addTest(.{
+        .name = "wasm unit test",
+        .root_source_file = b.path("wasm/tests.zig"),
+        .target = b.host,
+    });
+    const runWasmTest = b.addRunArtifact(wasmTest);
 
     const testStep = b.step("test", "Run unit tests");
-    testStep.dependOn(&runtTests.step);
+    testStep.dependOn(&runLibTest.step);
+    testStep.dependOn(&runCmdTest.step);
+    testStep.dependOn(&runWasmTest.step);
 
     // cmd (the default target)
 
@@ -182,11 +197,16 @@ const Config = struct {
     dumpAST: bool = false,
 };
 
-fn collectConfig(b: *std.Build) Config {
+fn collectConfig(b: *std.Build, mode: std.builtin.OptimizeMode) Config {
     var c = Config{};
 
-    if (b.option(bool, "dump_ast", "dump doc AST")) |dump|
-        c.dumpAST = dump;
+    if (b.option(bool, "dump_ast", "dump doc AST")) |dump| {
+        if (mode == .Debug) c.dumpAST = dump
+        else std.debug.print(
+            \\The "dump_ast" definition is ignored, because it is only valid in Debug optimization mode.
+            \\
+            , .{});
+    }
 
     return c;
 }

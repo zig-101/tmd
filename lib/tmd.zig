@@ -3,7 +3,6 @@
 
 pub const parser = @import("tmd_parser.zig");
 pub const render = @import("tmd_to_html.zig");
-pub const tests = @import("tests.zig");
 
 // The above two sub-namespaces and the following pub declartions
 // in the current namespace are visible to the "tmd" module users.
@@ -655,6 +654,7 @@ fn voidOr(T: type) type {
     };
 }
 
+// For debug purpose, to replace voidOr in debugging.
 fn identify(T: type) type {
     return struct {
         value: T,
@@ -954,7 +954,9 @@ pub const Token = union(enum) {
     evenBackticks: struct {
         start: DocSize,
         pairCount: DocSize,
-        secondary: bool,
+        more: packed struct {
+            secondary: bool,
+        },
 
         // `` means a void char.
         // ```` means (pairCount-1) non-collapsable spaces?
@@ -1047,7 +1049,7 @@ pub const Token = union(enum) {
         },
 
         pub fn typeName(self: @This()) []const u8 {
-            return @tagName(self.markType);
+            return @tagName(self.more.markType);
         }
     },
     containerMark: struct {
@@ -1127,7 +1129,7 @@ pub const Token = union(enum) {
             },
             .evenBackticks => |s| {
                 var e = self.start() + (s.pairCount << 1);
-                if (s.secondary) e += 1;
+                if (s.more.secondary) e += 1;
                 return e;
             },
             .spanMark => |m| {
