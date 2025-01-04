@@ -132,7 +132,7 @@ pub fn listType(itemMark: []const u8) ListType {
 pub const ElementAttibutes = struct {
     id: []const u8 = "", // ToDo: should be a Range?
     classes: []const u8 = "", // ToDo: should be Range list?
-    kvs: []const u8 = "", // ToDo: should be Range list?
+    //kvs: []const u8 = "", // ToDo: should be Range list?
 
     pub fn isForFootnote(self: *const @This()) bool {
         return self.id.len > 0 and self.id[0] == '^';
@@ -170,8 +170,8 @@ pub const CodeBlockAttibutes = struct {
     commentedOut: bool = false, // ToDo: use Range
     language: []const u8 = "", // ToDo: use Range
     // ToDo
-    // startLineNumber: u32 = 0, // ++n 0 means not show line numbers
-    // filepath: []const u8 = "", // @@path
+    // startLineNumber: u32 = 0, // +n, +0 means not show line numbers
+    // filepath: []const u8 = "", // @path
 };
 
 pub const ContentStreamAttributes = struct {
@@ -181,7 +181,7 @@ pub const ContentStreamAttributes = struct {
 pub const CustomBlockAttibutes = struct {
     commentedOut: bool = false, // ToDo: use Range
     app: []const u8 = "", // ToDo: use Range
-    arguments: []const u8 = "", // ToDo: use Range
+    //arguments: []const u8 = "", // ToDo: use Range
     // The argument is the content in the following custom block.
     // It might be a file path.
 };

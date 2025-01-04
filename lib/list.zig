@@ -136,24 +136,46 @@ pub fn destroyListElements(comptime NodeValue: type, l: List(NodeValue), comptim
 }
 
 test "list" {
+    const T = struct {
+        var lst: *List(u32) = undefined;
+        var sum: u32 = undefined;
+
+        fn f(v: u32) void {
+            sum += v;
+        }
+
+        fn sumList() u32 {
+            sum = 0;
+            lst.iterate(f);
+            return sum;
+        }
+    };
+
     var l: List(u32) = .{};
     try std.testing.expect(l.empty());
     try std.testing.expect(l.head == null);
     try std.testing.expect(l.tail == null);
+
+    T.lst = &l;
+    try std.testing.expect(T.sumList() == 0);
 
     var elements: [3]Element(u32) = .{ .{ .value = 0 }, .{ .value = 1 }, .{ .value = 2 } };
     l.pushTail(&elements[0]);
     try std.testing.expect(!l.empty());
     try std.testing.expect(l.head != null);
     try std.testing.expect(l.tail != null);
+    try std.testing.expect(T.sumList() == 0);
 
     l.pushHead(&elements[1]);
     l.pushTail(&elements[2]);
     try std.testing.expect(l.head.?.value == 1);
     try std.testing.expect(l.tail.?.value == 2);
+    try std.testing.expect(T.sumList() == 3);
 
     try std.testing.expect(l.popHead().?.value == 1);
+    try std.testing.expect(T.sumList() == 2);
     try std.testing.expect(l.popTail().?.value == 2);
+    try std.testing.expect(T.sumList() == 0);
     try std.testing.expect(l.head != null);
     try std.testing.expect(l.tail != null);
     try std.testing.expect(l.head == l.tail);
@@ -163,9 +185,13 @@ test "list" {
     try std.testing.expect(l.empty());
     try std.testing.expect(l.head == null);
     try std.testing.expect(l.tail == null);
+    try std.testing.expect(T.sumList() == 0);
 
-    l.pushTail(&elements[0]);
+    l.pushTail(&elements[1]);
     try std.testing.expect(!l.empty());
-    l.delete(&elements[0]);
+    try std.testing.expect(T.sumList() == 1);
+
+    l.delete(&elements[1]);
     try std.testing.expect(l.empty());
+    try std.testing.expect(T.sumList() == 0);
 }

@@ -25,22 +25,64 @@ const tmd = @import("tmd.zig");
 // * They can include letters, digits (0-9), hyphens (-), and underscores (_).
 // * They cannot contain spaces or special characters.
 
-// Use HTML4 spec:
+// HTML4 spec:
 //     ID and NAME tokens must begin with a letter ([A-Za-z]) and
 //     may be followed by any number of letters, digits ([0-9]),
 //     hyphens ("-"), underscores ("_"), colons (":"), and periods (".").
-const charIdLevels = blk: {
-    var table = [1]u3{0} ** 127;
+
+// Only for ASCII chars in range[0, 127].
+const charPropertiesTable = blk: {
+    var table = [1]packed struct {
+        canBeFirstInID: bool = false,
+        canBeInID: bool = false,
+
+        canBeFirstInClassName: bool = false,
+        canBeInClassName: bool = false,
+
+        canBeInLanguageName: bool = false,
+
+        canBeInAppName: bool = false,
+    }{.{}} ** 128;
 
     for ('a'..'z' + 1, 'A'..'Z' + 1) |i, j| {
-        table[i] = 6;
-        table[j] = 6;
+        table[i].canBeFirstInID = true;
+        table[j].canBeFirstInID = true;
+
+        table[i].canBeInID = true;
+        table[j].canBeInID = true;
+
+        table[i].canBeFirstInClassName = true;
+        table[j].canBeFirstInClassName = true;
+
+        table[i].canBeInClassName = true;
+        table[j].canBeInClassName = true;
     }
-    for ('0'..'9' + 1) |i| table[i] = 5;
-    table['_'] = 4;
-    table['-'] = 3;
-    table[':'] = 2;
-    table['.'] = 1;
+
+    for ('0'..'9' + 1) |i| {
+        table[i].canBeInID = true;
+        table[i].canBeInClassName = true;
+    }
+
+    // Yes, TapirMD is more stricted here.
+    //for ("_") |i| {
+    //    table[i].canBeFirstInID = true;
+    //    table[i].canBeFirstInClassName = true;
+    //}
+
+    // Yes, TapirMD is less stricted here, by extra allowing `:`,
+    // to work with TailWind CSS alike frameworks.
+    for (".-:") |i| {
+        table[i].canBeInID = true;
+        table[i].canBeInClassName = true;
+    }
+
+    // Any visible chars (not including spaces).
+    // Unicode with value >= 128 are also valid.
+    for (33..127) |i| {
+        table[i].canBeInLanguageName = true;
+        table[i].canBeInAppName = true;
+    }
+
     break :blk table;
 };
 
@@ -49,13 +91,13 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
 
     const id = std.meta.fieldIndex(tmd.ElementAttibutes, "id").?;
     const classes = std.meta.fieldIndex(tmd.ElementAttibutes, "classes").?;
-    const kvs = std.meta.fieldIndex(tmd.ElementAttibutes, "kvs").?;
+    //const kvs = std.meta.fieldIndex(tmd.ElementAttibutes, "kvs").?;
 
     var lastOrder: isize = -1;
-    var kvList: ?struct {
-        first: []const u8,
-        last: []const u8,
-    } = null;
+    // var kvList: ?struct {
+    //     first: []const u8,
+    //     last: []const u8,
+    // } = null;
 
     var it = mem.splitAny(u8, playload, " \t");
     var item = it.first();
@@ -65,9 +107,9 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
                 '#' => {
                     if (lastOrder >= id) break;
                     if (item.len == 1) break;
-                    if (item[1] >= 128 or charIdLevels[item[1]] != 6) break;
+                    if (item[1] >= 128 or !charPropertiesTable[item[1]].canBeFirstInID) break;
                     for (item[2..]) |c| {
-                        if (c >= 128 or charIdLevels[c] < 1) break :parse;
+                        if (c >= 128 or !charPropertiesTable[c].canBeInID) break :parse;
                     }
                     attrs.id = item[1..];
                     lastOrder = id;
@@ -82,33 +124,43 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
 
                     if (lastOrder >= classes) break;
                     if (item.len == 1) break;
-                    if (item[1] >= 128 or charIdLevels[item[1]] != 6) break;
-                    for (item[2..]) |c| {
-                        if (c == ';') continue; // seperators (TMD specific)
-                        if (c >= 128 or charIdLevels[c] < 2) break :parse;
+                    var firstInName = true;
+                    for (item[1..]) |c| {
+                        if (c == ';') {
+                            firstInName = true;
+                            continue; // seperators (TMD specific)
+                        }
+                        if (c >= 128) break :parse;
+                        if (firstInName) {
+                            if (!charPropertiesTable[c].canBeFirstInClassName) break :parse;
+                        } else {
+                            if (!charPropertiesTable[c].canBeInClassName) break :parse;
+                        }
                     }
 
                     attrs.classes = item[1..];
                     lastOrder = classes;
                 },
                 else => {
-                    // key-value pairs are seperated by SPACE or TAB chars.
-                    // Key parsing is the same as ID parsing.
-                    // Values containing SPACE and TAB chars must be quoted in `...` (the Go literal string form).
+                    break; // break the loop (kvs is not supported now)
 
-                    if (lastOrder > kvs) break;
-
-                    if (item.len < 3) break;
-
-                    // ToDo: write a more pricise implementation.
-
-                    if (std.mem.indexOfScalar(u8, item, '=')) |i| {
-                        if (0 < i and i < item.len - 1) {
-                            if (kvList == null) kvList = .{ .first = item, .last = item } else kvList.?.last = item;
-                        } else break;
-                    } else break;
-
-                    lastOrder = kvs;
+                    // // key-value pairs are seperated by SPACE or TAB chars.
+                    // // Key parsing is the same as ID parsing.
+                    // // Values containing SPACE and TAB chars must be quoted in `...` (the Go literal string form).
+                    //
+                    // if (lastOrder > kvs) break;
+                    //
+                    // if (item.len < 3) break;
+                    //
+                    // // ToDo: write a more pricise implementation.
+                    //
+                    // if (std.mem.indexOfScalar(u8, item, '=')) |i| {
+                    //     if (0 < i and i < item.len - 1) {
+                    //         if (kvList == null) kvList = .{ .first = item, .last = item } else kvList.?.last = item;
+                    //     } else break;
+                    // } else break;
+                    //
+                    // lastOrder = kvs;
                 },
             }
         }
@@ -118,13 +170,58 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
         } else break;
     }
 
-    if (kvList) |v| {
-        const start = @intFromPtr(v.first.ptr);
-        const end = @intFromPtr(v.last.ptr + v.last.len);
-        attrs.kvs = v.first.ptr[0 .. end - start];
-    }
+    // if (kvList) |v| {
+    //     const start = @intFromPtr(v.first.ptr);
+    //     const end = @intFromPtr(v.last.ptr + v.last.len);
+    //     attrs.kvs = v.first.ptr[0 .. end - start];
+    // }
 
     return attrs;
+}
+
+test "parse_element_attributes" {
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\
+    ), tmd.ElementAttibutes{});
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\#foo .bar;baz
+    ), tmd.ElementAttibutes{
+        .id = "foo",
+        .classes = "bar;baz",
+    });
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\#foo .;bar;baz
+    ), tmd.ElementAttibutes{
+        .id = "foo",
+        .classes = ";bar;baz",
+    });
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\#foo .bar;#baz
+    ), tmd.ElementAttibutes{
+        .id = "foo",
+        .classes = "",
+    });
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\#foo .bar;baz bla bla bla ...
+    ), tmd.ElementAttibutes{
+        .id = "foo",
+        .classes = "bar;baz",
+    });
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\#?foo .bar
+    ), tmd.ElementAttibutes{});
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\.bar;baz #foo
+    ), tmd.ElementAttibutes{
+        .id = "",
+        .classes = "bar;baz",
+    });
 }
 
 pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibutes {
@@ -151,6 +248,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
                         if (c != '/') break :parse;
                     }
                     attrs.commentedOut = true;
+                    return attrs;
                 },
                 '>', '<' => {
                     if (lastOrder >= horizontalAlign) break;
@@ -216,6 +314,75 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
     return attrs;
 }
 
+test "parse_base_block_open_playload" {
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\
+    ), tmd.BaseBlockAttibutes{});
+
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\// >> ^^ ..2:3
+    ), tmd.BaseBlockAttibutes{
+        .commentedOut = true,
+    });
+
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\>> ^^ ..2:3
+    ), tmd.BaseBlockAttibutes{
+        .commentedOut = false,
+        .horizontalAlign = .right,
+        .verticalAlign = .top,
+        .cellSpans = .{
+            .axisSpan = 2,
+            .crossSpan = 3,
+        },
+    });
+
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\>< :3
+    ), tmd.BaseBlockAttibutes{
+        .commentedOut = false,
+        .horizontalAlign = .center,
+        .verticalAlign = .none,
+        .cellSpans = .{
+            .axisSpan = 1,
+            .crossSpan = 3,
+        },
+    });
+
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\^^ ..2
+    ), tmd.BaseBlockAttibutes{
+        .commentedOut = false,
+        .horizontalAlign = .none,
+        .verticalAlign = .top,
+        .cellSpans = .{
+            .axisSpan = 2,
+            .crossSpan = 1,
+        },
+    });
+
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\<>
+    ), tmd.BaseBlockAttibutes{
+        .commentedOut = false,
+        .horizontalAlign = .justify,
+    });
+
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\<<
+    ), tmd.BaseBlockAttibutes{
+        .commentedOut = false,
+        .horizontalAlign = .left,
+    });
+
+    try std.testing.expectEqualDeep(parse_base_block_open_playload(
+        \\^^ <<
+    ), tmd.BaseBlockAttibutes{
+        .commentedOut = false,
+        .verticalAlign = .top,
+    });
+}
+
 pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibutes {
     var attrs = tmd.CodeBlockAttibutes{};
 
@@ -240,9 +407,11 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
                     return attrs;
                 },
                 else => {
-                    if (item.len > 0) {
-                        attrs.language = item;
+                    for (item[0..]) |c| {
+                        //if (c >= 128) break :parse;
+                        if (!charPropertiesTable[c].canBeInLanguageName) break :parse;
                     }
+                    attrs.language = item;
                     break; // break the loop
                 },
             }
@@ -254,6 +423,40 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
     }
 
     return attrs;
+}
+
+test "parse_code_block_open_playload" {
+    try std.testing.expectEqualDeep(parse_code_block_open_playload(
+        \\
+    ), tmd.CodeBlockAttibutes{});
+
+    try std.testing.expectEqualDeep(parse_code_block_open_playload(
+        \\// 
+    ), tmd.CodeBlockAttibutes{
+        .commentedOut = true,
+        .language = "",
+    });
+
+    try std.testing.expectEqualDeep(parse_code_block_open_playload(
+        \\// zig
+    ), tmd.CodeBlockAttibutes{
+        .commentedOut = true,
+        .language = "",
+    });
+
+    try std.testing.expectEqualDeep(parse_code_block_open_playload(
+        \\zig
+    ), tmd.CodeBlockAttibutes{
+        .commentedOut = false,
+        .language = "zig",
+    });
+
+    try std.testing.expectEqualDeep(parse_code_block_open_playload(
+        \\zig bla bla bla ...
+    ), tmd.CodeBlockAttibutes{
+        .commentedOut = false,
+        .language = "zig",
+    });
 }
 
 pub fn parse_code_block_close_playload(playload: []const u8) tmd.ContentStreamAttributes {
@@ -271,9 +474,12 @@ pub fn parse_code_block_close_playload(playload: []const u8) tmd.ContentStreamAt
                 for (item) |c| if (c != '<') return attrs;
                 arrowFound = true;
             } else if (content.len > 0) {
-                return attrs;
-            } else if (item.len > 0) {
+                // ToDo:
+                unreachable;
+            } else {
                 content = item;
+                break; // break the loop
+                // ToDo: now only support one stream source.
             }
         }
 
@@ -284,6 +490,28 @@ pub fn parse_code_block_close_playload(playload: []const u8) tmd.ContentStreamAt
 
     attrs.content = content;
     return attrs;
+}
+
+test "parse_code_block_close_playload" {
+    try std.testing.expectEqualDeep(parse_code_block_close_playload(
+        \\
+    ), tmd.ContentStreamAttributes{});
+
+    try std.testing.expectEqualDeep(parse_code_block_close_playload(
+        \\<<
+    ), tmd.ContentStreamAttributes{});
+
+    try std.testing.expectEqualDeep(parse_code_block_close_playload(
+        \\<< content
+    ), tmd.ContentStreamAttributes{
+        .content = "content",
+    });
+
+    try std.testing.expectEqualDeep(parse_code_block_close_playload(
+        \\<< #id bla bla ...
+    ), tmd.ContentStreamAttributes{
+        .content = "#id",
+    });
 }
 
 pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAttibutes {
@@ -310,9 +538,12 @@ pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAtt
                     return attrs;
                 },
                 else => {
-                    if (item.len > 0) {
-                        attrs.app = item;
+                    // ToDo: maybe it is okay to just disallow blank chars in the app name.
+                    for (item[0..]) |c| {
+                        //if (c >= 128) break :parse;
+                        if (!charPropertiesTable[c].canBeInAppName) break :parse;
                     }
+                    attrs.app = item;
                     break; // break the loop
                 },
             }
@@ -324,6 +555,40 @@ pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAtt
     }
 
     return attrs;
+}
+
+test "parse_custom_block_open_playload" {
+    try std.testing.expectEqualDeep(parse_custom_block_open_playload(
+        \\
+    ), tmd.CustomBlockAttibutes{});
+
+    try std.testing.expectEqualDeep(parse_custom_block_open_playload(
+        \\// 
+    ), tmd.CustomBlockAttibutes{
+        .commentedOut = true,
+        .app = "",
+    });
+
+    try std.testing.expectEqualDeep(parse_custom_block_open_playload(
+        \\// html
+    ), tmd.CustomBlockAttibutes{
+        .commentedOut = true,
+        .app = "",
+    });
+
+    try std.testing.expectEqualDeep(parse_custom_block_open_playload(
+        \\html
+    ), tmd.CustomBlockAttibutes{
+        .commentedOut = false,
+        .app = "html",
+    });
+
+    try std.testing.expectEqualDeep(parse_custom_block_open_playload(
+        \\html bla bla bla ...
+    ), tmd.CustomBlockAttibutes{
+        .commentedOut = false,
+        .app = "html",
+    });
 }
 
 pub fn isValidLinkURL(text: []const u8) bool {
@@ -349,17 +614,17 @@ pub fn isValidLinkURL(text: []const u8) bool {
 }
 
 test "isValidLinkURL" {
-    std.debug.assert(isValidLinkURL("http://aaa"));
-    std.debug.assert(isValidLinkURL("https://aaa"));
-    std.debug.assert(false == isValidLinkURL("http:"));
-    std.debug.assert(false == isValidLinkURL("https"));
-    std.debug.assert(isValidLinkURL("foo.htm"));
-    std.debug.assert(isValidLinkURL("foo.html#bar"));
-    std.debug.assert(isValidLinkURL("foo.htm#bar"));
-    std.debug.assert(isValidLinkURL("foo.html"));
-    //std.debug.assert(isValidLinkURL("foo.tmd#"));
-    std.debug.assert(isValidLinkURL("#"));
-    std.debug.assert(isValidLinkURL("#bar"));
+    try std.testing.expect(isValidLinkURL("http://aaa"));
+    try std.testing.expect(isValidLinkURL("https://aaa"));
+    try std.testing.expect(false == isValidLinkURL("http:"));
+    try std.testing.expect(false == isValidLinkURL("https"));
+    try std.testing.expect(isValidLinkURL("foo.htm"));
+    try std.testing.expect(isValidLinkURL("foo.html#bar"));
+    try std.testing.expect(isValidLinkURL("foo.htm#bar"));
+    try std.testing.expect(isValidLinkURL("foo.html"));
+    //try std.testing.expect(isValidLinkURL("foo.tmd#")); // ToDo
+    try std.testing.expect(isValidLinkURL("#"));
+    try std.testing.expect(isValidLinkURL("#bar"));
 }
 
 // ToDo: more
@@ -384,13 +649,24 @@ pub fn isValidMediaURL(src: []const u8) bool {
     //}
 
     for (supportedMediaExts) |ext| {
-        if (ascii.endsWithIgnoreCase(src, ext)) return true;
+        if (ascii.endsWithIgnoreCase(src, ext)) return src.len > ext.len;
     }
 
     return false;
 }
 
 test "isValidMediaURL" {
-    std.testing.expect(isValidMediaURL("foo.png"));
-    std.testing.expect(!isValidMediaURL("foo.xxxxx"));
+    try std.testing.expect(isValidMediaURL("foo.png"));
+    try std.testing.expect(isValidMediaURL("bar.PNG"));
+    try std.testing.expect(isValidMediaURL("foo.Jpeg"));
+    try std.testing.expect(isValidMediaURL("bar.JPG"));
+    try std.testing.expect(isValidMediaURL("bar.JPG"));
+    try std.testing.expect(isValidMediaURL("f.gif"));
+    try std.testing.expect(isValidMediaURL("b.GIF"));
+
+    try std.testing.expect(!isValidMediaURL(".gif"));
+    try std.testing.expect(!isValidMediaURL(".GIF"));
+    try std.testing.expect(!isValidMediaURL("PNG"));
+    try std.testing.expect(!isValidMediaURL(".jpeg"));
+    try std.testing.expect(!isValidMediaURL("foo.xyz"));
 }
