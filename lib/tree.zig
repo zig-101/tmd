@@ -4,6 +4,12 @@ const builtin = @import("builtin");
 // Ported from https://raw.githubusercontent.com/HuKeping/rbtree/master/rbtree.go,
 // which might be ported from https://www.eecs.umich.edu/courses/eecs380/ALG/niemann/s_rbt.txt.
 
+// CompareNamespace must have a
+//
+//      pub fn compare(Value, Value) isize
+//
+// function.
+//
 pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
     return struct {
         pub const Color = enum { red, black };
@@ -47,6 +53,13 @@ pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
                 node.right = self.right;
             }
         };
+
+        pub fn MakeNilNode() Node {
+            return .{
+                .color = .black,
+                .value = undefined,
+            };
+        }
 
         pub const Tree = struct {
             root: *Node = undefined,
@@ -123,8 +136,9 @@ pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
                 return null;
             }
 
-            // Please make sure that the life time of the tree in within the lifetime of z.
-            // If the return Node is z, then insertion succeeds;
+            // Please make sure that the node z is not in tree t now, and
+            // the life time of the tree is within the lifetime of the node,
+            // If the return Node is z, then it means insertion succeeds;
             // otherwise it means duplication is found (so the insertion is not made).
             pub fn insert(t: *Tree, z: *Node) *Node {
                 // Done in the following while loop.
@@ -178,7 +192,7 @@ pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
             }
 
             // Note: use this method with caution. Please make sure that
-            // z must be in t now. We can call the search method to ensure this.
+            // z is in t now. We can call the search method to ensure this.
             // If this can't be ensured, please use the delete method instead.
             pub fn deleteNode(t: *Tree, z: *Node) void {
                 if (builtin.mode == .Debug) {
@@ -441,4 +455,96 @@ pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
             }
         };
     };
+}
+
+test "tree" {
+    const T = struct {
+        v: usize,
+
+        pub fn compare(a: @This(), b: @This()) isize {
+            if (a.v < b.v) return -1;
+            if (a.v > b.v) return 1;
+            return 0;
+        }
+    };
+
+    const T2 = struct {
+        pub fn compare(a: T, b: T) isize {
+            if (a.v > b.v) return -1;
+            if (a.v < b.v) return 1;
+            return 0;
+        }
+    };
+
+    const N = 10;
+
+    const Test = struct {
+        var x: usize = 1;
+
+        fn t(CompareNS: type) type {
+            return struct {
+                test {
+                    const _RedBlack = RedBlack(T, CompareNS);
+                    const _Tree = _RedBlack.Tree;
+                    const _Node = _RedBlack.Node;
+
+                    var traverser: struct {
+                        v: usize = 0,
+                        goodCount: usize = 0,
+
+                        pub fn onNode(self: *@This(), node: *_Node) void {
+                            if (CompareNS == T) {
+                                if (self.v == node.value.v) self.goodCount += 1;
+                            }
+                            if (CompareNS == T2) {
+                                if (N - self.v == node.value.v + 1) self.goodCount += 1;
+                            }
+                            self.v += 1;
+                        }
+                    } = .{};
+
+                    var _nilNode = _RedBlack.MakeNilNode();
+                    var _tree = _Tree{};
+                    _tree.init(&_nilNode);
+
+                    var _nodes: [N]_Node = undefined;
+                    for (&_nodes, 0..) |*n, i| {
+                        n.value = .{ .v = i };
+                        try std.testing.expect(_tree.insert(n) == n);
+                    }
+                    try std.testing.expect(_tree.count == N);
+
+                    _tree.traverseNodes(&traverser);
+                    try std.testing.expect(traverser.goodCount == N);
+
+                    for (0..N) |i| {
+                        const n = &_nodes[i];
+                        const value: T = .{ .v = i };
+                        try std.testing.expect(_tree.search(value) == n);
+                    }
+                    try std.testing.expect(_tree.count == N);
+
+                    var tempNode = _Node{ .value = undefined };
+                    for (&_nodes, 0..) |*n, i| {
+                        tempNode.value = .{ .v = i };
+                        try std.testing.expect(_tree.insert(&tempNode) == n);
+                    }
+                    try std.testing.expect(_tree.count == N);
+
+                    for (&_nodes, 0..) |*n, i| {
+                        const value: T = .{ .v = i };
+                        try std.testing.expect(_tree.delete(value) == n);
+                    }
+                    try std.testing.expect(_tree.count == 0);
+
+                    traverser = .{};
+                    _tree.traverseNodes(&traverser);
+                    try std.testing.expect(traverser.goodCount == 0);
+                }
+            };
+        }
+    };
+
+    _ = Test.t(T);
+    _ = Test.t(T2);
 }
