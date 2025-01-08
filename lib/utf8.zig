@@ -9,6 +9,19 @@ pub fn ends_with_CJK_rune(utf8: []const u8) bool {
     return is_CJK_rune(read_last_rune(utf8));
 }
 
+test "begins/ends with CJK runes" {
+    try std.testing.expect(!begins_with_CJK_rune(""));
+    try std.testing.expect(!ends_with_CJK_rune(""));
+
+    try std.testing.expect(!begins_with_CJK_rune("αé"));
+    try std.testing.expect(!ends_with_CJK_rune("αé"));
+
+    try std.testing.expect(!begins_with_CJK_rune("a森"));
+    try std.testing.expect(begins_with_CJK_rune("森a"));
+    try std.testing.expect(!ends_with_CJK_rune("森a"));
+    try std.testing.expect(ends_with_CJK_rune("a森"));
+}
+
 pub const BadRune: u21 = 0xFFFD;
 
 pub fn is_rune_start(b: u8) bool {
@@ -25,17 +38,29 @@ pub fn read_last_rune(p: []const u8) u21 {
 
     start -= 1;
     std.debug.assert(start + 2 == p.len);
-    if (is_rune_start(p[start])) return unicode.utf8Decode2(p[start..][0..2].*) catch BadRune;
+    if (is_rune_start(p[start])) {
+        const len = unicode.utf8ByteSequenceLength(p[start]) catch return BadRune;
+        if (len != 2) return BadRune;
+        return unicode.utf8Decode2(p[start..][0..2].*) catch BadRune;
+    }
     if (start == 0) return BadRune;
 
     start -= 1;
     std.debug.assert(start + 3 == p.len);
-    if (is_rune_start(p[start])) return unicode.utf8Decode3(p[start..][0..3].*) catch BadRune;
+    if (is_rune_start(p[start])) {
+        const len = unicode.utf8ByteSequenceLength(p[start]) catch return BadRune;
+        if (len != 3) return BadRune;
+        return unicode.utf8Decode3(p[start..][0..3].*) catch BadRune;
+    }
     if (start == 0) return BadRune;
 
     start -= 1;
     std.debug.assert(start + 4 == p.len);
-    if (is_rune_start(p[start])) return unicode.utf8Decode4(p[start..][0..4].*) catch BadRune;
+    if (is_rune_start(p[start])) {
+        const len = unicode.utf8ByteSequenceLength(p[start]) catch return BadRune;
+        if (len != 4) return BadRune;
+        return unicode.utf8Decode4(p[start..][0..4].*) catch BadRune;
+    }
     return BadRune;
 }
 
@@ -53,6 +78,26 @@ pub fn read_rune(p: []const u8) u21 {
         4 => unicode.utf8Decode4(data[0..4].*) catch BadRune,
         else => unreachable,
     };
+}
+
+test "read runes" {
+    try std.testing.expect(read_rune("") == BadRune);
+    try std.testing.expect(read_last_rune("") == BadRune);
+
+    try std.testing.expect(read_rune("abc") == 'a');
+    try std.testing.expect(read_last_rune("abc") == 'c');
+
+    try std.testing.expect(read_rune("αé") == 0x03B1);
+    try std.testing.expect(read_last_rune("αé") == 0x00E9);
+
+    try std.testing.expect(read_rune("木林森") == 0x6728);
+    try std.testing.expect(read_last_rune("木林森") == 0x68EE);
+
+    try std.testing.expect(read_rune("\xE6\x9C\xE6\x9E\xE6\xA3") == BadRune);
+    try std.testing.expect(read_last_rune("\xE6\x9C\xE6\x9E\xE6\xA3") == BadRune);
+
+    try std.testing.expect(read_rune("\xE6\x9C") == BadRune);
+    try std.testing.expect(read_last_rune("\xE6\xA3") == BadRune);
 }
 
 const rrange = struct {
@@ -105,4 +150,30 @@ pub fn is_CJK_rune(r: u21) bool {
         }
     }
     return false;
+}
+
+test "is_CJK_rune" {
+    for (&CJK_rune_ranges) |rr| {
+        for (rr.start..rr.end + 1) |r| {
+            try std.testing.expect(is_CJK_rune(@intCast(r)));
+        }
+    }
+    const N: u21 = 100;
+    {
+        const rune = CJK_rune_ranges[0].start - N;
+        for (rune..rune + N) |r| {
+            try std.testing.expect(!is_CJK_rune(@intCast(r)));
+        }
+    }
+    {
+        const rune = CJK_rune_ranges[CJK_rune_ranges.len - 1].end + 1;
+        for (rune..rune + N) |r| {
+            try std.testing.expect(!is_CJK_rune(@intCast(r)));
+        }
+    }
+    {
+        for (0..256) |r| {
+            try std.testing.expect(!is_CJK_rune(@intCast(r)));
+        }
+    }
 }

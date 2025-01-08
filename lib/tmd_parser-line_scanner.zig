@@ -361,15 +361,15 @@ pub fn trim_blanks(str: []const u8) []const u8 {
 }
 
 test "trim_blanks" {
-    try std.testing.expectEqualDeep(trim_blanks(" "), "");
-    try std.testing.expectEqualDeep(trim_blanks("\t"), "");
-    try std.testing.expectEqualDeep(trim_blanks(" \t \t "), "");
-    try std.testing.expectEqualDeep(trim_blanks(" world"), "world");
-    try std.testing.expectEqualDeep(trim_blanks("world "), "world");
-    try std.testing.expectEqualDeep(trim_blanks(" world "), "world");
-    try std.testing.expectEqualDeep(trim_blanks("\x7F world \x00"), "world");
-    try std.testing.expectEqualDeep(trim_blanks(" \x00世界 \r"), "世界");
-    try std.testing.expectEqualDeep(trim_blanks(" world \n "), "world \n");
+    try std.testing.expectEqualStrings(trim_blanks(" "), "");
+    try std.testing.expectEqualStrings(trim_blanks("\t"), "");
+    try std.testing.expectEqualStrings(trim_blanks(" \t \t "), "");
+    try std.testing.expectEqualStrings(trim_blanks(" world"), "world");
+    try std.testing.expectEqualStrings(trim_blanks("world "), "world");
+    try std.testing.expectEqualStrings(trim_blanks(" world "), "world");
+    try std.testing.expectEqualStrings(trim_blanks("\x7F world \x00"), "world");
+    try std.testing.expectEqualStrings(trim_blanks(" \x00世界 \r"), "世界");
+    try std.testing.expectEqualStrings(trim_blanks(" world \n "), "world \n");
 }
 
 pub fn begins_with_blank(data: []const u8) bool {
