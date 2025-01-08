@@ -8,7 +8,7 @@ const LineScanner = @This();
 //const LineScanner = struct {
 data: []const u8,
 cursor: u32 = 0,
-cursorLineIndex: u32 = 0, // for debug
+cursorLineIndex: u32 = 0, // for debug. 1-based. 0 means invalod.
 
 // When lineEnd != null, cursor is the start of lineEnd.
 // That means, for a .rn line end, cursor is the index of '\r'.
@@ -68,9 +68,15 @@ pub const bytesKindTable = blk: {
     break :blk table;
 };
 
-//for ("0123456789-abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ") |c| {
-//    table[c] |= char_attr_idchar;
-//}
+test "bytesKindTable" {
+    try std.testing.expect(bytesKindTable['\n'] == .others);
+    try std.testing.expect(!bytesKindTable['\n'].isSpace());
+    try std.testing.expect(!bytesKindTable['\n'].isBlank());
+    try std.testing.expect(bytesKindTable['\t'].isSpace());
+    try std.testing.expect(bytesKindTable['\t'].isBlank());
+    try std.testing.expect(bytesKindTable[' '].isSpace());
+    try std.testing.expect(bytesKindTable[' '].isBlank());
+}
 
 pub fn debugPrint(ls: *LineScanner, opName: []const u8, customValue: u32) void {
     if (builtin.mode != .Debug) return;
@@ -83,6 +89,7 @@ pub fn debugPrint(ls: *LineScanner, opName: []const u8, customValue: u32) void {
         std.debug.print("cursor byte: {}\n", .{ls.peekCursor()});
 }
 
+// Call this at the doucment start or a line end.
 pub fn proceedToNextLine(ls: *LineScanner) bool {
     defer ls.cursorLineIndex += 1;
 
@@ -100,10 +107,10 @@ pub fn proceedToNextLine(ls: *LineScanner) bool {
                 if (ls.cursor >= ls.data.len) return false;
             },
         }
-    } else unreachable;
 
-    ls.lineEnd = null;
-    return true;
+        ls.lineEnd = null;
+        return true;
+    } else unreachable;
 }
 
 pub fn advance(ls: *LineScanner, n: u32) void {
@@ -112,7 +119,7 @@ pub fn advance(ls: *LineScanner, n: u32) void {
     ls.cursor += n;
 }
 
-// for retreat
+// for retreat (witin the current line).
 pub fn setCursor(ls: *LineScanner, cursor: u32) void {
     ls.cursor = cursor;
     ls.lineEnd = null;
@@ -132,11 +139,11 @@ pub fn peekNext(ls: *LineScanner) ?u8 {
     return null;
 }
 
-pub fn checkFollowing(ls: *LineScanner, prefix: []const u8) bool {
-    const k = ls.cursor + 1;
-    if (k >= ls.data.len) return false;
-    return std.mem.startsWith(u8, ls.data[k..], prefix);
-}
+//pub fn checkFollowing(ls: *LineScanner, prefix: []const u8) bool {
+//    const k = ls.cursor + 1;
+//    if (k >= ls.data.len) return false;
+//    return std.mem.startsWith(u8, ls.data[k..], prefix);
+//}
 
 // ToDo: return the blankStart instead?
 // Returns count of trailing blanks.
@@ -260,28 +267,87 @@ pub fn readUntilNotChar(ls: *LineScanner, char: u8) u32 {
 }
 
 // Return count of skipped bytes.
-pub fn readUntilCondition(ls: *LineScanner, comptime condition: fn (u8) bool) u32 {
-    const data = ls.data;
-    var index = ls.cursor;
-    while (index < data.len) : (index += 1) {
-        const c = data[index];
-        if (condition(c)) {
-            if (c == '\n') {
-                if (index > 0 and data[index - 1] == '\r') {
-                    ls.lineEnd = .rn;
-                    index = index - 1;
-                } else ls.lineEnd = .n;
-            }
+//pub fn readUntilCondition(ls: *LineScanner, comptime condition: fn (u8) bool) u32 {
+//    const data = ls.data;
+//    var index = ls.cursor;
+//    while (index < data.len) : (index += 1) {
+//        const c = data[index];
+//        if (condition(c)) {
+//            if (c == '\n') {
+//                if (index > 0 and data[index - 1] == '\r') {
+//                    ls.lineEnd = .rn;
+//                    index = index - 1;
+//                } else ls.lineEnd = .n;
+//            }
+//
+//            break;
+//        }
+//    } else ls.lineEnd = .void;
+//
+//    const skipped = index - ls.cursor;
+//    ls.cursor = index;
+//    return skipped;
+//}
 
-            break;
-        }
-    } else ls.lineEnd = .void;
+test "LineScanner" {
+    const data =
+        "   \t \t abcdef***rst \x00\x7f %% xyz \r\t\r\r\r\n" ++
+        " - foo\t\x00 \n" ++
+        "- \t bar";
+    var ls = LineScanner{ .data = data };
+    {
+        try std.testing.expect(ls.proceedToNextLine());
+        const start = ls.cursor;
+        const numSpaces = ls.readUntilNotBlank();
+        try std.testing.expect(numSpaces == ls.cursor);
+        try std.testing.expect(ls.peekCursor() == 'a');
+        try std.testing.expect(ls.peekNext() == 'b');
+        var numBlanks = ls.readUntilSpanMarkChar(null);
+        try std.testing.expect(numBlanks == 0);
+        try std.testing.expect(ls.peekCursor() == '*');
+        const numStars = ls.readUntilNotChar('*');
+        try std.testing.expect(numStars == 3);
+        numBlanks = ls.readUntilSpanMarkChar(null);
+        try std.testing.expect(numBlanks == 4);
+        numBlanks = ls.readUntilLineEnd();
+        try std.testing.expect(numBlanks == 5);
 
-    const skipped = index - ls.cursor;
-    ls.cursor = index;
-    return skipped;
+        ls.setCursor(start);
+        numBlanks = ls.readUntilLineEnd();
+        try std.testing.expect(numBlanks == 5);
+        try std.testing.expect(ls.lineEnd == .rn);
+    }
+    {
+        try std.testing.expect(ls.proceedToNextLine());
+        var numSpaces = ls.readUntilNotBlank();
+        try std.testing.expect(numSpaces == 1);
+        try std.testing.expect(ls.peekCursor() == '-');
+        ls.advance(1);
+        numSpaces = ls.readUntilNotBlank();
+        try std.testing.expect(numSpaces == 1);
+        const from = ls.cursor;
+        const numBlanks = ls.readUntilLineEnd();
+        try std.testing.expect(numBlanks == 3);
+        try std.testing.expect(ls.lineEnd == .n);
+        const to = ls.cursor - numBlanks;
+        try std.testing.expectEqualDeep("foo", data[from..to]);
+    }
+    {
+        try std.testing.expect(ls.proceedToNextLine());
+        var numSpaces = ls.readUntilNotBlank();
+        try std.testing.expect(numSpaces == 0);
+        try std.testing.expect(ls.peekCursor() == '-');
+        ls.advance(1);
+        numSpaces = ls.readUntilNotBlank();
+        try std.testing.expect(numSpaces == 3);
+        const from = ls.cursor;
+        const numBlanks = ls.readUntilLineEnd();
+        try std.testing.expect(numBlanks == 0);
+        try std.testing.expect(ls.lineEnd == .void);
+        const to = ls.cursor - numBlanks;
+        try std.testing.expectEqualDeep("bar", data[from..to]);
+    }
 }
-//};
 
 //===========================
 
@@ -290,14 +356,20 @@ pub fn trim_blanks(str: []const u8) []const u8 {
     while (i < str.len and bytesKindTable[str[i]].isBlank()) : (i += 1) {}
     const str2 = str[i..];
     i = str2.len;
-    while (i > 0 and bytesKindTable[str[i - 1]].isBlank()) : (i -= 1) {}
+    while (i > 0 and bytesKindTable[str2[i - 1]].isBlank()) : (i -= 1) {}
     return str2[0..i];
 }
 
-pub fn slice_to_first_space(str: []const u8) []const u8 {
-    var i: usize = 0;
-    while (i < str.len and bytesKindTable[str[i]].isSpace()) : (i += 1) {}
-    return str[0..i];
+test "trim_blanks" {
+    try std.testing.expectEqualDeep(trim_blanks(" "), "");
+    try std.testing.expectEqualDeep(trim_blanks("\t"), "");
+    try std.testing.expectEqualDeep(trim_blanks(" \t \t "), "");
+    try std.testing.expectEqualDeep(trim_blanks(" world"), "world");
+    try std.testing.expectEqualDeep(trim_blanks("world "), "world");
+    try std.testing.expectEqualDeep(trim_blanks(" world "), "world");
+    try std.testing.expectEqualDeep(trim_blanks("\x7F world \x00"), "world");
+    try std.testing.expectEqualDeep(trim_blanks(" \x00世界 \r"), "世界");
+    try std.testing.expectEqualDeep(trim_blanks(" world \n "), "world \n");
 }
 
 pub fn begins_with_blank(data: []const u8) bool {
@@ -305,7 +377,31 @@ pub fn begins_with_blank(data: []const u8) bool {
     return bytesKindTable[data[0]].isBlank();
 }
 
+test "begins_with_blank" {
+    try std.testing.expect(begins_with_blank(" "));
+    try std.testing.expect(begins_with_blank("\t"));
+    try std.testing.expect(begins_with_blank(" world"));
+    try std.testing.expect(begins_with_blank("\x7Fworld"));
+    try std.testing.expect(begins_with_blank("\x00世界"));
+
+    try std.testing.expect(!begins_with_blank("world"));
+    try std.testing.expect(!begins_with_blank("世界 "));
+    try std.testing.expect(!begins_with_blank(".\tWorld\t."));
+}
+
 pub fn ends_with_blank(data: []const u8) bool {
     if (data.len == 0) return false;
     return bytesKindTable[data[data.len - 1]].isBlank();
+}
+
+test "ends_with_blank" {
+    try std.testing.expect(ends_with_blank(" "));
+    try std.testing.expect(ends_with_blank("\t"));
+    try std.testing.expect(ends_with_blank("world "));
+    try std.testing.expect(ends_with_blank("world\x7F"));
+    try std.testing.expect(ends_with_blank("世界\x00"));
+
+    try std.testing.expect(!ends_with_blank("world"));
+    try std.testing.expect(!ends_with_blank(" 世界"));
+    try std.testing.expect(!ends_with_blank("\tWorld\t."));
 }
