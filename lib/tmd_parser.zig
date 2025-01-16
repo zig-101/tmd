@@ -53,10 +53,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     const nilBlockTreeNodeElement = try list.createListElement(BlockRedBlack.Node, allocator);
     tmdDoc._blockTreeNodes.pushTail(nilBlockTreeNodeElement);
     const nilBlockTreeNode = &nilBlockTreeNodeElement.value;
-    nilBlockTreeNode.* = .{
-        .color = .black,
-        .value = undefined,
-    };
+    nilBlockTreeNode.* = BlockRedBlack.MakeNilNode();
     tmdDoc.blocksByID.init(nilBlockTreeNode);
 
     var docParser = DocParser{

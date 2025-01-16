@@ -30,6 +30,8 @@ pendingTocHeaderBlock: ?*tmd.Block = null,
 fn createAndPushBlockElement(parser: *DocParser) !*tmd.Block {
     var blockElement = try list.createListElement(tmd.Block, parser.allocator);
     parser.tmdDoc.blocks.pushTail(blockElement);
+    parser.tmdDoc.blockCount += 1;
+
     const block = &blockElement.value;
     block.attributes = null; // !important
     parser.numBlocks += 1;
@@ -998,6 +1000,7 @@ fn parse(parser: *DocParser) !void {
         line.index.set(lineScanner.cursorLineIndex);
 
         parser.tmdDoc.lines.pushTail(lineElement);
+        parser.tmdDoc.lineCount += 1;
 
         if (oldLastBlock != parser.lastBlock) {
             try parser.tryToAttributeBlock(oldLastBlock);

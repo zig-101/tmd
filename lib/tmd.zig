@@ -19,6 +19,8 @@ pub const Doc = struct {
     data: []const u8,
     blocks: list.List(Block) = .{},
     lines: list.List(Line) = .{},
+    blockCount: u32 = 0,
+    lineCount: u32 = 0,
 
     tocHeaders: list.List(*Block) = .{},
     titleHeader: ?*Block = null,
@@ -41,6 +43,15 @@ pub const Doc = struct {
     _contentStreamAttributes: list.List(ContentStreamAttributes) = .{}, // ToDo: use SinglyLinkedList
 
     const BlockRedBlack = tree.RedBlack(*Block, Block);
+
+    // A doc always has a root block. And the root
+    // block is always the first block of the doc.
+    pub fn rootBlock(doc: *const @This()) *const Block {
+        return if (doc.blocks.head) |head| {
+            std.debug.assert(head.value.blockType == .root);
+            return &head.value;
+        } else unreachable;
+    }
 
     pub fn getBlockByID(self: *const @This(), id: []const u8) ?*Block {
         var a = ElementAttibutes{
@@ -266,6 +277,15 @@ pub const Block = struct {
                 unreachable;
             },
         };
+    }
+
+    // For atom blocks only (for tests purpose).
+    // ToDo: maybe it is best to sypport a token iterator which also
+    //       iterates block/line mark and line start/end tokens.
+    pub fn inlineTokens(self: *const @This()) InlineTokenIterator {
+        std.debug.assert(self.isAtom());
+
+        return inlineTokensBetweenLines(self.getStartLine(), self.getEndLine());
     }
 
     pub fn compare(x: *const @This(), y: *const @This()) isize {
@@ -785,6 +805,11 @@ pub const Line = struct {
         return null;
     }
 
+    pub fn firstInlineToken(self: *const @This()) ?*Token {
+        return self.firstTokenOf(.others);
+    }
+
+    // Currently, .others means inline style or content tokens.
     pub fn firstTokenOf(self: *const @This(), tokenKind: enum { any, containerMark_or_others, extra_or_others, lineTypeMark_or_others, others }) ?*Token {
         var tokenElement = self.tokens.head;
         switch (tokenKind) {
@@ -890,6 +915,61 @@ pub const Line = struct {
         };
     }
 };
+
+pub const InlineTokenIterator = struct {
+    _startLine: *const Line,
+    _endLine: *const Line,
+    _curentLine: *const Line,
+    _currentToken: ?*const Token = null,
+
+    // Call first will make other uses of the InlineTokenIterator illegal.
+    pub fn first(self: *@This()) ?*const Token {
+        return self.firstFromLine(self._startLine);
+    }
+
+    pub fn next(self: *@This()) ?*const Token {
+        if (self._currentToken) |token| {
+            if (token.next()) |nextToken| {
+                self._currentToken = nextToken;
+                return nextToken;
+            }
+            if (self._curentLine == self._endLine) {
+                self._currentToken = null;
+                return null;
+            }
+            if (self._curentLine.next()) |nextLine| return self.firstFromLine(nextLine);
+            unreachable;
+        } else unreachable;
+    }
+
+    fn firstFromLine(self: *@This(), line: *const Line) ?*const Token {
+        self._curentLine = line;
+        while (true) {
+            if (self._curentLine.firstInlineToken()) |t| {
+                self._currentToken = t;
+                return t;
+            }
+            if (self._curentLine == self._endLine) {
+                self._currentToken = null;
+                return null;
+            }
+            if (self._curentLine.next()) |nextLine| self._curentLine = nextLine;
+            unreachable;
+        }
+
+        unreachable;
+    }
+};
+
+// Both lines are inclusive.
+// The returned value can be reused but can't be used concurrently.
+fn inlineTokensBetweenLines(startLine: *const Line, endLine: *const Line) InlineTokenIterator {
+    return InlineTokenIterator{
+        ._startLine = startLine,
+        ._endLine = endLine,
+        ._curentLine = undefined,
+    };
+}
 
 // Tokens consume most memory after a doc is parsed.
 // So try to keep the size of TokenType small and use as few tokens as possible.

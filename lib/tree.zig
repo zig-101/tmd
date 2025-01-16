@@ -10,6 +10,9 @@ const builtin = @import("builtin");
 //
 // function.
 //
+// Why not use a fn parameter directly?
+// See: https://github.com/ziglang/zig/issues/18478
+//
 pub fn RedBlack(comptime Value: type, comptime CompareNamespace: type) type {
     return struct {
         pub const Color = enum { red, black };

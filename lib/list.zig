@@ -105,6 +105,7 @@ pub fn List(comptime Value: type) type {
     };
 }
 
+// ToDo: put in the List namespace?
 pub fn Element(comptime Value: type) type {
     return struct {
         value: Value = undefined,

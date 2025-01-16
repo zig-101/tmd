@@ -32,16 +32,21 @@ fn copyLinkText(dst: anytype, from: u32, src: []const u8) u32 {
 
 const DummyLinkText = struct {
     //lastIsSpace: bool = false,
+    //
+    //pub fn set(self: *DummyLinkText, _: u32, r: u8) bool {
+    //    if (LineScanner.bytesKindTable[r].isBlank()) {
+    //        if (!self.lastIsSpace and LineScanner.bytesKindTable[r].isSpace()) {
+    //            self.lastIsSpace = true;
+    //            return true;
+    //        }
+    //        return false;
+    //    }
+    //    self.lastIsSpace = false;
+    //    return true;
+    //}
+
     pub fn set(_: *DummyLinkText, _: u32, r: u8) bool {
-        if (LineScanner.bytesKindTable[r].isBlank()) {
-            //if (!self.lastIsSpace and LineScanner.bytesKindTable[r].isSpace()) {
-            //    self.lastIsSpace = true;
-            //    return true;
-            //}
-            return false;
-        }
-        //self.lastIsSpace = false;
-        return true;
+        return !LineScanner.bytesKindTable[r].isBlank();
     }
 };
 
@@ -101,8 +106,6 @@ const RevisedLinkText = struct {
     }
 };
 
-// ToDo: this and the above types should not be public.
-//       Merge this file with the parser file?
 const InvertedRevisedLinkText = struct {
     len: u32 = 0,
     text: [*]const u8 = "".ptr,
@@ -145,10 +148,7 @@ fn Patricia(comptime TextType: type) type {
         allocator: mem.Allocator,
 
         topTree: Tree = .{},
-        nilNode: Node = .{
-            .color = .black,
-            .value = .{},
-        },
+        nilNode: Node = rbtree.MakeNilNode(),
 
         freeNodeList: ?*Node = null,
 
@@ -387,7 +387,7 @@ fn Patricia(comptime TextType: type) type {
             }
 
             if (node.value.deeperTree.count == 0) {
-                // ToDo: delete the node (not necessary).
+                // ToDo: delete the node (not necessarily).
             }
         }
 

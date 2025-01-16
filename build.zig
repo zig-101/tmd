@@ -36,13 +36,18 @@ pub fn build(b: *std.Build) !void {
 
     const libTest = b.addTest(.{
         .name = "lib unit test",
+        .root_source_file = b.path("lib-tests/all.zig"),
+        .target = b.host,
+    });
+    libTest.root_module.addImport("tmd", tmdLibModule); // just use file imports instead of module import
+    const runLibTest = b.addRunArtifact(libTest);
+
+    const libInternalTest = b.addTest(.{
+        .name = "lib internal unit test",
         .root_source_file = b.path("lib/tests.zig"),
         .target = b.host,
     });
-    //libTest.root_module.addImport("tmd", tmdLibModule); // just use file imports instead of module import
-    //const installTest = b.addInstallArtifact(libTest, .{});
-    const runLibTest = b.addRunArtifact(libTest);
-    //runLibTest.step.dependOn(&installTest.step); // The last line has built this relation.
+    const runLibInternalTest = b.addRunArtifact(libInternalTest);
 
     const cmdTest = b.addTest(.{
         .name = "cmd unit test",
@@ -60,6 +65,7 @@ pub fn build(b: *std.Build) !void {
 
     const testStep = b.step("test", "Run unit tests");
     testStep.dependOn(&runLibTest.step);
+    testStep.dependOn(&runLibInternalTest.step);
     testStep.dependOn(&runCmdTest.step);
     testStep.dependOn(&runWasmTest.step);
 

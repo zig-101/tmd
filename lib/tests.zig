@@ -4,4 +4,5 @@ test {
     _ = @import("utf8.zig");
     _ = @import("tmd_parser-attribute_parser.zig");
     _ = @import("tmd_parser-line_scanner.zig");
+    //_ = @import("tmd_to_html-fns.zig");
 }
