@@ -51,16 +51,16 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
         std.debug.print("\n", .{});
 
         if (block.isAtom()) {
-            var line = block.getStartLine();
-            const end = block.getEndLine();
+            var line = block.startLine();
+            const end = block.endLine();
             while (true) {
                 var depth = block.nestingDepth + 1;
                 while (depth > 0) : (depth -= 1) {
                     std.debug.print("  ", .{});
                 }
                 std.debug.print("- L{} @{}: <{s}> ({}..{}) ({}..{}) ({}..{}) <{s}> {}\n", .{
-                    line.index.get(),
-                    line.atomBlockIndex.get(),
+                    line.index.value(),
+                    line.atomBlockIndex.value(),
                     line.typeName(),
                     line.prefixBlankEnd - line.start(.none) + 1,
                     line.suffixBlankStart - line.start(.none) + 1,

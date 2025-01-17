@@ -71,7 +71,7 @@ pub const TmdRender = struct {
             .id = id,
             .orderIndex = @intCast(self.footnotesByID.count + 1),
             .refCount = 1,
-            .block = self.doc.getBlockByID(id),
+            .block = self.doc.blockByID(id),
         };
 
         const nodeElement = try list.createListElement(FootnoteRedBlack.Node, self.allocator);
@@ -115,11 +115,11 @@ pub const TmdRender = struct {
     }
 
     fn renderBlock(self: *TmdRender, w: anytype, block: *const tmd.Block) anyerror!void {
-        const footerTag = if (block.getFooterSibling()) |footer| blk: {
+        const footerTag = if (block.footerAttibutes()) |footerAttrs| blk: {
             const tag = "footer";
             const classes = "tmd-footer";
 
-            try fns.writeOpenTag(w, tag, classes, footer.attributes, self.suffixForIdsAndNames, true);
+            try fns.writeOpenTag(w, tag, classes, footerAttrs, self.suffixForIdsAndNames, true);
             break :blk tag;
         } else "";
 
@@ -215,7 +215,7 @@ pub const TmdRender = struct {
                         try fns.writeCloseTag(w, tag, true);
                     },
                     .definitions => {
-                        const forDdBlock = if (block.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
+                        const forDdBlock = if (block.specialHeaderChild(self.doc.data)) |headerBlock| blk: {
                             const tag = "dt";
                             const classes = "";
 
@@ -256,7 +256,7 @@ pub const TmdRender = struct {
                             .{ headerTag, tabInfo.orderId, tabInfo.nextItemOrderId, self.suffixForIdsAndNames },
                         );
 
-                        const firstContentBlock = if (block.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
+                        const firstContentBlock = if (block.specialHeaderChild(self.doc.data)) |headerBlock| blk: {
                             try fns.writeBlockAttributes(w, headerClasses, headerBlock.attributes, self.suffixForIdsAndNames);
                             _ = try w.write(">");
 
@@ -294,7 +294,7 @@ pub const TmdRender = struct {
             .quotation => {
                 const tag = "div";
 
-                const firstContentBlock = if (block.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
+                const firstContentBlock = if (block.specialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     const classes = "tmd-quotation-large";
                     try fns.writeOpenTag(w, tag, classes, block.attributes, self.suffixForIdsAndNames, true);
 
@@ -324,7 +324,7 @@ pub const TmdRender = struct {
 
                 try fns.writeOpenTag(w, tag, classes, block.attributes, self.suffixForIdsAndNames, true);
 
-                const firstContentBlock = if (block.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
+                const firstContentBlock = if (block.specialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     {
                         const headerTag = "div";
                         const headerClasses = "tmd-notice-header";
@@ -356,7 +356,7 @@ pub const TmdRender = struct {
 
                 const headerTag = "summary";
                 const headerClasses = "tmd-reveal-header tmd-usual";
-                const firstContentBlock = if (block.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
+                const firstContentBlock = if (block.specialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     try fns.writeOpenTag(w, headerTag, headerClasses, headerBlock.attributes, self.suffixForIdsAndNames, true);
                     try self.writeUsualContentBlockLines(w, headerBlock);
 
@@ -385,7 +385,7 @@ pub const TmdRender = struct {
 
                 try fns.writeOpenTag(w, tag, classes, block.attributes, self.suffixForIdsAndNames, true);
 
-                const firstContentBlock = if (block.getSpecialHeaderChild(self.doc.data)) |headerBlock| blk: {
+                const firstContentBlock = if (block.specialHeaderChild(self.doc.data)) |headerBlock| blk: {
                     {
                         const headerTag = "div";
                         const headerClasses = "tmd-plain-header";
@@ -708,7 +708,7 @@ pub const TmdRender = struct {
                     return try self.renderTableHeaderCellBlock(w, tableCellBlock, spans);
             },
             .base => |*base| { // some headers might need different text aligns.
-                if (tableCellBlock.getSpecialHeaderChild(self.doc.data)) |headerBlock| {
+                if (tableCellBlock.specialHeaderChild(self.doc.data)) |headerBlock| {
                     if (headerBlock.nextSibling() == null)
                         return try self.renderTableHeaderCellBlock(w, headerBlock, spans);
                 }
@@ -840,8 +840,8 @@ pub const TmdRender = struct {
         if (attrs.app.len == 0) {
             _ = try w.write("[...]");
         } else if (std.ascii.eqlIgnoreCase(attrs.app, "html")) blk: {
-            const endLine = block.getEndLine();
-            const startLine = block.getStartLine();
+            const endLine = block.endLine();
+            const startLine = block.startLine();
             std.debug.assert(startLine.lineType == .customBlockStart);
 
             var line = startLine.next() orelse break :blk;
@@ -896,8 +896,8 @@ pub const TmdRender = struct {
             _ = try w.write(">");
         }
 
-        const endLine = block.getEndLine();
-        const startLine = block.getStartLine();
+        const endLine = block.endLine();
+        const startLine = block.startLine();
         std.debug.assert(startLine.lineType == .codeBlockStart);
 
         if (startLine.next()) |firstLine| {
@@ -929,7 +929,7 @@ pub const TmdRender = struct {
                 // ToDo: ...
             } else if (std.mem.startsWith(u8, content, "#")) {
                 const id = content[1..];
-                const b = if (self.doc.getBlockByID(id)) |b| b else break :blk;
+                const b = if (self.doc.blockByID(id)) |b| b else break :blk;
                 _ = try self.renderTmdCode(w, b, true);
             } else break :blk;
         }
@@ -969,8 +969,8 @@ pub const TmdRender = struct {
     }
 
     fn renderTmdCodeForAtomBlock(self: *TmdRender, w: anytype, atomBlock: *const tmd.Block, trimBoundaryLines: bool) !void {
-        var line = atomBlock.getStartLine();
-        const endLine = atomBlock.getEndLine();
+        var line = atomBlock.startLine();
+        const endLine = atomBlock.endLine();
         while (true) {
             try self.renderTmdCodeOfLine(w, line, trimBoundaryLines);
 
@@ -1021,8 +1021,8 @@ pub const TmdRender = struct {
         const inHeader = block.blockType == .header;
         var tracker: MarkStatusesTracker = .{};
 
-        const endLine = block.getEndLine();
-        var line = block.getStartLine();
+        const endLine = block.endLine();
+        var line = block.startLine();
 
         // Just to check all possible types. Don't remove.
         switch (line.lineType) {

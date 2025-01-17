@@ -66,7 +66,7 @@ const RevisedLinkText = struct {
     len: u32 = 0,
     text: [*]const u8 = "".ptr,
 
-    pub fn get(self: *const RevisedLinkText, n: u32) u8 {
+    pub fn at(self: *const RevisedLinkText, n: u32) u8 {
         std.debug.assert(n < self.len);
         return self.text[n];
     }
@@ -110,7 +110,7 @@ const InvertedRevisedLinkText = struct {
     len: u32 = 0,
     text: [*]const u8 = "".ptr,
 
-    pub fn get(self: *const InvertedRevisedLinkText, n: u32) u8 {
+    pub fn at(self: *const InvertedRevisedLinkText, n: u32) u8 {
         std.debug.assert(n < self.len);
         return (self.text - n)[0];
     }
@@ -243,7 +243,7 @@ fn Patricia(comptime TextType: type) type {
                 if (x.textSegment.len == 0 and y.textSegment.len == 0) return 0;
                 if (x.textSegment.len == 0) return -1;
                 if (y.textSegment.len == 0) return 1;
-                return @as(isize, x.textSegment.get(0)) - @as(isize, y.textSegment.get(0));
+                return @as(isize, x.textSegment.at(0)) - @as(isize, y.textSegment.at(0));
             }
 
             fn commonPrefixLen(x: *const @This(), y: *const @This()) u32 {
@@ -252,7 +252,7 @@ fn Patricia(comptime TextType: type) type {
                 const n = if (lx < ly) lx else ly;
                 for (0..n) |i| {
                     const k: u32 = @intCast(i);
-                    if (x.textSegment.get(k) != y.textSegment.get(k)) {
+                    if (x.textSegment.at(k) != y.textSegment.at(k)) {
                         return k;
                     }
                 }

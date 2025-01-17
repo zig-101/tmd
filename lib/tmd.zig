@@ -53,7 +53,7 @@ pub const Doc = struct {
         } else unreachable;
     }
 
-    pub fn getBlockByID(self: *const @This(), id: []const u8) ?*Block {
+    pub fn blockByID(self: *const @This(), id: []const u8) ?*Block {
         var a = ElementAttibutes{
             .id = id,
         };
@@ -233,7 +233,7 @@ pub const Block = struct {
         };
     }
 
-    pub fn getStartLine(self: *const @This()) *Line {
+    pub fn startLine(self: *const @This()) *Line {
         return switch (self.blockType) {
             inline else => |bt| {
                 if (@hasDecl(@TypeOf(bt), "Atom")) {
@@ -256,7 +256,7 @@ pub const Block = struct {
         };
     }
 
-    pub fn getEndLine(self: *const @This()) *Line {
+    pub fn endLine(self: *const @This()) *Line {
         return switch (self.blockType) {
             inline else => |bt| {
                 if (@hasDecl(@TypeOf(bt), "Atom")) {
@@ -285,7 +285,7 @@ pub const Block = struct {
     pub fn inlineTokens(self: *const @This()) InlineTokenIterator {
         std.debug.assert(self.isAtom());
 
-        return inlineTokensBetweenLines(self.getStartLine(), self.getEndLine());
+        return inlineTokensBetweenLines(self.startLine(), self.endLine());
     }
 
     pub fn compare(x: *const @This(), y: *const @This()) isize {
@@ -300,15 +300,15 @@ pub const Block = struct {
         };
     }
 
-    // Only atom blocks and base blocks can call this method.
-    pub fn getFooterSibling(self: *const @This()) ?*Block {
+    // Only atom blocks and base blocks may be footer blocks.
+    pub fn footerAttibutes(self: *const @This()) ?*ElementAttibutes {
         //if (self.isContainer()) unreachable;
         if (self.isContainer()) return null;
 
         if (self.nextSibling()) |sibling| {
             if (sibling.blockType == .attributes) {
                 if (sibling.nextSibling() == null)
-                    return sibling;
+                    return sibling.attributes;
             }
         }
 
@@ -395,7 +395,7 @@ pub const Block = struct {
         };
     }
 
-    pub fn getSpecialHeaderChild(self: *const @This(), tmdData: []const u8) ?*const Block {
+    pub fn specialHeaderChild(self: *const @This(), tmdData: []const u8) ?*const Block {
         std.debug.assert(self.isContainer() or self.blockType == .base);
         var child = self.firstChild() orelse return null;
         while (true) {
@@ -660,16 +660,16 @@ fn voidOr(T: type) type {
     const ValueType = if (builtin.mode == .Debug) T else void;
 
     return struct {
-        value: ValueType,
+        _value: ValueType,
 
-        pub fn get(self: @This()) T {
+        pub fn value(self: @This()) T {
             if (builtin.mode != .Debug) return 0;
-            return self.value;
+            return self._value;
         }
 
         pub fn set(self: *@This(), v: T) void {
             if (builtin.mode != .Debug) return;
-            self.value = v;
+            self._value = v;
         }
     };
 }
@@ -677,14 +677,14 @@ fn voidOr(T: type) type {
 // For debug purpose, to replace voidOr in debugging.
 fn identify(T: type) type {
     return struct {
-        value: T,
+        _value: T,
 
-        pub fn get(self: @This()) T {
-            return self.value;
+        pub fn value(self: @This()) T {
+            return self._value;
         }
 
         pub fn set(self: *@This(), v: T) void {
-            self.value = v;
+            self._value = v;
         }
     };
 }
@@ -852,7 +852,7 @@ pub const Line = struct {
     }
 
     fn startPos(self: *const @This()) DocSize {
-        if (builtin.mode == .Debug) return self.startAt.get();
+        if (builtin.mode == .Debug) return self.startAt.value();
         return if (self.prev()) |prevLine| prevLine.endAt else 0;
     }
 
