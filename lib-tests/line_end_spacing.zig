@@ -6,6 +6,7 @@ test "line end spacing" {
         fn check(data: []const u8) !bool {
             var doc = try tmd.parser.parse_tmd_doc(data, std.testing.allocator);
             defer tmd.parser.destroy_tmd_doc(&doc, std.testing.allocator);
+
             if (doc.lines.head) |le| {
                 if (doc.lines.tail.?.value.treatEndAsSpace) {
                     return error.TreatDocTailLineEndAsSpace;
