@@ -22,6 +22,14 @@ export fn buffer_offset() isize {
     return @intCast(@intFromPtr(bufferWithHeader.ptr));
 }
 
+export fn get_version() isize {
+    const versionWithLengthHeader = writeWersion() catch |err| {
+        logMessage("write version error: ", @errorName(err), @intFromError(err));
+        return -@as(i32, @intFromError(err));
+    };
+    return @intCast(@intFromPtr(versionWithLengthHeader.ptr));
+}
+
 export fn tmd_to_html(fullHtmlPage: bool, supportCustomBlocks: bool) isize {
     const htmlWithLengthHeader = render(fullHtmlPage, supportCustomBlocks) catch |err| {
         logMessage("render error: ", @errorName(err), @intFromError(err));
@@ -38,6 +46,18 @@ fn init() ![]u8 {
     var fbs = std.io.fixedBufferStream(buffer);
     try fbs.writer().writeInt(u32, maxInFileSize, .little);
 
+    return buffer;
+}
+
+fn writeWersion() ![]u8 {
+    if (buffer.len == 0) {
+        return error.BufferNotCreatedYet;
+    }
+
+    var fbs = std.io.fixedBufferStream(buffer);
+    try fbs.writer().writeInt(u32, tmd.version.len, .little);
+    const n = try fbs.writer().write(tmd.version);
+    std.debug.assert(n == tmd.version.len);
     return buffer;
 }
 

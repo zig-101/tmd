@@ -1,6 +1,8 @@
 //! This module provides functions for parse tmd files (as tmd.Doc),
 //! and functions for rendering (tmd.Doc) to HTML.
 
+pub const version = @import("version.zig").version;
+
 pub const parser = @import("tmd_parser.zig");
 pub const render = @import("tmd_to_html.zig");
 

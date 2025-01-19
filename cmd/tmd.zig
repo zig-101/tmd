@@ -6,6 +6,9 @@ const tmd = @import("tmd");
 const maxInFileSize = 1 << 23; // 8M
 const bufferSize = maxInFileSize * 8;
 
+const stdout = std.io.getStdOut().writer();
+const stderr = std.io.getStdErr().writer();
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -20,17 +23,9 @@ pub fn main() !void {
 
     std.debug.assert(args.len > 0);
 
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
+    if (args.len <= 1) try printUsages(0);
 
-    if (args.len <= 1 or !std.mem.eql(u8, args[1], "render")) {
-        try stdout.print(
-            \\Usage:
-            \\  tmd render [--full-html] TMD-files...
-            \\
-        , .{});
-        std.process.exit(1);
-    }
+    if (std.mem.eql(u8, args[1], "render")) {} else try printUsages(1);
 
     if (args.len == 2) {
         try stderr.print("No tmd files specified.", .{});
@@ -127,4 +122,17 @@ pub fn main() !void {
             \\
         , .{ arg, stat.size, outputFilename, fbs.getWritten().len });
     }
+}
+
+// "toolset" is better than "toolkit" here?
+// https://www.difference.wiki/toolset-vs-toolkit/
+fn printUsages(exitCode: u8) !void {
+    try stdout.print(
+        \\TapirMD toolset v{s}
+        \\
+        \\Usages:
+        \\  tmd render [--full-html] TMD-files...
+        \\
+    , .{tmd.version});
+    std.process.exit(exitCode);
 }

@@ -31,6 +31,7 @@ __the specification``specification.html__.
 """html
 <script>
 let buffer_offset = null;
+let get_version = null;
 let tmd_to_html = null;
 let memory = null;
 
@@ -78,22 +79,43 @@ function tmdToHTML() {
 	}
 
 	//let startTime = new Date();
+
+	// get buffer information
 	
-	const inputOffset = buffer_offset();
-	//console.log("inputOffset: ", inputOffset);
-	if (inputOffset < 0) {
-		//console.log("bad inputOffset: ", inputOffset);
-		setRenderEffect("bad inputOffset: " + inputOffset, false);
+	const bufferOffset = buffer_offset();
+	//console.log("bufferOffset:", bufferOffset);
+	if (bufferOffset < 0) {
+		//console.log("bad bufferOffset:", bufferOffset);
+		setRenderEffect("bad bufferOffset: " + bufferOffset, false);
 		return;
 	}
-	const inputView = new DataView(memory.buffer, inputOffset);
+	const inputView = new DataView(memory.buffer, bufferOffset);
 	const maxInputLength = inputView.getUint32(0, true);
-	//console.log("maxInputLength: ", maxInputLength);
+	//console.log("maxInputLength:", maxInputLength);
+
+	// get the lib version
+	const versionOffset = get_version(false, false);
+	if (versionOffset < 0) {
+		//console.log("bad versionOffset:", versionOffset);
+		setRenderEffect("bad versionOffset: " + versionOffset, false);
+		return;
+	}
+	
+	const versionView = new DataView(memory.buffer, versionOffset);
+	
+	const versionLength = versionView.getUint32(0, true);
+	//console.log("versionLength:", versionLength);
+	
+	const versionBytes = new Uint8Array(memory.buffer, versionOffset+4, versionLength);
+	const version = new TextDecoder().decode(versionBytes);
+	console.log("version:", version);
+
+	// write input data and get output data
 	
 	const inputTextArea = document.getElementById('tmd-source');
 	const tmdData = inputTextArea.value;
 	if (tmdData == lastTmdData) {
-		//console.log(`no change`);
+		//console.log("no change");
 		return;
 	}
 
@@ -103,43 +125,43 @@ function tmdToHTML() {
 		setRenderEffect("inputLength  (" + inputLength + ") is too large (larger than " + maxInputLength + ").", false);
 		return;
 	}
-	//console.log("inputLength: ", inputLength);
+	//console.log("inputLength:", inputLength);
 	
 	let offset = 0;
 	const demoSuffix = "__demo";
 	inputView.setUint8(offset, demoSuffix.length);
 	offset += 1;
-	const suffixBytes = new Uint8Array(memory.buffer, inputOffset + offset);
+	const suffixBytes = new Uint8Array(memory.buffer, bufferOffset + offset);
 	const { } = new TextEncoder().encodeInto(demoSuffix, suffixBytes);
 	offset += demoSuffix.length;
 
 	inputView.setInt32(offset, inputLength, true);
 	offset += 4;
-	const inputBytes = new Uint8Array(memory.buffer, inputOffset + offset);
+	const inputBytes = new Uint8Array(memory.buffer, bufferOffset + offset);
 	const { written } = new TextEncoder().encodeInto(tmdData, inputBytes);
-	//console.log("written: ", written);
+	//console.log("written:", written);
 
 	//console.log("elapsed time (prepare input): ", new Date() - startTime); startTime = new Date();
 	
 	const outputOffset = tmd_to_html(false, false);
 	if (outputOffset < 0) {
-		//console.log("bad outputOffset: ", outputOffset);
+		//console.log("bad outputOffset:", outputOffset);
 		setRenderEffect("bad outputOffset: " + outputOffset, false);
 		return;
 	}
 
-	//console.log("elapsed time (tmd_to_html): ", new Date() - startTime); startTime = new Date();
+	//console.log("elapsed time (tmd_to_html):", new Date() - startTime); startTime = new Date();
 	
 	const outputView = new DataView(memory.buffer, outputOffset);
 	
 	const outputLength = outputView.getUint32(0, true);
-	//console.log("outputLength: ", outputLength);
+	//console.log("outputLength:", outputLength);
 	
 	const outputBytes = new Uint8Array(memory.buffer, outputOffset+4, outputLength);
 	const output = new TextDecoder().decode(outputBytes);
-	//console.log("output: ", output);
+	//console.log("output:", output);
 
-	//console.log("elapsed time (decode output): ", new Date() - startTime);
+	//console.log("elapsed time (decode output):", new Date() - startTime);
 
 	setRenderEffect(output, true);
 	lastTmdData = tmdData;
@@ -184,6 +206,7 @@ function loadWasm() {
 					//console.log("instance wasm done: ", instance);
 					memory = instance.exports.memory;
 					buffer_offset = instance.exports.buffer_offset;
+					get_version = instance.exports.get_version;
 					tmd_to_html = instance.exports.tmd_to_html;
 				});
 			}
