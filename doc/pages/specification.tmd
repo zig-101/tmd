@@ -426,10 +426,9 @@ The remaining un-parsed texts are ignored.
 If an attribute is defined more than once in multiple lines in an attribute block,
 the first definition is chosen.
 
-If an attibute block has not a next sibling block but a previous sibling block.
-then the attributes defined in the attibute block
-are set for the previous sibling block,
-and the previous sibling block is viewed as a footer block.
+If an attibute block has not a next sibling block but a previous sibling block,
+then the previous sibling block will be wrapped in an (implicit) footer block,
+and the attributes defined in the attibute block are set on the footer block.
 
 ! ### ToDo:
   ;;; If an attribute block has no sibling blocks,

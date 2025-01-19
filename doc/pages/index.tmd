@@ -5,21 +5,16 @@
 ---
 {
   ::
-  ``- __Installation`` installation.html __
-  |
-  ^**Libraries (coming) **
-  |
-  __Specification`` specification.html __
+  ``- __Specification`` specification.html __
+  | __Demos`` demos.html __
+  | __Try It Online`` play.html __
   \\
-  ``- __Demos`` demos.html __
-  |
-  __Use Cases`` use-cases.html __
-  |
-  __Try It Online`` play.html __
+  // ``- __Ecosystem`` ecosystem.html __
+  ``- __Official Tools`` installation.html __
+  | __Use Cases`` use-cases.html __
   \\
-  `` - __Source Code`` https://github.com/zig-101/tmd __
-  |
-  __@zigo_101`` https://x.com/zigo_101 __
+  ``- __Source Code`` https://github.com/zig-101/tmd __
+  | __@zigo_101`` https://x.com/zigo_101 __
 }
 ---
 
@@ -73,10 +68,10 @@ Features:
   + Hyperlinks.
     ~ Self-defined links.
     ~ Link definitions based on exact, **prefix, or suffix matching**.
-* More
+* More:
   + TOC (table of contents) generation for automatic navigation.
   + Footnotes for references and citations.
-  + Footer blocks (without dedicated syntax).
+  + Footer blocks (**without dedicated syntax**).
   + Subtitles.
   + **Line-end spacing control**.
   + **Source streaming (to code blocks)**.

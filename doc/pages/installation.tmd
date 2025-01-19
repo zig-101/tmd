@@ -6,7 +6,7 @@
   }
   // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/installation.tmd
 
-This page shows the steps of installing and using the official __TapirMD__ renderer.
+This page shows the steps of installing and using the official __TapirMD__ renderer locally.
 You can also experience the renderer __online__.
 
   // __TapirMD:: index.html
