@@ -67,6 +67,10 @@ pub const Doc = struct {
         return if (self.blocksByID.search(&b)) |node| node.value else null;
     }
 
+    pub fn firstLine(self: *const @This()) ?*Line {
+        return if (self.lines.head) |le| &le.value else null;
+    }
+
     pub fn rangeData(self: *const @This(), r: Range) []const u8 {
         return self.data[r.start..r.end];
     }
@@ -215,7 +219,9 @@ pub const Block = struct {
 
     attributes: ?*ElementAttibutes = null,
 
-    hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual? ToDo: not only)
+    more: packed struct {
+        hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual? ToDo: not only)
+    } = .{},
 
     pub fn typeName(self: *const @This()) []const u8 {
         return @tagName(self.blockType);

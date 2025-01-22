@@ -1160,7 +1160,7 @@ pub const TmdRender = struct {
                                 if (!writeTags) break :blk;
 
                                 const mediaInfoElement = tokenElement.next.?;
-                                const isInline = inHeader or block.hasNonMediaTokens;
+                                const isInline = inHeader or block.more.hasNonMediaTokens;
 
                                 writeMedia: {
                                     const mediaInfoToken = mediaInfoElement.value;

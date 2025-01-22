@@ -633,7 +633,7 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
             },
         }
 
-        self.blockSession.atomBlock.hasNonMediaTokens = notMediaLine;
+        self.blockSession.atomBlock.more.hasNonMediaTokens = notMediaLine;
 
         // determine .treatEndAsSpace for .lineWithPending_treatEndAsSpace
 
