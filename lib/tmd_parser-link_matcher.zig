@@ -152,6 +152,9 @@ fn Patricia(comptime TextType: type) type {
 
         freeNodeList: ?*Node = null,
 
+        _debugAlloctedNodeCount: usize = 0,
+        _debugFreeNodeCount: usize = 0,
+
         const rbtree = tree.RedBlack(NodeValue, NodeValue);
         const Tree = rbtree.Tree;
         const Node = rbtree.Node;
@@ -162,10 +165,15 @@ fn Patricia(comptime TextType: type) type {
 
         fn deinit(self: *@This()) void {
             self.clear();
+            std.debug.assert(self._debugAlloctedNodeCount == self._debugFreeNodeCount);
 
+            var count: usize = 0;
             while (self.tryToGetFreeNode()) |node| {
                 self.allocator.destroy(node);
+                count += 1;
             }
+            std.debug.assert(self._debugAlloctedNodeCount == count);
+            std.debug.assert(self._debugFreeNodeCount == 0);
         }
 
         fn clear(self: *@This()) void {
@@ -174,33 +182,38 @@ fn Patricia(comptime TextType: type) type {
             const NodeHandler = struct {
                 t: *PatriciaTree,
 
-                pub fn onNode(h: @This(), node: *Node) void {
+                pub fn onNode(h: *@This(), node: *Node) void {
+                    node.value.deeperTree.traverseNodes(h);
                     //node.value = .{};
                     h.t.freeNode(node);
                 }
             };
 
-            const handler = NodeHandler{ .t = self };
-            self.topTree.traverseNodes(handler);
+            var handler = NodeHandler{ .t = self };
+            self.topTree.traverseNodes(&handler);
             self.topTree.reset();
         }
 
         fn tryToGetFreeNode(self: *@This()) ?*Node {
             if (self.freeNodeList) |node| {
-                if (node.value.deeperTree.count == 0) {
+                if (node.value.deeperTree.count == 0) { // mean next == null
                     self.freeNodeList = null;
-                } else {
+                } else { // count == 1 means next free node != null
                     std.debug.assert(node.value.deeperTree.count == 1);
                     self.freeNodeList = node.value.deeperTree.root;
                     node.value.deeperTree.count = 0;
                 }
+                self._debugFreeNodeCount -= 1;
                 return node;
             }
             return null;
         }
 
         fn getFreeNode(self: *@This()) !*Node {
-            const n = self.tryToGetFreeNode() orelse try self.allocator.create(Node);
+            const n = self.tryToGetFreeNode() orelse blk: {
+                self._debugAlloctedNodeCount += 1;
+                break :blk try self.allocator.create(Node);
+            };
 
             n.* = .{
                 .value = .{},
@@ -226,6 +239,8 @@ fn Patricia(comptime TextType: type) type {
                 node.value.deeperTree.count = 0;
             }
             self.freeNodeList = node;
+
+            self._debugFreeNodeCount += 1;
         }
 
         const NodeValue = struct {
