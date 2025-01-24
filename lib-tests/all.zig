@@ -1,7 +1,10 @@
 test {
     _ = @import("line_end_spacing.zig");
+    _ = @import("line_end_types.zig");
+    _ = @import("block_types.zig");
     _ = @import("span_contents.zig");
     _ = @import("block_attributes.zig");
+    _ = @import("link_matching.zig");
 }
 
 const std = @import("std");
@@ -89,4 +92,39 @@ test "DocChecker" {
             return error.Nothing;
         }
     }.check) == error.Nothing);
+}
+
+pub const RenderChecker = struct {
+    pub fn check(data: []const u8, completeHTML: bool, v: anytype) !bool {
+        var doc = try tmd.parser.parse_tmd_doc(data, std.testing.allocator);
+        defer tmd.parser.destroy_tmd_doc(&doc, std.testing.allocator);
+
+        var buf = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1 << 20);
+        defer buf.deinit();
+
+        try tmd.render.tmd_to_html(&doc, buf.writer(), completeHTML, true, "", std.testing.allocator);
+        const html = buf.items;
+
+        return v.checkFn(html);
+    }
+};
+
+test "RenderChecker" {
+    try std.testing.expect(try RenderChecker.check("", true, struct {
+        fn checkFn(_: []const u8) !bool {
+            return true;
+        }
+    }));
+
+    try std.testing.expect(try RenderChecker.check("", true, struct {
+        fn checkFn(_: []const u8) !bool {
+            return false;
+        }
+    }) == false);
+
+    try std.testing.expect(RenderChecker.check("", true, struct {
+        fn checkFn(_: []const u8) !bool {
+            return error.Nothing;
+        }
+    }) == error.Nothing);
 }

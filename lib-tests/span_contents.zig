@@ -2,7 +2,7 @@ const std = @import("std");
 const tmd = @import("tmd");
 const all = @import("all.zig");
 
-test "backticks" {
+test "span contents" {
     var spanChecker: struct {
         buffer: all.Buffer(256) = .{},
         opening: bool = false,
