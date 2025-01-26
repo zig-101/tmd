@@ -9,6 +9,7 @@ const tree = @import("tree.zig");
 const AttributeParser = @import("tmd_parser-attribute_parser.zig");
 const LineScanner = @import("tmd_parser-line_scanner.zig");
 const DocDumper = @import("tmd_parser-doc_dumper.zig");
+const DocVerifier = @import("tmd_parser-doc_verifier.zig");
 const DocParser = @import("tmd_parser-doc_parser.zig");
 
 pub const trim_blanks = LineScanner.trim_blanks;
@@ -63,6 +64,7 @@ pub fn parse_tmd_doc(tmdData: []const u8, allocator: mem.Allocator) !tmd.Doc {
     try docParser.parseAll();
 
     DocDumper.dumpTmdDoc(&tmdDoc);
+    DocVerifier.verifyTmdDoc(&tmdDoc);
 
     return tmdDoc;
 }

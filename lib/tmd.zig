@@ -212,8 +212,8 @@ pub const MaxBlockNestingDepth = 64; // should be 2^N
 pub const BlockNestingDepthType = u6; // must be capable of storing MaxBlockNestingDepth-1
 
 pub const Block = struct {
-    index: u32 = undefined, // one basedd (for debug purpose only)
-    nestingDepth: u32 = 0,
+    index: u32 = undefined, // one basedd (for debug purpose only, ToDo: voidOr(u32))
+    nestingDepth: u32 = 0, // ToDo: can be of BlockNestingDepthType and put in .more
 
     blockType: BlockType,
 

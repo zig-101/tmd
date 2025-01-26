@@ -145,4 +145,8 @@ test "span contents" {
         \\ \\ xyz %%
         \\hello ** world
     ), "bar--%%foo**xyz hello world");
+
+    try std.testing.expectEqualStrings(try spanChecker.contentOfFirstSpanOfType(null,
+        \\^*** bbb ** ccc ^***
+    ), "bbb ** ccc ^");
 }

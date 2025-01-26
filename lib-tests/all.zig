@@ -2,7 +2,9 @@ test {
     _ = @import("line_end_spacing.zig");
     _ = @import("line_end_types.zig");
     _ = @import("block_types.zig");
+    _ = @import("block_nesting.zig");
     _ = @import("span_contents.zig");
+    _ = @import("span_marks.zig");
     _ = @import("block_attributes.zig");
     _ = @import("link_matching.zig");
 }
