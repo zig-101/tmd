@@ -82,8 +82,8 @@ pub fn main() !void {
 
         // parse file
 
-        var tmdDoc = try tmd.parser.parse_tmd_doc(tmdContent, fbaAllocator);
-        // defer tmd.parser.destroy_tmd_doc(&tmdDoc, fbaAllocator); // if fba, then this is actually not necessary.
+        var tmdDoc = try tmd.parse_tmd(tmdContent, fbaAllocator);
+        // defer tmd.destroy_doc(&tmdDoc, fbaAllocator); // if fba, then this is actually not necessary.
 
         // render file
 
@@ -107,7 +107,7 @@ pub fn main() !void {
         const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
         defer fbaAllocator.free(renderBuffer);
         var fbs = std.io.fixedBufferStream(renderBuffer);
-        try tmd.render.tmd_to_html(&tmdDoc, fbs.writer(), option_full_html, option_support_custom_blocks, "", gpaAllocator);
+        try tmd.doc_to_html(&tmdDoc, fbs.writer(), option_full_html, option_support_custom_blocks, "", gpaAllocator);
 
         // write file
 

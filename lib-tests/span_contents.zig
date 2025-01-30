@@ -11,8 +11,8 @@ test "span contents" {
         fn contentOfFirstSpanOfType(self: *@This(), spanType: ?tmd.SpanMarkType, data: []const u8) ![]const u8 {
             self.* = .{ .opening = spanType == null };
 
-            var doc = try tmd.parser.parse_tmd_doc(data, std.testing.allocator);
-            defer tmd.parser.destroy_tmd_doc(&doc, std.testing.allocator);
+            var doc = try tmd.parse_tmd(data, std.testing.allocator);
+            defer tmd.destroy_doc(&doc, std.testing.allocator);
 
             var block = doc.rootBlock();
             const contentBlock = while (block.next()) |nextBlock| {

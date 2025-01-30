@@ -3,8 +3,9 @@
 
 pub const version = @import("version.zig").version;
 
-pub const parser = @import("tmd_parser.zig");
-pub const render = @import("tmd_to_html.zig");
+pub const destroy_doc = @import("tmd_to_doc.zig").destroy_tmd_doc;
+pub const parse_tmd = @import("tmd_to_doc.zig").parse_tmd_doc;
+pub const doc_to_html = @import("doc_to_html.zig").tmd_to_html;
 
 // The above two sub-namespaces and the following pub declartions
 // in the current namespace are visible to the "tmd" module users.

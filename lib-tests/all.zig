@@ -69,8 +69,8 @@ test "Buffer" {
 
 pub const DocChecker = struct {
     pub fn check(data: []const u8, checkFn: fn (*const tmd.Doc) anyerror!bool) !bool {
-        var doc = try tmd.parser.parse_tmd_doc(data, std.testing.allocator);
-        defer tmd.parser.destroy_tmd_doc(&doc, std.testing.allocator);
+        var doc = try tmd.parse_tmd(data, std.testing.allocator);
+        defer tmd.destroy_doc(&doc, std.testing.allocator);
 
         return checkFn(&doc);
     }
@@ -98,13 +98,13 @@ test "DocChecker" {
 
 pub const RenderChecker = struct {
     pub fn check(data: []const u8, completeHTML: bool, v: anytype) !bool {
-        var doc = try tmd.parser.parse_tmd_doc(data, std.testing.allocator);
-        defer tmd.parser.destroy_tmd_doc(&doc, std.testing.allocator);
+        var doc = try tmd.parse_tmd(data, std.testing.allocator);
+        defer tmd.destroy_doc(&doc, std.testing.allocator);
 
         var buf = try std.ArrayList(u8).initCapacity(std.testing.allocator, 1 << 20);
         defer buf.deinit();
 
-        try tmd.render.tmd_to_html(&doc, buf.writer(), completeHTML, true, "", std.testing.allocator);
+        try tmd.doc_to_html(&doc, buf.writer(), completeHTML, true, "", std.testing.allocator);
         const html = buf.items;
 
         return v.checkFn(html);

@@ -4,8 +4,8 @@ const tmd = @import("tmd");
 test "block nesting depths" {
     const BlockNestingDepthChecker = struct {
         fn check(data: []const u8, expectedNestingDepths: []const u32) !bool {
-            var doc = try tmd.parser.parse_tmd_doc(data, std.testing.allocator);
-            defer tmd.parser.destroy_tmd_doc(&doc, std.testing.allocator);
+            var doc = try tmd.parse_tmd(data, std.testing.allocator);
+            defer tmd.destroy_doc(&doc, std.testing.allocator);
 
             const lastBlock = doc.blockByID("bar") orelse &doc.blocks.tail.?.value;
             var block = doc.blockByID("foo") orelse doc.rootBlock();

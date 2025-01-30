@@ -179,8 +179,7 @@ Within a parent base block,
 Code and custom data blocks are explicitly defined by start and end boundary lines.
 The lines between the boundary lines of a custom data block are referred to as %%**data lines**%%.
 Similarly, the lines between the boundary lines of a code block are called %%**code lines**%%.
-In essence, code blocks can be viewed as a type of custom data block,
-making code lines a subset of data lines.
+In essence, code blocks can be viewed as a type of data block, making code lines a subset of data lines.
 
 Data lines are guaranteed to contain no TapirMD marks.
 Non-data lines, which may or may not contain TapirMD marks,

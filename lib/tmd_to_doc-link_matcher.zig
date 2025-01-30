@@ -5,9 +5,9 @@ const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 
-const AttributeParser = @import("tmd_parser-attribute_parser.zig");
-const LineScanner = @import("tmd_parser-line_scanner.zig");
-const DocParser = @import("tmd_parser-doc_parser.zig");
+const AttributeParser = @import("tmd_to_doc-attribute_parser.zig");
+const LineScanner = @import("tmd_to_doc-line_scanner.zig");
+const DocParser = @import("tmd_to_doc-doc_parser.zig");
 
 const LinkMatcher = @This();
 

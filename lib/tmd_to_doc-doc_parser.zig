@@ -5,11 +5,11 @@ const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 
-const BlockArranger = @import("tmd_parser-block_manager.zig");
-const ContentParser = @import("tmd_parser-content_parser.zig");
-const LineScanner = @import("tmd_parser-line_scanner.zig");
-const AttributeParser = @import("tmd_parser-attribute_parser.zig");
-const LinkMatcher = @import("tmd_parser-link_matcher.zig");
+const BlockArranger = @import("tmd_to_doc-block_manager.zig");
+const ContentParser = @import("tmd_to_doc-content_parser.zig");
+const LineScanner = @import("tmd_to_doc-line_scanner.zig");
+const AttributeParser = @import("tmd_to_doc-attribute_parser.zig");
+const LinkMatcher = @import("tmd_to_doc-link_matcher.zig");
 
 const DocParser = @This();
 

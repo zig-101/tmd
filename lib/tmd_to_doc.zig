@@ -6,11 +6,11 @@ const tmd = @import("tmd.zig");
 const list = @import("list.zig");
 const tree = @import("tree.zig");
 
-const AttributeParser = @import("tmd_parser-attribute_parser.zig");
-const LineScanner = @import("tmd_parser-line_scanner.zig");
-const DocDumper = @import("tmd_parser-doc_dumper.zig");
-const DocVerifier = @import("tmd_parser-doc_verifier.zig");
-const DocParser = @import("tmd_parser-doc_parser.zig");
+const AttributeParser = @import("tmd_to_doc-attribute_parser.zig");
+const LineScanner = @import("tmd_to_doc-line_scanner.zig");
+const DocDumper = @import("tmd_to_doc-doc_dumper.zig");
+const DocVerifier = @import("tmd_to_doc-doc_verifier.zig");
+const DocParser = @import("tmd_to_doc-doc_parser.zig");
 
 pub const trim_blanks = LineScanner.trim_blanks;
 pub const parse_custom_block_open_playload = AttributeParser.parse_custom_block_open_playload;

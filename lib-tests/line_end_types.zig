@@ -4,8 +4,8 @@ const tmd = @import("tmd");
 test "line end type" {
     const LineEndTypeChecker = struct {
         fn check(data: []const u8, expectedLineEnds: []const tmd.Line.EndType) !bool {
-            var doc = try tmd.parser.parse_tmd_doc(data, std.testing.allocator);
-            defer tmd.parser.destroy_tmd_doc(&doc, std.testing.allocator);
+            var doc = try tmd.parse_tmd(data, std.testing.allocator);
+            defer tmd.destroy_doc(&doc, std.testing.allocator);
 
             var line = doc.firstLine() orelse {
                 if (expectedLineEnds.len > 0) return error.TooFewLines;
