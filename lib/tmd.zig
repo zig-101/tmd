@@ -1,14 +1,7 @@
-//! This module provides functions for parse tmd files (as tmd.Doc),
-//! and functions for rendering (tmd.Doc) to HTML.
+//! This module provides functions for parse tmd files (as Doc),
+//! and functions for rendering (Doc) to HTML.
 
 pub const version = @import("version.zig").version;
-
-pub const destroy_doc = @import("tmd_to_doc.zig").destroy_tmd_doc;
-pub const parse_tmd = @import("tmd_to_doc.zig").parse_tmd_doc;
-pub const doc_to_html = @import("doc_to_html.zig").tmd_to_html;
-
-// The above two sub-namespaces and the following pub declartions
-// in the current namespace are visible to the "tmd" module users.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -19,6 +12,8 @@ pub const DocSize = u28; // max 256M (in practice, most TMD doc sizes < 1M)
 pub const MaxDocSize: u32 = 1 << @bitSizeOf(DocSize) - 1;
 
 pub const Doc = struct {
+    allocator: std.mem.Allocator = undefined,
+
     data: []const u8,
     blocks: list.List(Block) = .{},
     lines: list.List(Line) = .{},
@@ -46,6 +41,46 @@ pub const Doc = struct {
     _contentStreamAttributes: list.List(ContentStreamAttributes) = .{}, // ToDo: use SinglyLinkedList
 
     const BlockRedBlack = tree.RedBlack(*Block, Block);
+
+    pub fn parse(tmdData: []const u8, allocator: std.mem.Allocator) !Doc {
+        return try @import("tmd_to_doc.zig").parse_tmd(tmdData, allocator);
+    }
+
+    pub fn destroy(doc: *Doc) void {
+        list.destroyListElements(Block, doc.blocks, null, doc.allocator);
+
+        const T = struct {
+            fn destroyLineTokens(line: *Line, a: std.mem.Allocator) void {
+                //if (line.tokens()) |tokens| {
+                //    list.destroyListElements(Token, tokens.*, null, a);
+                //}
+                list.destroyListElements(Token, line.tokens, null, a);
+            }
+        };
+
+        list.destroyListElements(Line, doc.lines, T.destroyLineTokens, doc.allocator);
+
+        list.destroyListElements(ElementAttibutes, doc._elementAttributes, null, doc.allocator);
+        list.destroyListElements(BaseBlockAttibutes, doc._baseBlockAttibutes, null, doc.allocator);
+        list.destroyListElements(CodeBlockAttibutes, doc._codeBlockAttibutes, null, doc.allocator);
+        list.destroyListElements(CustomBlockAttibutes, doc._customBlockAttibutes, null, doc.allocator);
+        list.destroyListElements(ContentStreamAttributes, doc._contentStreamAttributes, null, doc.allocator);
+
+        list.destroyListElements(BlockRedBlack.Node, doc._blockTreeNodes, null, doc.allocator);
+
+        list.destroyListElements(Link, doc.links, null, doc.allocator);
+        list.destroyListElements(*Block, doc.tocHeaders, null, doc.allocator);
+
+        doc.* = .{ .data = "" };
+    }
+
+    pub fn toHTML(doc: *const Doc, writer: anytype, completeHTML: bool, supportCustomBlocks: bool, suffixForIdsAndNames: []const u8, allocator: std.mem.Allocator) !void {
+        try @import("doc_to_html.zig").doc_to_html(writer, doc, completeHTML, supportCustomBlocks, suffixForIdsAndNames, allocator);
+    }
+
+    pub fn toTMD(doc: *const Doc, writer: anytype, comptime format: bool) !void {
+        try @import("doc_to_tmd.zig").doc_to_tmd(writer, doc, format);
+    }
 
     // A doc always has a root block. And the root
     // block is always the first block of the doc.
@@ -410,7 +445,7 @@ pub const Block = struct {
         while (true) {
             switch (child.blockType) {
                 .attributes => {
-                    child = if (child.nextSibling()) |sibling| sibling else break;
+                    child = child.nextSibling() orelse break;
                     continue;
                 },
                 .header => |header| if (header.level(tmdData) == 1) return child else break,
@@ -572,7 +607,7 @@ pub const BlockType = union(enum) {
         endLine: *Line = undefined,
 
         // ToDo: when false, no need to render.
-        //       So a block with a singal ` will outout nothing.
+        //       So a block with a singal ` will output nothing.
         //       Maybe needless with .blankSpan.
         // hasContent: bool = false,
 
@@ -736,10 +771,12 @@ pub const Line = struct {
         }
     };
 
-    index: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
-    atomBlockIndex: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
+    _index: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
 
-    startAt: voidOr(DocSize) = undefined,
+    // Every line should belong to an atom block, except base block boundary lines.
+    _atomBlockIndex: voidOr(u32) = undefined, // one based (for debug purpose only) ToDo: voidOf(u32)
+
+    _startAt: voidOr(DocSize) = undefined, //
 
     // ToDo: it looks packing the following 6 fields doesn't reduce size at all.
     //       They use totally 91 bits, so 12 bytes (96 bits) are sufficient.
@@ -860,12 +897,13 @@ pub const Line = struct {
         return null;
     }
 
+    // Same as start(.none).
     fn startPos(self: *const @This()) DocSize {
-        if (builtin.mode == .Debug) return self.startAt.value();
+        if (builtin.mode == .Debug) return self._startAt.value();
         return if (self.prev()) |prevLine| prevLine.endAt else 0;
     }
 
-    pub fn start(self: *const @This(), trimOption: enum { none, trimContainerMark, trimLeadingSpaces }) DocSize {
+    pub fn start(self: *const @This(), trimOption: enum { none, trimLeadingSpaces, trimContainerMark }) DocSize {
         switch (trimOption) {
             .none => return self.startPos(),
             .trimLeadingSpaces => return self.prefixBlankEnd,

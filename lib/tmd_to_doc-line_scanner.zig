@@ -351,6 +351,14 @@ test "LineScanner" {
 
 //===========================
 
+pub fn are_all_blanks(str: []const u8) bool {
+    for (str) |c| {
+        if (bytesKindTable[c].isBlank()) continue;
+        return false;
+    }
+    return true;
+}
+
 pub fn trim_blanks(str: []const u8) []const u8 {
     var i: usize = 0;
     while (i < str.len and bytesKindTable[str[i]].isBlank()) : (i += 1) {}

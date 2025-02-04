@@ -1,5 +1,4 @@
 const std = @import("std");
-const mem = std.mem;
 const builtin = @import("builtin");
 
 const tmd = @import("tmd.zig");
@@ -17,7 +16,7 @@ const Footnote = struct {
     block: ?*tmd.Block = undefined,
 
     pub fn compare(x: *const @This(), y: *const @This()) isize {
-        return switch (mem.order(u8, x.id, y.id)) {
+        return switch (std.mem.order(u8, x.id, y.id)) {
             .lt => -1,
             .gt => 1,
             .eq => 0,
@@ -45,11 +44,11 @@ pub const TmdRender = struct {
     footnotesByID: FootnoteRedBlack.Tree = .{}, // ToDo: use PatriciaTree to get a better performance
     footnoteNodes: list.List(FootnoteRedBlack.Node) = .{}, // for destroying
 
-    allocator: mem.Allocator,
+    allocator: std.mem.Allocator,
 
     fn cleanup(self: *TmdRender) void {
         const T = struct {
-            fn destroyFootnoteNode(node: *FootnoteRedBlack.Node, a: mem.Allocator) void {
+            fn destroyFootnoteNode(node: *FootnoteRedBlack.Node, a: std.mem.Allocator) void {
                 a.destroy(node.value);
             }
         };
@@ -101,17 +100,13 @@ pub const TmdRender = struct {
         };
         self.footnotesByID.init(&nilFootnoteTreeNode);
 
-        if (self.doc.blocks.head) |blockElement| {
-            const rootBlock = &blockElement.value;
-            std.debug.assert(rootBlock.blockType == .root);
-
-            if (renderRoot) {
-                try self.renderBlock(w, rootBlock); // will call writeFootnotes
-            } else {
-                try self.renderBlockChildren(w, rootBlock.firstChild());
-                try self.writeFootnotes(w);
-            }
-        } else unreachable;
+        const rootBlock = self.doc.rootBlock();
+        if (renderRoot) {
+            try self.renderBlock(w, rootBlock); // will call writeFootnotes
+        } else {
+            try self.renderBlockChildren(w, rootBlock.firstChild());
+            try self.writeFootnotes(w);
+        }
     }
 
     fn renderBlock(self: *TmdRender, w: anytype, block: *const tmd.Block) anyerror!void {
@@ -498,7 +493,7 @@ pub const TmdRender = struct {
         var child = firstChild orelse return;
         while (true) {
             try self.renderBlock(w, child);
-            child = if (child.nextSibling()) |sibling| sibling else break;
+            child = child.nextSibling() orelse break;
         }
     }
 
@@ -964,7 +959,7 @@ pub const TmdRender = struct {
         var child = parentBlock.firstChild() orelse return;
         while (true) {
             try self.renderTmdCode(w, child, false);
-            child = if (child.nextSibling()) |sibling| sibling else break;
+            child = child.nextSibling() orelse break;
         }
     }
 

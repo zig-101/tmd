@@ -1,5 +1,4 @@
 const std = @import("std");
-const mem = std.mem;
 
 const tmd = @import("tmd.zig");
 
@@ -58,7 +57,7 @@ pub fn writeClasses(w: anytype, classesSeperatedBySpace: []const u8, classesSepe
     var needSpace = classesSeperatedBySpace.len > 0;
     if (needSpace) _ = try w.write(classesSeperatedBySpace);
     if (classesSeperatedBySemicolon.len > 0) {
-        var it = mem.splitAny(u8, classesSeperatedBySemicolon, ";");
+        var it = std.mem.splitAny(u8, classesSeperatedBySemicolon, ";");
         var item = it.first();
         while (true) {
             if (item.len != 0) {

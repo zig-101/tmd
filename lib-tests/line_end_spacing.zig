@@ -4,8 +4,8 @@ const tmd = @import("tmd");
 test "line end spacing" {
     const LineEndSpacingChecker = struct {
         fn check(data: []const u8) !bool {
-            var doc = try tmd.parse_tmd(data, std.testing.allocator);
-            defer tmd.destroy_doc(&doc, std.testing.allocator);
+            var doc = try tmd.Doc.parse(data, std.testing.allocator);
+            defer doc.destroy();
 
             if (doc.lines.head) |le| {
                 if (doc.lines.tail.?.value.treatEndAsSpace) {

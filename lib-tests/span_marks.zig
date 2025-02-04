@@ -4,8 +4,8 @@ const tmd = @import("tmd");
 test "span marks" {
     const SpanMarksChecker = struct {
         fn check(data: []const u8, expectedSpanMarkTypes: []const tmd.SpanMarkType) !bool {
-            var doc = try tmd.parse_tmd(data, std.testing.allocator);
-            defer tmd.destroy_doc(&doc, std.testing.allocator);
+            var doc = try tmd.Doc.parse(data, std.testing.allocator);
+            defer doc.destroy();
 
             var block = doc.rootBlock();
             const contentBlock = while (block.next()) |nextBlock| {

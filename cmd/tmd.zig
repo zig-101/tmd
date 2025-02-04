@@ -14,20 +14,50 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const gpaAllocator = gpa.allocator();
 
-    const buffer = try gpaAllocator.alloc(u8, bufferSize);
-    defer gpaAllocator.free(buffer);
-    var fba = std.heap.FixedBufferAllocator.init(buffer);
-
     const args = try std.process.argsAlloc(gpaAllocator);
     defer std.process.argsFree(gpaAllocator, args);
 
     std.debug.assert(args.len > 0);
 
-    if (args.len <= 1) try printUsages(0);
+    if (args.len <= 1) {
+        try printUsages();
+        std.process.exit(0);
+        unreachable;
+    }
 
-    if (std.mem.eql(u8, args[1], "render")) {} else try printUsages(1);
+    if (std.mem.eql(u8, args[1], "gen")) {
+        std.process.exit(try generate(args[2..], gpaAllocator));
+        unreachable;
+    }
 
-    if (args.len == 2) {
+    if (std.mem.eql(u8, args[1], "fmt")) {
+        std.process.exit(try format(args[2..], gpaAllocator));
+        unreachable;
+    }
+
+    try printUsages();
+    std.process.exit(1);
+    unreachable;
+}
+
+// "toolset" is better than "toolkit" here?
+// https://www.difference.wiki/toolset-vs-toolkit/
+fn printUsages() !void {
+    try stdout.print(
+        \\TapirMD toolset v{s}
+        \\
+        \\Usages:
+        \\  tmd gen [--full-html] TMD-files...
+        \\
+    , .{tmd.version});
+}
+
+fn generate(args: []const []const u8, allocator: std.mem.Allocator) !u8 {
+    const buffer = try allocator.alloc(u8, bufferSize);
+    defer allocator.free(buffer);
+    var fba = std.heap.FixedBufferAllocator.init(buffer);
+
+    if (args.len == 0) {
         try stderr.print("No tmd files specified.", .{});
         std.process.exit(1);
     }
@@ -36,7 +66,7 @@ pub fn main() !void {
     var option_full_html = false;
     var option_support_custom_blocks = false;
 
-    for (args[2..]) |arg| {
+    for (args) |arg| {
 
         // ToDo: improve ...
         if (std.mem.startsWith(u8, arg, "--")) blk: {
@@ -69,7 +99,8 @@ pub fn main() !void {
         }
 
         const tmdContent = buffer[bufferSize - stat.size ..];
-        const remainingBuffer = buffer[0 .. bufferSize - maxInFileSize];
+        //const remainingBuffer = buffer[0 .. bufferSize - maxInFileSize];
+        const remainingBuffer = buffer[0 .. bufferSize - stat.size];
 
         const readSize = try tmdFile.readAll(tmdContent);
         if (stat.size != readSize) {
@@ -82,15 +113,15 @@ pub fn main() !void {
 
         // parse file
 
-        var tmdDoc = try tmd.parse_tmd(tmdContent, fbaAllocator);
-        // defer tmd.destroy_doc(&tmdDoc, fbaAllocator); // if fba, then this is actually not necessary.
+        var tmdDoc = try tmd.Doc.parse(tmdContent, fbaAllocator);
+        // defer tmdDoc.destroy(); // if fba, then this is actually not necessary.
 
-        // render file
+        // generate file
 
         const htmlExt = ".html";
         const tmdExt = ".tmd";
         var outputFilePath: [1024]u8 = undefined;
-        var outputFilename: []u8 = undefined;
+        var outputFilename: []const u8 = undefined;
         if (std.ascii.endsWithIgnoreCase(arg, tmdExt)) {
             if (arg.len - tmdExt.len + htmlExt.len > outputFilePath.len)
                 return error.InputFileNameTooLong;
@@ -107,7 +138,7 @@ pub fn main() !void {
         const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
         defer fbaAllocator.free(renderBuffer);
         var fbs = std.io.fixedBufferStream(renderBuffer);
-        try tmd.doc_to_html(&tmdDoc, fbs.writer(), option_full_html, option_support_custom_blocks, "", gpaAllocator);
+        try tmdDoc.toHTML(fbs.writer(), option_full_html, option_support_custom_blocks, "", allocator);
 
         // write file
 
@@ -122,17 +153,83 @@ pub fn main() !void {
             \\
         , .{ arg, stat.size, outputFilename, fbs.getWritten().len });
     }
+
+    return 0;
 }
 
-// "toolset" is better than "toolkit" here?
-// https://www.difference.wiki/toolset-vs-toolkit/
-fn printUsages(exitCode: u8) !void {
-    try stdout.print(
-        \\TapirMD toolset v{s}
-        \\
-        \\Usages:
-        \\  tmd render [--full-html] TMD-files...
-        \\
-    , .{tmd.version});
-    std.process.exit(exitCode);
+fn format(args: []const []const u8, allocator: std.mem.Allocator) !u8 {
+    const buffer = try allocator.alloc(u8, bufferSize);
+    defer allocator.free(buffer);
+    var fba = std.heap.FixedBufferAllocator.init(buffer);
+
+    if (args.len == 0) {
+        try stderr.print("No tmd files specified.", .{});
+        std.process.exit(1);
+    }
+
+    for (args) |arg| {
+        // load file
+
+        const tmdContent, const remainingBuffer = readFile: {
+            const tmdFile = try std.fs.cwd().openFile(arg, .{});
+            defer tmdFile.close();
+            const stat = try tmdFile.stat();
+            if (stat.kind != .file) {
+                try stderr.print("[{s}] is not a file.\n", .{arg});
+                continue;
+            }
+            if (stat.size > maxInFileSize) {
+                try stderr.print("[{s}] size is too large ({} > {}).\n", .{ arg, stat.size, maxInFileSize });
+                continue;
+            }
+
+            const tmdContent = buffer[bufferSize - stat.size ..];
+
+            std.debug.assert(tmdContent.len == stat.size);
+
+            //const remainingBuffer = buffer[0 .. bufferSize - maxInFileSize];
+            const remainingBuffer = buffer[0 .. bufferSize - tmdContent.len];
+
+            const readSize = try tmdFile.readAll(tmdContent);
+            if (tmdContent.len != readSize) {
+                try stderr.print("[{s}] read size not match ({} != {}).\n", .{ arg, tmdContent.len, readSize });
+                continue;
+            }
+
+            break :readFile .{ tmdContent, remainingBuffer };
+        };
+
+        defer fba.reset();
+        const fbaAllocator = fba.allocator();
+
+        // parse file
+
+        var tmdDoc = try tmd.Doc.parse(tmdContent, fbaAllocator);
+        // defer tmdDoc.destroy(); // if fba, then this is actually not necessary.
+
+        // write file
+
+        const outputFilename: []const u8 = arg;
+
+        const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
+        defer fbaAllocator.free(renderBuffer);
+        var fbs = std.io.fixedBufferStream(renderBuffer);
+
+        try tmdDoc.toTMD(fbs.writer(), true);
+
+        // write file
+
+        const newContent = fbs.getWritten();
+        if (!std.mem.eql(u8, tmdContent, newContent)) {
+            const tmdFile = try std.fs.cwd().createFile(outputFilename, .{});
+            defer tmdFile.close();
+            try tmdFile.writeAll(newContent);
+            try stdout.print(
+                \\{s}
+                \\
+            , .{outputFilename});
+        }
+    }
+
+    return 0;
 }

@@ -4,8 +4,8 @@ const tmd = @import("tmd");
 test "block types" {
     const BlockTypeChecker = struct {
         fn check(data: []const u8, expectedBlockTypes: []const std.meta.Tag(tmd.BlockType)) !bool {
-            var doc = try tmd.parse_tmd(data, std.testing.allocator);
-            defer tmd.destroy_doc(&doc, std.testing.allocator);
+            var doc = try tmd.Doc.parse(data, std.testing.allocator);
+            defer doc.destroy();
 
             var block = doc.rootBlock();
             for (expectedBlockTypes) |expected| {

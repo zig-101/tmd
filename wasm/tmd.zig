@@ -31,8 +31,8 @@ export fn get_version() isize {
 }
 
 export fn tmd_to_html(fullHtmlPage: bool, supportCustomBlocks: bool) isize {
-    const htmlWithLengthHeader = render(fullHtmlPage, supportCustomBlocks) catch |err| {
-        logMessage("render error: ", @errorName(err), @intFromError(err));
+    const htmlWithLengthHeader = generate(fullHtmlPage, supportCustomBlocks) catch |err| {
+        logMessage("generate error: ", @errorName(err), @intFromError(err));
         return -@as(i32, @intFromError(err));
     };
     return @intCast(@intFromPtr(htmlWithLengthHeader.ptr));
@@ -61,7 +61,7 @@ fn writeWersion() ![]u8 {
     return buffer;
 }
 
-fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
+fn generate(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
     if (buffer.len == 0) {
         return error.BufferNotCreatedYet;
     }
@@ -88,7 +88,7 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
 
     // parse file
 
-    var tmdDoc = try tmd.parse_tmd(tmdContent, fbaAllocator);
+    var tmdDoc = try tmd.Doc.parse(tmdContent, fbaAllocator);
 
     // render file
 
@@ -110,7 +110,7 @@ fn render(fullHtmlPage: bool, supportCustomBlocks: bool) ![]u8 {
     fbs = std.io.fixedBufferStream(renderBuffer);
     try fbs.writer().writeInt(u32, 0, .little);
 
-    try tmd.doc_to_html(&tmdDoc, fbs.writer(), fullHtmlPage, supportCustomBlocks, suffixForIdsAndNames, std.heap.wasm_allocator);
+    try tmdDoc.toHTML(fbs.writer(), fullHtmlPage, supportCustomBlocks, suffixForIdsAndNames, std.heap.wasm_allocator);
     const htmlWithLengthHeader = fbs.getWritten();
     try fbs.seekTo(0);
     try fbs.writer().writeInt(u32, htmlWithLengthHeader.len - 4, .little);

@@ -1,6 +1,4 @@
 const std = @import("std");
-const mem = std.mem;
-const ascii = std.ascii;
 
 const tmd = @import("tmd.zig");
 
@@ -99,7 +97,7 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
     //     last: []const u8,
     // } = null;
 
-    var it = mem.splitAny(u8, playload, " \t");
+    var it = std.mem.splitAny(u8, playload, " \t");
     var item = it.first();
     parse: while (true) {
         if (item.len != 0) {
@@ -234,7 +232,7 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
 
     var lastOrder: isize = -1;
 
-    var it = mem.splitAny(u8, playload, " \t");
+    var it = std.mem.splitAny(u8, playload, " \t");
     var item = it.first();
     parse: while (true) {
         if (item.len != 0) {
@@ -256,13 +254,13 @@ pub fn parse_base_block_open_playload(playload: []const u8) tmd.BaseBlockAttibut
 
                     if (item.len != 2) break;
                     if (item[1] != '>' and item[1] != '<') break;
-                    if (mem.eql(u8, item, "<<"))
+                    if (std.mem.eql(u8, item, "<<"))
                         attrs.horizontalAlign = .left
-                    else if (mem.eql(u8, item, ">>"))
+                    else if (std.mem.eql(u8, item, ">>"))
                         attrs.horizontalAlign = .right
-                    else if (mem.eql(u8, item, "><"))
+                    else if (std.mem.eql(u8, item, "><"))
                         attrs.horizontalAlign = .center
-                    else if (mem.eql(u8, item, "<>"))
+                    else if (std.mem.eql(u8, item, "<>"))
                         attrs.horizontalAlign = .justify;
                 },
                 '^' => {
@@ -391,7 +389,7 @@ pub fn parse_code_block_open_playload(playload: []const u8) tmd.CodeBlockAttibut
 
     const lastOrder: isize = -1;
 
-    var it = mem.splitAny(u8, playload, " \t");
+    var it = std.mem.splitAny(u8, playload, " \t");
     var item = it.first();
     parse: while (true) {
         if (item.len != 0) {
@@ -465,7 +463,7 @@ pub fn parse_code_block_close_playload(playload: []const u8) tmd.ContentStreamAt
     var arrowFound = false;
     var content: []const u8 = "";
 
-    var it = mem.splitAny(u8, playload, " \t");
+    var it = std.mem.splitAny(u8, playload, " \t");
     var item = it.first();
     while (true) {
         if (item.len != 0) {
@@ -522,7 +520,7 @@ pub fn parse_custom_block_open_playload(playload: []const u8) tmd.CustomBlockAtt
 
     const lastOrder: isize = -1;
 
-    var it = mem.splitAny(u8, playload, " \t");
+    var it = std.mem.splitAny(u8, playload, " \t");
     var item = it.first();
     parse: while (true) {
         if (item.len != 0) {
@@ -594,21 +592,21 @@ test "parse_custom_block_open_playload" {
 pub fn isValidLinkURL(text: []const u8) bool {
     // ToDo: more precisely and performant.
 
-    if (ascii.startsWithIgnoreCase(text, "#")) return true;
-    if (ascii.startsWithIgnoreCase(text, "http")) {
+    if (std.ascii.startsWithIgnoreCase(text, "#")) return true;
+    if (std.ascii.startsWithIgnoreCase(text, "http")) {
         const t = text[4..];
-        if (ascii.startsWithIgnoreCase(t, "s://")) return true;
-        if (ascii.startsWithIgnoreCase(t, "://")) return true;
+        if (std.ascii.startsWithIgnoreCase(t, "s://")) return true;
+        if (std.ascii.startsWithIgnoreCase(t, "://")) return true;
     }
 
-    const t = if (mem.indexOfScalar(u8, text, '#')) |k| blk: {
+    const t = if (std.mem.indexOfScalar(u8, text, '#')) |k| blk: {
         const t = text[0..k];
-        //if (ascii.endsWithIgnoreCase(t, ".tmd")) return true;
+        //if (std.ascii.endsWithIgnoreCase(t, ".tmd")) return true;
         break :blk t;
     } else text;
 
-    if (ascii.endsWithIgnoreCase(t, ".htm")) return true;
-    if (ascii.endsWithIgnoreCase(t, ".html")) return true;
+    if (std.ascii.endsWithIgnoreCase(t, ".htm")) return true;
+    if (std.ascii.endsWithIgnoreCase(t, ".html")) return true;
 
     return false;
 }
@@ -641,15 +639,15 @@ pub fn isValidMediaURL(src: []const u8) bool {
     //next: {
     //    //if (std.mem.startsWith(u8, src, "./") break :next;
     //    //if (std.mem.startsWith(u8, src, "../") break :next;
-    //    if (ascii.startsWithIgnoreCase(text, "http")) {
+    //    if (std.ascii.startsWithIgnoreCase(text, "http")) {
     //        const t = text[4..];
-    //        if (ascii.startsWithIgnoreCase(t, "s://")) break :next;
-    //        if (ascii.startsWithIgnoreCase(t, "://")) break :next;
+    //        if (std.ascii.startsWithIgnoreCase(t, "s://")) break :next;
+    //        if (std.ascii.startsWithIgnoreCase(t, "://")) break :next;
     //    }
     //}
 
     for (supportedMediaExts) |ext| {
-        if (ascii.endsWithIgnoreCase(src, ext)) return src.len > ext.len;
+        if (std.ascii.endsWithIgnoreCase(src, ext)) return src.len > ext.len;
     }
 
     return false;

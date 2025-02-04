@@ -1,5 +1,4 @@
 const std = @import("std");
-const mem = std.mem;
 const builtin = @import("builtin");
 
 const tmd = @import("tmd.zig");
@@ -193,7 +192,7 @@ fn open_span(self: *ContentParser, markType: tmd.SpanMarkType, markStart: u32, m
         };
         self.blockSession.lastLinkInfoToken = token;
 
-        var linkElement = try list.createListElement(tmd.Link, self.docParser.allocator);
+        var linkElement = try list.createListElement(tmd.Link, self.docParser.tmdDoc.allocator);
         self.docParser.tmdDoc.links.pushTail(linkElement);
         const link = &linkElement.value;
         link.* = .{

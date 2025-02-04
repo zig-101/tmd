@@ -1,11 +1,9 @@
 const std = @import("std");
-const mem = std.mem;
 
 const tmd = @import("tmd.zig");
-const render = @import("doc_to_html-render.zig");
 
-pub fn tmd_to_html(tmdDoc: *const tmd.Doc, writer: anytype, completeHTML: bool, supportCustomBlocks: bool, suffixForIdsAndNames: []const u8, allocator: mem.Allocator) !void {
-    var r = render.TmdRender{
+pub fn doc_to_html(writer: anytype, tmdDoc: *const tmd.Doc, completeHTML: bool, supportCustomBlocks: bool, suffixForIdsAndNames: []const u8, allocator: std.mem.Allocator) !void {
+    var r = @import("doc_to_html-render.zig").TmdRender{
         .doc = tmdDoc,
         .allocator = allocator,
 

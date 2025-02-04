@@ -80,13 +80,13 @@ the offcial TapirMD commands locally.
 
   *. Run
     '''
-    tmd render --full-html mydoc.tmd
+    tmd gen --full-html mydoc.tmd
     '''
     to generate a `mydoc.html` file for your TapirMD document.
-    Then you can open the `mydoc.html` file in a web browser to view the render result.
+    Then you can open the `mydoc.html` file in a web browser to view the generation result.
     ;;;
     You can also run
     '''
-    tmd render mydoc.tmd
+    tmd gen mydoc.tmd
     '''
     to geneate an incomplete HTML file for embedding purpose. 

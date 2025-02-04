@@ -1,5 +1,4 @@
 const std = @import("std");
-const mem = std.mem;
 
 const tmd = @import("tmd.zig");
 const list = @import("list.zig");
@@ -13,7 +12,7 @@ const LinkMatcher = @This();
 
 tmdData: []const u8,
 links: *list.List(tmd.Link),
-allocator: mem.Allocator,
+allocator: std.mem.Allocator,
 
 // Match link definitions.
 
@@ -145,7 +144,7 @@ const InvertedRevisedLinkText = struct {
 
 fn Patricia(comptime TextType: type) type {
     return struct {
-        allocator: mem.Allocator,
+        allocator: std.mem.Allocator,
 
         topTree: Tree = .{},
         nilNode: Node = rbtree.MakeNilNode(),
@@ -440,7 +439,7 @@ const LinkForTree = struct {
     }
 };
 
-fn destroyRevisedLinkText(link: *LinkForTree, a: mem.Allocator) void {
+fn destroyRevisedLinkText(link: *LinkForTree, a: std.mem.Allocator) void {
     a.free(link.revisedLinkText.asString());
 }
 
@@ -462,7 +461,7 @@ const Matcher = struct {
 
         // ToDo: require that the ending "..." must be amtomic?
         const ddd = "...";
-        if (mem.endsWith(u8, linkText, ddd)) {
+        if (std.mem.endsWith(u8, linkText, ddd)) {
             if (linkText.len == ddd.len) {
                 // all matching
 
@@ -481,7 +480,7 @@ const Matcher = struct {
                 }
             }
         } else {
-            if (mem.startsWith(u8, linkText, ddd)) {
+            if (std.mem.startsWith(u8, linkText, ddd)) {
                 // suffix matching
 
                 const revisedLinkText = linkDef.revisedLinkText.suffix(@intCast(ddd.len));
@@ -560,7 +559,7 @@ pub fn matchLinks(self: *const LinkMatcher) !void {
                     //std.debug.print("self defined url: {s}\n", .{str});
                     linkInfo.setSourceOfURL(lastToken, true);
 
-                    if (lastToken == firstTextToken and mem.startsWith(u8, str, "#") and !mem.startsWith(u8, str[1..], "#")) {
+                    if (lastToken == firstTextToken and std.mem.startsWith(u8, str, "#") and !std.mem.startsWith(u8, str[1..], "#")) {
                         linkInfo.setFootnote(true);
                     }
 

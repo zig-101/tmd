@@ -10,10 +10,8 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
     if (!config.dump_ast) return;
     std.debug.assert(builtin.mode == .Debug);
 
-    var blockElement = tmdDoc.blocks.head;
-    while (blockElement) |be| {
-        defer blockElement = be.next;
-        const block = &be.value;
+    var block = tmdDoc.rootBlock();
+    while (true) {
         {
             var depth = block.nestingDepth;
             while (depth > 0) : (depth -= 1) {
@@ -59,8 +57,8 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                     std.debug.print("  ", .{});
                 }
                 std.debug.print("- L{} @{}: <{s}> ({}..{}) ({}..{}) ({}..{}) <{s}> {}\n", .{
-                    line.index.value(),
-                    line.atomBlockIndex.value(),
+                    line._index.value(),
+                    line._atomBlockIndex.value(),
                     line.typeName(),
                     line.prefixBlankEnd - line.start(.none) + 1,
                     line.suffixBlankStart - line.start(.none) + 1,
@@ -168,5 +166,6 @@ pub fn dumpTmdDoc(tmdDoc: *const tmd.Doc) void {
                 } else unreachable; // should always break from above
             }
         }
+        block = block.next() orelse break;
     }
 }

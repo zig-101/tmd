@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) !void {
     const websitePagesPath = b.path("doc/pages");
 
     buildWebsiteCommand.setCwd(websitePagesPath);
-    buildWebsiteCommand.addArg("render");
+    buildWebsiteCommand.addArg("gen");
     buildWebsiteCommand.addArg("--full-html");
     buildWebsiteCommand.addArg("--support-custom-blocks");
 
