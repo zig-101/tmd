@@ -94,24 +94,20 @@ const UnchangeWriter = struct {
 //
 // Code/data blocks inner lines should be kept as is.
 //
-// Header lines in a header block keep relative alignments.
+// Usual lines in header blocks aligned with the end of ### mark.
+//
+// Blank lines should be empty.
 //
 // All lines of other atom blocks should be left aligned.
 // And they are right trimmed.
 //
-// Blank lines should be empty.
-//
-// Base blocks don't increase indentation.
+// Base blocks don't increase indentation, except for those have only one attribute child.
 //
 // Container blocks increase 3-space indentation.
 //
-// Container mark token lengths should be formatted to 3.
+// Container mark token lengths should be formatted to 3 if not bare.
 //
 // @@@ ;;; ###, are always followed by one space if not bare.
-//
-// Generally, base childeren of base blocks have not relative indentation.
-// However, if a base only contains an attribute code,
-// then that attribute code is indented.
 //
 
 fn doc_to_tmd_with_formatting(writer: anytype, tmdDoc: *const tmd.Doc) !void {
@@ -218,6 +214,8 @@ const FormatWriter = struct {
         const mark = token.*.containerMark;
         _ = try w.write(fw.indentSpaces());
         _ = try w.write(fw.data(mark.start, mark.start + mark.more.markLen));
+        if (mark.blankLen == 0) return;
+
         switch (mark.more.markLen) {
             1 => _ = try w.write("  "),
             2 => _ = try w.write(" "),
@@ -240,7 +238,7 @@ const FormatWriter = struct {
                     }
                 }
 
-                const lineEnd = line.end(.trimLineEnd);
+                const lineEnd = line.end(.trimTrailingSpaces);
                 const remainingStart = if (line.lineTypeMarkToken()) |token| blk: {
                     const mark = token.*.lineTypeMark;
                     _ = try w.write(fw.data(mark.start, mark.start + mark.markLen));
