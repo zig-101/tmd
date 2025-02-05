@@ -10,29 +10,30 @@ __the specification``specification.html__.
 @@@ #note-enable-js
 %%(Note: This page needs JavaScript to function.)
 
-* ### Edit
-  """html
+*  ### Edit
+   """ html
 <textarea id="tmd-source" rows="22" style="width: 100%; border: 1px solid #c7923c; background: #fddaa1;"></textarea>
-  """
+   """
 
-* @@@ #effect-tab
-  ### Render Effect
-  @@@ #render-effect
-  {
-  }
-  
-* @@@ #html-tab
-  ### Result HTML
-  @@@ #result-html .tmd-auto-wrap
-  '''
-  '''
+*  @@@ #effect-tab
+   ### Render Effect
+   @@@ #render-effect
+   {
+   }
+
+*  @@@ #html-tab
+   ### Result HTML
+   @@@ #result-html .tmd-auto-wrap
+   '''
+   '''
 
 
-"""html
+""" html
 <script>
 let buffer_offset = null;
 let get_version = null;
 let tmd_to_html = null;
+let tmd_format = null;
 let memory = null;
 
 let lastTmdData = "";
@@ -108,7 +109,7 @@ function tmdToHTML() {
 	
 	const versionBytes = new Uint8Array(memory.buffer, versionOffset+4, versionLength);
 	const version = new TextDecoder().decode(versionBytes);
-	console.log("version:", version);
+	//console.log("version:", version);
 
 	// write input data and get output data
 	
@@ -143,6 +144,32 @@ function tmdToHTML() {
 
 	//console.log("elapsed time (prepare input): ", new Date() - startTime); startTime = new Date();
 	
+	// format TMD
+
+	const formatOffset = tmd_format();
+	//console.log("formatOffset=", formatOffset);
+	if (formatOffset < 0) {
+		//console.log("bad formatOffset:", formatOffset);
+		setRenderEffect("bad formatOffset: " + formatOffset, false);
+		return;
+	}
+
+	//console.log("elapsed time (tmd_format):", new Date() - startTime); startTime = new Date();
+
+	const formatView = new DataView(memory.buffer, formatOffset);
+	const formatLength = formatView.getUint32(0, true);
+	//console.log("formatLength:", formatLength);
+	if (formatLength > 0) {
+		const formatBytes = new Uint8Array(memory.buffer, formatOffset+4, formatLength);
+		const format = new TextDecoder().decode(formatBytes);
+		//console.log("format:", format);
+		inputTextArea.value = format;
+	}
+
+	//console.log("elapsed time (decode format):", new Date() - startTime); startTime = new Date();
+
+	// generate HTML
+
 	const outputOffset = tmd_to_html(false, false);
 	if (outputOffset < 0) {
 		//console.log("bad outputOffset:", outputOffset);
@@ -153,7 +180,6 @@ function tmdToHTML() {
 	//console.log("elapsed time (tmd_to_html):", new Date() - startTime); startTime = new Date();
 	
 	const outputView = new DataView(memory.buffer, outputOffset);
-	
 	const outputLength = outputView.getUint32(0, true);
 	//console.log("outputLength:", outputLength);
 	
@@ -208,6 +234,7 @@ function loadWasm() {
 					buffer_offset = instance.exports.buffer_offset;
 					get_version = instance.exports.get_version;
 					tmd_to_html = instance.exports.tmd_to_html;
+					tmd_format = instance.exports.tmd_format;
 				});
 			}
 		};

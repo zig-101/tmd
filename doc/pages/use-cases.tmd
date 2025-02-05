@@ -1,48 +1,48 @@
 ##### TapirMD Use Cases
 
-! {><
-  :: The page is written in TapirMD (source is available __here__).
-  }
-  // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/use-cases.tmd
+!  { ><
+   :: The page is written in TapirMD (source is available __here__).
+   }
+   // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/use-cases.tmd
 
 This page lists some use cases of __TapirMD__.
 
-  // __TapirMD:: index.html
+// __TapirMD:: index.html
 
-* __All pages__ of the TapirMD official website are written in TapirMD.
-  // __All pages:: https://github.com/zig-101/tmd/tree/master/doc/pages
+*  __All pages__ of the TapirMD official website are written in TapirMD.
+   // __All pages:: https://github.com/zig-101/tmd/tree/master/doc/pages
 
-* __Go101.org__ leverages TapirMD for much of its content.
-  Here are the current TapirMD-written sections:
-  // __Go101.org:: https://go101.org
-  + __ Go 101 Blog
+*  __Go101.org__ leverages TapirMD for much of its content.
+   Here are the current TapirMD-written sections:
+   // __Go101.org:: https://go101.org
+   +  __ Go 101 Blog
       ``https://go101.org/blog/101.html
-    __ %%::(__ source code
+      __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/blog
-    __)
-  + __ Go Optimizations 101
+      __)
+   +  __ Go Optimizations 101
       ``https://go101.org/optimizations/101.html
-    __ %%::(__ source code
+      __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/optimizations
-    __)
-  + __ Go Details & Tips 101
+      __)
+   +  __ Go Details & Tips 101
       ``https://go101.org/details-and-tips/101.html
-    __ %%::(__ source code
+      __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/details-and-tips
-    __)
-  + __ Go 101 Apps & Libs
+      __)
+   +  __ Go 101 Apps & Libs
       ``https://go101.org/apps-and-libs/101.html
-    __ %%::(__ source code
+      __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/apps-and-libs
-    __)
-  + __ Go Bugs 101
+      __)
+   +  __ Go Bugs 101
       ``https://go101.org/bugs/101.html
-    __ %%::(__ source code
+      __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/bugs
-    __)
-  + __ Go Q&A 101
+      __)
+   +  __ Go Q&A 101
       ``https://go101.org/q-and-a/101.html
-    __ %%::(__ source code
+      __ %%::(__ source code
       ``https://github.com/go101/go101/tree/master/pages/q-and-a
-    __)
+      __)
 

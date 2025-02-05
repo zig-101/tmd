@@ -1,92 +1,97 @@
 
 ##### Install the Official TapirMD Renderer
 
-! {><
-  :: The page is written in TapirMD (source is available __here__).
-  }
-  // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/installation.tmd
+!  { ><
+   :: The page is written in TapirMD (source is available __here__).
+   }
+   // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/installation.tmd
 
 This page shows the steps of installing and using the official __TapirMD__ renderer locally.
 You can also experience the renderer __online__.
 
-  // __TapirMD:: index.html
-  // __online:: play.html
+// __TapirMD:: index.html
+// __online:: play.html
 
 ###+++++ Installation steps
 
-    // __Git :: https://git-scm.com/downloads
-    // __Go :: https://go.dev/dl/
-    // __Zig :: https://ziglang.org/download/
-    // __the TapirMD project :: https://github.com/zig-101/tmd
-    // __the go-tmd project :: https://github.com/go101/tmd
+// __Git :: https://git-scm.com/downloads
+// __Go :: https://go.dev/dl/
+// __Zig :: https://ziglang.org/download/
+// __the TapirMD project :: https://github.com/zig-101/tmd
+// __the go-tmd project :: https://github.com/go101/tmd
 
 TapirMD hasn't yet reached version 1.0.0 (or even 0.1.0).
 At this stage, building from source is the only way to run
 the offcial TapirMD commands locally.
 
-- ### Build with Zig
+-  ### Build with Zig (recommended)
 
-  *. Install __Zig__, if haven't. The latest version tip (master) version is recommended.
+   *. Install __Zig__, if haven't. The latest version tip (master) version is recommended.
 
-  *. Get the source code of __the TapirMD project__.
-    You can download its source code or clone it (install __Git__ if needed).
+   *. Get the source code of __the TapirMD project__.
+      You can download its source code or clone it (install __Git__ if needed).
 
-  *. Open your terminal or command prompt, and change directory to the TapirMD project folder,
-    then run
-    '''
+   *. Open your terminal or command prompt, and change directory to the TapirMD project folder,
+      then run
+      '''
     zig build -Doptimize=ReleaseSafe
-    '''
-    If the build is successful, the `tmd` command binary file will be located in
-    the `bin` folder under the project local `zig-out` folder.
+      '''
+      If the build is successful, the `tmd` command binary file will be located in
+      the `bin` folder under the project local `zig-out` folder.
 
-  *. (Optional), copy the `tmd` binary file to a directory configured
-    in the `PATH` enviroment variable, or add the path of
-    the `bin` folder to the `PATH` enviroment variable,
-    so that you can run the `tmd` command anywhere.
+   *. (Optional), copy the `tmd` binary file to a directory configured
+      in the `PATH` enviroment variable, or add the path of
+      the `bin` folder to the `PATH` enviroment variable,
+      so that you can run the `tmd` command anywhere.
 
-- ### Build with Go
+-  ### Build with Go
 
-  *. Install __Go__, if haven't. The latest version stable version is recommended.
+   *. Install __Go__, if haven't. The latest version stable version is recommended.
 
-  *. Install the renderer in either of the following two ways:
+   *. Install the renderer in either of the following two ways:
 
-     + Run
-     '''
+      +  Run
+         '''
      go install go101.org/tmd@latest
-     '''
+         '''
 
-     + Or get the source code of __the go-tmd project__.
-        You can download its source code or clone it (install __Git__ if needed).
-        ;;;
-        Then open your terminal or command prompt, and change directory to the go-tmd project folder,
-        then run
-    '''
+      +  Or get the source code of __the go-tmd project__.
+         You can download its source code or clone it (install __Git__ if needed).
+         ;;;
+         Then open your terminal or command prompt, and change directory to the go-tmd project folder,
+         then run
+         '''
     go install
-    '''
+         '''
 
-  *. The `tmd` command binary file is installed in the Go binary installation path specified by the `GOBIN`
-    environment variable, which defaults to the path of the `bin` subfolder under the first path
-    specified in the `GOPATH` environment variable, which defaults to the path of the `go`
-    subfolder under the path specified by the `HOME` environment variable.
+   *. The `tmd` command binary file is installed in the Go binary installation path specified by the `GOBIN`
+      environment variable, which defaults to the path of the `bin` subfolder under the first path
+      specified in the `GOPATH` environment variable, which defaults to the path of the `go`
+      subfolder under the path specified by the `HOME` environment variable.
 
-  *. (Optional), add the Go binary installation path to the `PATH` enviroment variable,
-    or copy the `tmd` binary file to a directory configured in the `PATH` enviroment variable,
-    so that you can run the `tmd` command anywhere.
+   *. (Optional), add the Go binary installation path to the `PATH` enviroment variable,
+      or copy the `tmd` binary file to a directory configured in the `PATH` enviroment variable,
+      so that you can run the `tmd` command anywhere.
 
 ###+++++ Use the renderer
 
-  *. Edit a TapirMD document and save it in a file with the recommended `.tmd` extension.
-    Assume the file name is `mydoc.tmd`.
+*. Edit a TapirMD document and save it in a file with the recommended `.tmd` extension.
+   Assume the file name is `mydoc.tmd`.
 
-  *. Run
-    '''
+*. Run
+   '''
     tmd gen --full-html mydoc.tmd
-    '''
-    to generate a `mydoc.html` file for your TapirMD document.
-    Then you can open the `mydoc.html` file in a web browser to view the generation result.
-    ;;;
-    You can also run
-    '''
+   '''
+   to generate a `mydoc.html` file for your TapirMD document.
+   Then you can open the `mydoc.html` file in a web browser to view the generation result.
+   ;;;
+   You can also run
+   '''
     tmd gen mydoc.tmd
-    '''
-    to geneate an incomplete HTML file for embedding purpose. 
+   '''
+   to geneate an incomplete HTML file for embedding purpose.
+   ;;;
+   Run the following command to format TapirMD files:
+   '''
+    tmd fmt mydoc.tmd
+   '''
