@@ -1448,6 +1448,7 @@ pub const TmdRender = struct {
             if (id.len == 0) _ = try w.write("<span class=\"tmd-broken-link\"") else {
                 _ = try w.write("<a href=\"#");
                 _ = try w.write(id);
+                _ = try w.write(self.suffixForIdsAndNames);
             }
             _ = try w.write("\">");
 
