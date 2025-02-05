@@ -37,7 +37,7 @@ pub fn build(b: *std.Build) !void {
     const libTest = b.addTest(.{
         .name = "lib unit test",
         .root_source_file = b.path("lib-tests/all.zig"),
-        .target = b.host,
+        .target = target,
     });
     libTest.root_module.addImport("tmd", tmdLibModule); // just use file imports instead of module import
     const runLibTest = b.addRunArtifact(libTest);
@@ -45,21 +45,21 @@ pub fn build(b: *std.Build) !void {
     const libInternalTest = b.addTest(.{
         .name = "lib internal unit test",
         .root_source_file = b.path("lib/tests.zig"),
-        .target = b.host,
+        .target = target,
     });
     const runLibInternalTest = b.addRunArtifact(libInternalTest);
 
     const cmdTest = b.addTest(.{
         .name = "cmd unit test",
         .root_source_file = b.path("cmd/tests.zig"),
-        .target = b.host,
+        .target = target,
     });
     const runCmdTest = b.addRunArtifact(cmdTest);
 
     const wasmTest = b.addTest(.{
         .name = "wasm unit test",
         .root_source_file = b.path("wasm/tests.zig"),
-        .target = b.host,
+        .target = target, // ToDo: related to wasmTarget?
     });
     const runWasmTest = b.addRunArtifact(wasmTest);
 
@@ -197,6 +197,16 @@ pub fn build(b: *std.Build) !void {
     //       RequireOptimizeMode custom step and let the "wasm" step depend on it.
     buildDoc.makeFn = RequireOptimizeMode_ReleaseSmall.check;
     wasmStep.makeFn = RequireOptimizeMode_ReleaseSmall.check;
+
+    // fmt
+
+    const fmt = b.addFmt(.{
+        .paths = &.{
+            ".",
+        },
+    });
+    const fmtCode = b.step("fmt", "Format code");
+    fmtCode.dependOn(&fmt.step);
 }
 
 const Config = struct {
@@ -207,11 +217,10 @@ fn collectConfig(b: *std.Build, mode: std.builtin.OptimizeMode) Config {
     var c = Config{};
 
     if (b.option(bool, "dump_ast", "dump doc AST")) |dump| {
-        if (mode == .Debug) c.dumpAST = dump
-        else std.debug.print(
+        if (mode == .Debug) c.dumpAST = dump else std.debug.print(
             \\The "dump_ast" definition is ignored, because it is only valid in Debug optimization mode.
             \\
-            , .{});
+        , .{});
     }
 
     return c;
@@ -227,7 +236,7 @@ const RequireOptimizeMode_ReleaseSmall = struct {
         std.debug.print(
             \\The "{s}" step requires "{s}" optimization mode (-Doptimize={s}), but it is "{s}" now.
             \\
-            , .{step.name, @tagName(required), @tagName(required), @tagName(current)} );
+        , .{ step.name, @tagName(required), @tagName(required), @tagName(current) });
         return error.InvalidOptimizeMode;
     }
 };
