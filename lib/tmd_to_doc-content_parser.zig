@@ -608,11 +608,11 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
         break :blk lastToken;
     } else unreachable; // a line might have no tokens, but then this function will not be called for such a line.
 
-    if (self.lineSession.currentLine.tokens.head) |head| {
+    if (self.lineSession.currentLine.firstInlineToken()) |firstInlineToken| {
         var notMediaLine = true;
         var tryToPendLine = true;
         var cancelPeading = false;
-        switch (head.value) {
+        switch (firstInlineToken.*) {
             .leadingSpanMark => |m| switch (m.more.markType) {
                 .media => {
                     notMediaLine = false;
@@ -621,18 +621,16 @@ fn parse_line_tokens(self: *ContentParser, handleLineSpanMark: bool) !u32 {
                 },
                 .comment => tryToPendLine = false,
                 .lineBreak => cancelPeading = true,
-                .escape, .spoiler => if (head.next) |next| {
-                    const first = &next.value;
-                    cancelPeading = first.* == .spanMark and !first.spanMark.more.open;
+                .escape, .spoiler => if (firstInlineToken.next()) |next| {
+                    cancelPeading = next.* == .spanMark and !next.spanMark.more.open;
                 },
             },
             else => {
-                const first = &head.value;
-                cancelPeading = first.* == .spanMark and !first.spanMark.more.open;
+                cancelPeading = firstInlineToken.* == .spanMark and !firstInlineToken.spanMark.more.open;
             },
         }
 
-        self.blockSession.atomBlock.more.hasNonMediaTokens = notMediaLine;
+        if (notMediaLine) self.blockSession.atomBlock.more.hasNonMediaTokens = true;
 
         // determine .treatEndAsSpace for .lineWithPending_treatEndAsSpace
 

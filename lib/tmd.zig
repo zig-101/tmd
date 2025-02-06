@@ -256,7 +256,8 @@ pub const Block = struct {
     attributes: ?*ElementAttibutes = null,
 
     more: packed struct {
-        hasNonMediaTokens: bool = false, // for certain atom blocks only (only .usual? ToDo: not only)
+        // for atom blocks only. Ignore ;;; token but not ### token.
+        hasNonMediaTokens: bool = false,
     } = .{},
 
     pub fn typeName(self: *const @This()) []const u8 {
