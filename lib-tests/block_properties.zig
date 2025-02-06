@@ -190,4 +190,64 @@ test "block attributes" {
             return true;
         }
     }.check));
+
+    try std.testing.expect(try all.DocChecker.check(
+        \\ @@@ #example .line-numbers
+        \\ ''' zig
+        \\ pub fn main() void {}
+        \\ '''
+        \\
+    , struct {
+        fn check(doc: *const tmd.Doc) !bool {
+            try std.testing.expect(try BlockTypeChecker.check(doc, "example", .code));
+            try std.testing.expectEqualStrings(doc.blockByID("example").?.attributes.?.classes, "line-numbers");
+            return true;
+        }
+    }.check));
+
+    try std.testing.expect(try all.DocChecker.check(
+        \\ && example.png
+        \\
+    , struct {
+        fn check(doc: *const tmd.Doc) !bool {
+            try std.testing.expect(doc.rootBlock().next().?.blockType == .usual);
+            try std.testing.expect(doc.rootBlock().next().?.more.hasNonMediaTokens == false);
+            return true;
+        }
+    }.check));
+
+    try std.testing.expect(try all.DocChecker.check(
+        \\ ;;; && example.png
+        \\
+    , struct {
+        fn check(doc: *const tmd.Doc) !bool {
+            try std.testing.expect(doc.rootBlock().next().?.blockType == .usual);
+            try std.testing.expect(doc.rootBlock().next().?.more.hasNonMediaTokens == false);
+            return true;
+        }
+    }.check));
+
+    try std.testing.expect(try all.DocChecker.check(
+        \\ ;;;
+        \\ && example.png
+        \\
+    , struct {
+        fn check(doc: *const tmd.Doc) !bool {
+            try std.testing.expect(doc.rootBlock().next().?.blockType == .usual);
+            try std.testing.expect(doc.rootBlock().next().?.more.hasNonMediaTokens == false);
+            return true;
+        }
+    }.check));
+
+    try std.testing.expect(try all.DocChecker.check(
+        \\ ;;; ``
+        \\ && example.png
+        \\
+    , struct {
+        fn check(doc: *const tmd.Doc) !bool {
+            try std.testing.expect(doc.rootBlock().next().?.blockType == .usual);
+            try std.testing.expect(doc.rootBlock().next().?.more.hasNonMediaTokens);
+            return true;
+        }
+    }.check));
 }

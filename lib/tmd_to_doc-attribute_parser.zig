@@ -109,6 +109,7 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
                     for (item[2..]) |c| {
                         if (c >= 128 or !charPropertiesTable[c].canBeInID) break :parse;
                     }
+
                     attrs.id = item[1..];
                     lastOrder = id;
                 },
@@ -131,6 +132,7 @@ pub fn parse_element_attributes(playload: []const u8) tmd.ElementAttibutes {
                         if (c >= 128) break :parse;
                         if (firstInName) {
                             if (!charPropertiesTable[c].canBeFirstInClassName) break :parse;
+                            firstInName = false;
                         } else {
                             if (!charPropertiesTable[c].canBeInClassName) break :parse;
                         }
@@ -187,6 +189,20 @@ test "parse_element_attributes" {
     ), tmd.ElementAttibutes{
         .id = "foo",
         .classes = "bar;baz",
+    });
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\#foo .bar-baz
+    ), tmd.ElementAttibutes{
+        .id = "foo",
+        .classes = "bar-baz",
+    });
+
+    try std.testing.expectEqualDeep(parse_element_attributes(
+        \\#foo .-bar-baz
+    ), tmd.ElementAttibutes{
+        .id = "foo",
+        .classes = "",
     });
 
     try std.testing.expectEqualDeep(parse_element_attributes(

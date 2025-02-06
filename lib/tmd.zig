@@ -256,7 +256,7 @@ pub const Block = struct {
     attributes: ?*ElementAttibutes = null,
 
     more: packed struct {
-        // for atom blocks only. Ignore ;;; token but not ### token.
+        // for .usual atom blocks only
         hasNonMediaTokens: bool = false,
     } = .{},
 
