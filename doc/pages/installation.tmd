@@ -1,13 +1,13 @@
 
-##### Install the Official TapirMD Renderer
+##### Install the Official TapirMD Toolset
 
 !  { ><
    :: The page is written in TapirMD (source is available __here__).
    }
-   // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/installation.tmd
+   // __here :: https://raw.githubusercontent.com/tapirmd/tmd/refs/heads/master/doc/pages/installation.tmd
 
-This page shows the steps of installing and using the official __TapirMD__ renderer locally.
-You can also experience the renderer __online__.
+This page shows the steps of installing and using the official __TapirMD__ toolset locally.
+You can also experience the toolset __online__.
 
 // __TapirMD:: index.html
 // __online:: play.html
@@ -17,7 +17,7 @@ You can also experience the renderer __online__.
 // __Git :: https://git-scm.com/downloads
 // __Go :: https://go.dev/dl/
 // __Zig :: https://ziglang.org/download/
-// __the TapirMD project :: https://github.com/zig-101/tmd
+// __the TapirMD project :: https://github.com/tapirmd/tmd
 // __the go-tmd project :: https://github.com/go101/tmd
 
 TapirMD hasn't yet reached version 1.0.0 (or even 0.1.0).
@@ -48,7 +48,7 @@ the offcial TapirMD commands locally.
 
    *. Install __Go__, if haven't. The latest version stable version is recommended.
 
-   *. Install the renderer in either of the following two ways:
+   *. Install the toolset in either of the following two ways:
 
       +  Run
          '''
@@ -73,7 +73,7 @@ the offcial TapirMD commands locally.
       or copy the `tmd` binary file to a directory configured in the `PATH` enviroment variable,
       so that you can run the `tmd` command anywhere.
 
-###+++++ Use the renderer
+###+++++ Use the toolset
 
 *. Edit a TapirMD document and save it in a file with the recommended `.tmd` extension.
    Assume the file name is `mydoc.tmd`.

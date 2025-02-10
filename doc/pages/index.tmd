@@ -13,7 +13,7 @@
 ``- __Official Tools`` installation.html __
 | __Use Cases`` use-cases.html __
 \\
-``- __Source Code`` https://github.com/zig-101/tmd __
+``- __Source Code`` https://github.com/tapirmd/tmd __
 | __@zigo_101`` https://x.com/zigo_101 __
 }
 ---
@@ -28,6 +28,7 @@ Features:
    +  All marks consist of ASCII punctuation characters.
    +  Minimizes non-content text to enhance readibilty.
    +  **Semantics vary based on composition**, reducing unnecessary syntax complexity.
+   +  **Indentations have no semantic meaning.
 *  Consistent Syntax:
    +  Predefined container block marks typically consist of one punctuation character.
    +  Atom container block marks begin with 3+ identical punctuation characters.
@@ -79,7 +80,7 @@ Features:
 ---
 {
 The page is written in TapirMD (source is available __here__).
-// __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/index.tmd
+// __here :: https://raw.githubusercontent.com/tapirmd/tmd/refs/heads/master/doc/pages/index.tmd
 @@@
 }
 

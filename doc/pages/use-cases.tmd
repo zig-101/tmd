@@ -3,14 +3,14 @@
 !  { ><
    :: The page is written in TapirMD (source is available __here__).
    }
-   // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/use-cases.tmd
+   // __here :: https://raw.githubusercontent.com/tapirmd/tmd/refs/heads/master/doc/pages/use-cases.tmd
 
 This page lists some use cases of __TapirMD__.
 
 // __TapirMD:: index.html
 
 *  __All pages__ of the TapirMD official website are written in TapirMD.
-   // __All pages:: https://github.com/zig-101/tmd/tree/master/doc/pages
+   // __All pages:: https://github.com/tapirmd/tmd/tree/master/doc/pages
 
 *  __Go101.org__ leverages TapirMD for much of its content.
    Here are the current TapirMD-written sections:

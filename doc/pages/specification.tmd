@@ -4,7 +4,7 @@
 !  { ><
    :: The specification is written in TapirMD (source is available __here__).
    }
-   // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/specification.tmd
+   // __here :: https://raw.githubusercontent.com/tapirmd/tmd/refs/heads/master/doc/pages/specification.tmd
 
 __TapirMD__ is a powerful, next-generation markup language
 that simplifies content creation.

@@ -4,7 +4,7 @@
 !  { ><
    :: The page is written in TapirMD (source is available __here__).
    }
-   // __here :: https://raw.githubusercontent.com/zig-101/tmd/refs/heads/master/doc/pages/demos.tmd
+   // __here :: https://raw.githubusercontent.com/tapirmd/tmd/refs/heads/master/doc/pages/demos.tmd
 
 This page presents a few simple demos using __TapirMD__.
 For detailed explanations, please refer to __the specification__.
