@@ -1,15 +1,12 @@
 .{
     .name = "tmd",
-    .version = "0.0.0",
+    .version = "0.0.2",
     .minimum_zig_version = "0.14.0",
 
     .paths = .{
         "LICENSE",
-        "README.tmd",
         "build.zig",
         "build.zig.zon",
         "lib",
-        "cmd",
-        "doc",
     },
 }
