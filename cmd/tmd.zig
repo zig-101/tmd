@@ -35,6 +35,11 @@ pub fn main() !void {
         unreachable;
     }
 
+    if (std.mem.eql(u8, args[1], "vet")) {
+        std.process.exit(try vet(args[2..], gpaAllocator));
+        unreachable;
+    }
+
     try printUsages();
     std.process.exit(1);
     unreachable;
@@ -48,6 +53,7 @@ fn printUsages() !void {
         \\
         \\Usages:
         \\  tmd gen [--full-html] TMD-files...
+        \\  tmd fmt TMD-fiels...
         \\
     , .{tmd.version});
 }
@@ -86,7 +92,7 @@ fn generate(args: []const []const u8, allocator: std.mem.Allocator) !u8 {
 
         // load file
 
-        const tmdFile = try std.fs.cwd().openFile(arg, .{});
+        const tmdFile = try std.fs.cwd().openFile(arg, .{}); // ToDo: catch, if file not found, print the file path
         defer tmdFile.close();
         const stat = try tmdFile.stat();
         if (stat.kind != .file) {
@@ -211,9 +217,9 @@ fn format(args: []const []const u8, allocator: std.mem.Allocator) !u8 {
 
         const outputFilename: []const u8 = arg;
 
-        const renderBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
-        defer fbaAllocator.free(renderBuffer);
-        var fbs = std.io.fixedBufferStream(renderBuffer);
+        const formatBuffer = try fbaAllocator.alloc(u8, remainingBuffer.len - fba.end_index);
+        defer fbaAllocator.free(formatBuffer);
+        var fbs = std.io.fixedBufferStream(formatBuffer);
 
         try tmdDoc.toTMD(fbs.writer(), true);
 
@@ -232,4 +238,16 @@ fn format(args: []const []const u8, allocator: std.mem.Allocator) !u8 {
     }
 
     return 0;
+}
+
+// ToDo:
+// * duplicated block IDs
+// * ill-formed attribute lines and boundary line attribute lines
+// * ...
+
+fn vet(args: []const []const u8, allocator: std.mem.Allocator) !u8 {
+    _ = args;
+    _ = allocator;
+    try stdout.print("Not implemented yet.", .{});
+    return 1;
 }

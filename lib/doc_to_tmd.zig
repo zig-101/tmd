@@ -118,7 +118,7 @@ fn doc_to_tmd_with_formatting(writer: anytype, tmdDoc: *const tmd.Doc) !void {
 const FormatWriter = struct {
     tmdDoc: *const tmd.Doc,
     currentIndentLen: u32 = 0,
-    writingHeaderLines: bool = false,
+    shouldIndentUsualLines: bool = false,
 
     const indentUnit = 3;
     const spaces = " " ** (tmd.MaxBlockNestingDepth * indentUnit);
@@ -169,20 +169,25 @@ const FormatWriter = struct {
             if (changeIndentation) fw.currentIndentLen -= indentUnit;
         }
 
-        try fw.writeBlock(w, child, indentationWritten);
+        const tryToIndentUsualLines = parent.blockType == .table;
+
+        try fw.writeBlock(w, child, indentationWritten, tryToIndentUsualLines);
         while (true) {
             child = child.nextSibling() orelse break;
-            try fw.writeBlock(w, child, false);
+            try fw.writeBlock(w, child, false, tryToIndentUsualLines);
         }
     }
 
-    fn writeBlock(fw: *FormatWriter, w: anytype, block: *const tmd.Block, firstLineIndentationWritten: bool) anyerror!void {
+    fn writeBlock(fw: *FormatWriter, w: anytype, block: *const tmd.Block, firstLineIndentationWritten: bool, tryToIndentUsualLines: bool) anyerror!void {
         if (block.isAtom()) {
-            defer fw.writingHeaderLines = false;
-            fw.writingHeaderLines = block.blockType == .header;
-
             var line = block.startLine();
             try fw.writeLine(w, line, firstLineIndentationWritten);
+
+            std.debug.assert(!fw.shouldIndentUsualLines);
+            defer fw.shouldIndentUsualLines = false;
+            fw.shouldIndentUsualLines = block.blockType == .header or
+                tryToIndentUsualLines and block.blockType == .usual and line.lineTypeMarkToken() != null;
+
             const endLine = block.endLine();
             while (true) {
                 if (line == endLine) break;
@@ -233,8 +238,8 @@ const FormatWriter = struct {
                 if (!indentationWritten) {
                     _ = try w.write(fw.indentSpaces());
 
-                    if (fw.writingHeaderLines and line.lineType == .usual) {
-                        _ = try w.write("   ");
+                    if (fw.shouldIndentUsualLines and line.lineType == .usual) {
+                        _ = try w.write("    "); // 4 spaces
                     }
                 }
 

@@ -5,5 +5,6 @@ Run `zig build` to build the `tmd` command.
 Now it only supports the following sub-commands:
 * `tmd gen foo.tmd bar.tmd`
 * `tmd gen --full-html foo.tmd bar.tmd`
+* `tmd fmt foo.tmd bar.tmd`
 
 Please visit __https://tmd.tapirgames.com__ for more information.
